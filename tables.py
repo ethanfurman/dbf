@@ -516,6 +516,16 @@ class DbfTable(object):
     _meta_only = False
     _use_deleted = True
     _backed_up = False
+    class _DbfLists(object):
+        "implements the weakref structure for DbfLists"
+        def __init__(yo):
+            yo._lists = set()
+        def __iter__(yo):
+            yo._lists = set([s for s in yo._lists if s() is not None])    
+            return (s() for s in yo._lists if s() is not None)
+        def add(yo, new_list):
+            yo._lists.add(weakref.ref(new_list))
+            yo._lists = set([s for s in yo._lists if s() is not None])    
     class _MetaData(dict):
         blankrecord = None
         fields = None
@@ -832,6 +842,7 @@ class DbfTable(object):
             return yo._table[yo._index[value]]
         elif type(value) == slice:
             sequence = DbfList(desc='%s -->  %s' % (yo.filename, value))
+            yo._dbflists.add(sequence)
             for index in yo._index[value]:
                 record = yo._table[index]
                 if yo.use_deleted is True or not record.has_been_deleted:
@@ -855,6 +866,7 @@ class DbfTable(object):
                 raise DbfError("field list must be specified for in-memory tables")
         elif type(yo) is DbfTable:
             raise DbfError("only memory tables supported")
+        yo._dbflists = yo._DbfLists()
         yo._meta = meta = yo._MetaData()
         meta.table = weakref.ref(yo)
         meta.index = 'ORIGINAL'
@@ -1387,6 +1399,11 @@ class DbfTable(object):
         i = 0
         for record in yo._table:
             if record.has_been_deleted and _pack:
+                print "checking record %r" % record
+                for dbflist in yo._dbflists:
+                    print "looking in dbflist %s" % dbflist
+                    if record in dbflist:
+                        dbflist.purge(record)
                 record._recnum = -1
             else:
                 record._recnum = i
@@ -1411,6 +1428,7 @@ class DbfTable(object):
         if python is None:
             raise DbfError("query: python parameter must be specified")
         possible = DbfList(desc="%s -->  %s" % (yo.filename, python))
+        yo._dbflists.add(possible)
         query_result = {}
         select = 'query_result["keep"] = %s' % python
         g = {}
@@ -1456,6 +1474,7 @@ class DbfTable(object):
             records = DbfList(desc="%s -->  search: index=%s, match=%s, fuzzy=%s(%s))" % (yo.filename, yo.index(), match, fuzzy.__name__, fuzzy_match))
         else:
             records = DbfList(desc="%s -->  search: index=%s, match=%s)" % (yo.filename, yo.index(), match))
+        yo._dbflists.add(records)
         if indices:
             records = []
         if not isinstance(match, tuple):
@@ -1816,6 +1835,9 @@ class DbfList(object):
             result._current = 0 if result else -1
             return result
         return NotImplemented
+    def __contains__(yo, record):
+        item = record.record_table, record.record_number
+        return item in yo._set
     def __delitem__(yo, key):
         if isinstance(key, int):
             item = yo._list.pop[key]
@@ -1955,6 +1977,33 @@ class DbfList(object):
             if yo._current > -1:
                 return yo._get_record()
         raise Bof()
+    def purge(yo, record):
+        records = sorted(yo._list, key=lambda item: item[1])
+        item = record.record_table, record.record_number
+        print "yo._list has %d items" % len(yo._list)
+        yo._list.pop(yo._list.index(item))
+        print "yo._list has %d items" % len(yo._list)
+        print "yo._set has %d items" % len(yo._set)
+        yo._set.remove(item)
+        print "yo._list has %d items" % len(yo._list)
+        print "records.index(item) = %d" % records.index(item)
+        start = records.index(item) + 1
+        print "start = %d" % start
+        for item in records[start:]:
+            i = yo._list.index(item)
+            print "adjusting record %r" % yo[i]
+            print "yo._set has %d items" % len(yo._set)
+            yo._set.remove(item)
+            print "yo._set has %d items" % len(yo._set)
+            print "yo._list has %d items" % len(yo._list)
+            item = item[0], (item[1] - 1)
+            print "yo._list has %d items" % len(yo._list)
+            yo._list[i] = item
+            print "yo._set has %d items" % len(yo._set)
+            yo._set.add(item)
+            print "yo._set has %d items" % len(yo._set)
+
+
     def remove(yo, record):
         item = record.record_table, record.record_number
         yo._list.remove(item)

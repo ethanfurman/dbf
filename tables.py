@@ -523,9 +523,12 @@ class DbfTable(object):
         def __iter__(yo):
             yo._lists = set([s for s in yo._lists if s() is not None])    
             return (s() for s in yo._lists if s() is not None)
+        def __len__(yo):
+            yo._lists = set([s for s in yo._lists if s() is not None])
+            return len(yo._lists)
         def add(yo, new_list):
             yo._lists.add(weakref.ref(new_list))
-            yo._lists = set([s for s in yo._lists if s() is not None])    
+            yo._lists = set([s for s in yo._lists if s() is not None])
     class _MetaData(dict):
         blankrecord = None
         fields = None
@@ -1396,25 +1399,25 @@ class DbfTable(object):
         "physically removes all deleted records"
         newtable = []
         newindex = []
-        i = 0
+        index = 0
+        purged = [0] * len(yo._dbflists) # how many records have been purged from each list?
         for record in yo._table:
             if record.has_been_deleted and _pack:
-                print "checking record %r" % record
-                for dbflist in yo._dbflists:
-                    print "looking in dbflist %s" % dbflist
-                    if record in dbflist:
-                        dbflist.purge(record)
+                for i, dbflist in enumerate(yo._dbflists):
+                    if (record.record_table, record.record_number - purged[i]) in dbflist:
+                        dbflist.purge(record, record.record_number - purged[i])
+                        purged[i] += 1
                 record._recnum = -1
             else:
-                record._recnum = i
+                record._recnum = index
                 newtable.append(record)
-                newindex.append(i)
-                i += 1
+                newindex.append(index)
+                index += 1
         yo._table.clear()
         for record in newtable:
             yo._table.append(record)
         yo._index = newindex
-        yo._meta.header.record_count = i
+        yo._meta.header.record_count = index
         yo._current = -1
         yo._update_disk()
         yo.index(sort=yo._meta.index, reverse=yo._meta.index_reversed)
@@ -1836,7 +1839,10 @@ class DbfList(object):
             return result
         return NotImplemented
     def __contains__(yo, record):
-        item = record.record_table, record.record_number
+        if isinstance(record, tuple):
+            item = record
+        else:
+            item = record.record_table, record.record_number
         return item in yo._set
     def __delitem__(yo, key):
         if isinstance(key, int):
@@ -1977,32 +1983,18 @@ class DbfList(object):
             if yo._current > -1:
                 return yo._get_record()
         raise Bof()
-    def purge(yo, record):
+    def purge(yo, record, old_record_number):
         records = sorted(yo._list, key=lambda item: item[1])
-        item = record.record_table, record.record_number
-        print "yo._list has %d items" % len(yo._list)
+        item = record.record_table, old_record_number
         yo._list.pop(yo._list.index(item))
-        print "yo._list has %d items" % len(yo._list)
-        print "yo._set has %d items" % len(yo._set)
         yo._set.remove(item)
-        print "yo._list has %d items" % len(yo._list)
-        print "records.index(item) = %d" % records.index(item)
         start = records.index(item) + 1
-        print "start = %d" % start
         for item in records[start:]:
             i = yo._list.index(item)
-            print "adjusting record %r" % yo[i]
-            print "yo._set has %d items" % len(yo._set)
             yo._set.remove(item)
-            print "yo._set has %d items" % len(yo._set)
-            print "yo._list has %d items" % len(yo._list)
             item = item[0], (item[1] - 1)
-            print "yo._list has %d items" % len(yo._list)
             yo._list[i] = item
-            print "yo._set has %d items" % len(yo._set)
             yo._set.add(item)
-            print "yo._set has %d items" % len(yo._set)
-
 
     def remove(yo, record):
         item = record.record_table, record.record_number

@@ -1401,12 +1401,16 @@ class DbfTable(object):
         newindex = []
         index = 0
         purged = [0] * len(yo._dbflists) # how many records have been purged from each list?
+        print "1 - purged: %r" % purged
         for record in yo._table:
             if record.has_been_deleted and _pack:
+                print "2 - purged: %r" % purged
                 for i, dbflist in enumerate(yo._dbflists):
-                    if (record.record_table, record.record_number - purged[i]) in dbflist:
-                        dbflist.purge(record, record.record_number - purged[i])
+                    key = dbflist.key(record)
+                    if key in dbflist:
+                        dbflist.purge(record, record.record_number - purged[i], key)
                         purged[i] += 1
+                        print "3 - purged: %r" % purged
                 record._recnum = -1
             else:
                 record._recnum = index
@@ -1809,32 +1813,48 @@ class VfpTable(DbfTable):
 class DbfList(object):
     "list of Dbf records, with set-like behavior"
     _desc = ''
-    def __init__(yo, new_records=None, desc=None):
+    def __init__(yo, new_records=None, desc=None, key=None):
         yo._list = []
         yo._set = set()
+        if key is not None:
+            yo.key = key
+            if key.__doc__ is None:
+                key.__doc__ = 'unknown'
+        key = yo.key
         yo._current = -1
         if isinstance(new_records, DbfList):
             yo._list = new_records._list[:]
             yo._set = new_records._set.copy()
+            yo.key = key
             yo._current = 0
         elif new_records is not None:
             for record in new_records:
-                item = (record.record_table, record.record_number)
-                if item not in yo._set:
-                    yo._set.add(item)
+                value = key(record)
+                item = (record.record_table, record.record_number, value)
+                if value not in yo._set:
+                    yo._set.add(value)
                     yo._list.append(item)
             yo._current = 0
         if desc is not None:
             yo._desc = desc
     def __add__(yo, other):
+        key = yo.key
         if isinstance(other, DbfList):
             result = DbfList()
             result._set = yo._set.copy()
             result._list[:] = yo._list[:]
-            for item in other._list:
-                if item not in result._set:
-                    result._set.add(item)
-                    result._list.append(item)
+            result.key = yo.key
+            if key is other.key:   # same key?  just compare key values
+                for item in other._list:
+                    if item[2] not in result._set:
+                        result._set.add(item[2])
+                        result._list.append(item)
+            else:                   # different keys, use this list's key on other's records
+                for rec in other:
+                    value = key(rec)
+                    if value not in result._set:
+                        result._set.add(value)
+                        result._list.append((rec.record_table, rec.record_number, value))
             result._current = 0 if result else -1
             return result
         return NotImplemented
@@ -1842,14 +1862,14 @@ class DbfList(object):
         if isinstance(record, tuple):
             item = record
         else:
-            item = record.record_table, record.record_number
+            item = record.record_table, record.record_number, yo.key(record)
         return item in yo._set
     def __delitem__(yo, key):
         if isinstance(key, int):
             item = yo._list.pop[key]
-            yo._set.remove(item)
+            yo._set.remove(item[2])
         elif isinstance(key, slice):
-            yo._set.difference_update(yo._list[key])
+            yo._set.difference_update([item[2] for item in yo._list[key]])
             yo._list.__delitem__(key)
         else:
             raise TypeError
@@ -1863,12 +1883,13 @@ class DbfList(object):
             result = DbfList()
             result._list[:] = yo._list[key]
             result._set = set(result._list)
+            result.key = yo.key
             result._current = 0 if result else -1
             return result
         else:
             raise TypeError
     def __iter__(yo):
-        return (table.get_record(recno) for table, recno in yo._list)
+        return (table.get_record(recno) for table, recno, value in yo._list)
     def __len__(yo):
         return len(yo._list)
     def __nonzero__(yo):
@@ -1877,47 +1898,65 @@ class DbfList(object):
         return yo.__add__(other)
     def __repr__(yo):
         if yo._desc:
-            return "DbfList(%s - %d records)" % (yo._desc, len(yo._list))
+            return "DbfList(key=%s - %s - %d records)" % (yo.key.__doc__, yo._desc, len(yo._list))
         else:
-            return "DbfList(%d records)" % len(yo._list)
+            return "DbfList(key=%s - %d records)" % (yo.key.__doc__, len(yo._list))
     def __rsub__(yo, other):
         if isinstance(other, DbfList):
+            key = yo.key
             result = DbfList()
             result._list[:] = other._list[:]
             result._set = other._set.copy()
+            result.key = key
             lost = set()
-            for item in yo._list:
-                if item in result._list:
-                    result._set.remove(item)
-                    lost.add(item)
+            if key is other.key:
+                for item in yo._list:
+                    if item[2] in result._list:
+                        result._set.remove(item[2])
+                        lost.add(item)
+            else:
+                for rec in other:
+                    value = key(rec)
+                    if value in result._set:
+                        result._set.remove(value)
+                        lost.add((rec.record_table, rec.record_number, value))
             result._list = [item for item in result._list if item not in lost]
             result._current = 0 if result else -1
             return result
         return NotImplemented
     def __sub__(yo, other):
         if isinstance(other, DbfList):
+            key = yo.key
             result = DbfList()
             result._list[:] = yo._list[:]
             result._set = yo._set.copy()
+            result.key = key
             lost = set()
-            for item in other._list:
-                if item in result._set:
-                    result._set.remove(item)
-                    lost.add(item)
-            result._list = [item for item in result._list if item not in lost]
+            if key is other.key:
+                for item in other._list:
+                    if item[2] in result._set:
+                        result._set.remove(item[2])
+                        lost.add(item[2])
+            else:
+                for rec in other:
+                    value = key(rec)
+                    if value in result._set:
+                        result._set.remove(value)
+                        lost.add(value)
+            result._list = [item for item in result._list if item[2] not in lost]
             result._current = 0 if result else -1
             return result
         return NotImplemented
     def _maybe_add(yo, item):
-        if item not in yo._set:
-            yo._set.add(item)
+        if item[2] not in yo._set:
+            yo._set.add(item[2])
             yo._list.append(item)
-    def _get_record(yo, table=None, rec_no=None):
+    def _get_record(yo, table=None, rec_no=None, value=None):
         if table is rec_no is None:
-            table, rec_no = yo._list[yo._current]
+            table, rec_no, value = yo._list[yo._current]
         return table.get_record(rec_no)
     def append(yo, new_record):
-        yo._maybe_add((new_record.record_table, new_record.record_number))
+        yo._maybe_add((new_record.record_table, new_record.record_number, yo.key(new_record)))
         if yo._current == -1 and yo._list:
             yo._current = 0
     def bottom(yo):
@@ -1936,12 +1975,19 @@ class DbfList(object):
             raise Eof()
         return yo._get_record()
     def extend(yo, new_records):
+        key = yo.key
         if isinstance(new_records, DbfList):
-            for item in new_records._list:
-                yo._maybe_add(item)
+            if key is new_records.key:   # same key?  just compare key values
+                for item in new_records._list:
+                    yo._maybe_add(item)
+            else:                   # different keys, use this list's key on other's records
+                for rec in new_records:
+                    value = key(rec)
+                    yo._maybe_add((rec.record_table, rec.record_number, value))
         else:
             for record in new_records:
-                yo.append(record)
+                value = key(rec)
+                yo._maybe_add((rec.record_table, rec.record_number, value))
         if yo._current == -1 and yo._list:
             yo._current = 0
     def goto(yo, index_number):
@@ -1952,17 +1998,20 @@ class DbfList(object):
             raise DbfError("index %d not in DbfList of %d records" % (index_number, len(yo._list)))
         raise DbfError("DbfList is empty")
     def index(yo, record, start=None, stop=None):
-        item = record.record_table, record.record_number
+        item = record.record_table, record.record_number, yo.key(record)
         if start is None:
             start = 0
         if stop is None:
             stop = len(yo._list)
         return yo._list.index(item, start, stop)
-    def insert(yo, i, table, record):
-        item = table, record.record_number
+    def insert(yo, i, record):
+        item = record.record_table, record.record_number, yo.key(record)
         if item not in yo._set:
-            yo._set.add(item)
+            yo._set.add(item[2])
             yo._list.insert(i, item)
+    def key(yo, record):
+        "table_name, record_number"
+        return record.record_table, record.record_number
     def next(yo):
         if yo._current < len(yo._list):
             yo._current += 1
@@ -1971,35 +2020,33 @@ class DbfList(object):
         raise Eof()
     def pop(yo, index=None):
         if index is None:
-            table, recno = yo._list.pop()
-            yo._set.remove((table, recno))
+            table, recno, value = yo._list.pop()
         else:
-            table, recno = yo._list.pop(index)
-            yo._set.remove((table, recno))
-        return yo._get_record(table, recno)
+            table, recno, value = yo._list.pop(index)
+        yo._set.remove(value)
+        return yo._get_record(table, recno, value)
     def prev(yo):
         if yo._current >= 0:
             yo._current -= 1
             if yo._current > -1:
                 return yo._get_record()
         raise Bof()
-    def purge(yo, record, old_record_number):
+    def purge(yo, record, old_record_number, value):
         records = sorted(yo._list, key=lambda item: item[1])
-        item = record.record_table, old_record_number
+        item = record.record_table, old_record_number, value
         yo._list.pop(yo._list.index(item))
-        yo._set.remove(item)
+        yo._set.remove(item[2])
         start = records.index(item) + 1
         for item in records[start:]:
             i = yo._list.index(item)
-            yo._set.remove(item)
-            item = item[0], (item[1] - 1)
+            yo._set.remove(item[2])
+            item = item[0], (item[1] - 1), item[2]
             yo._list[i] = item
-            yo._set.add(item)
-
+            yo._set.add(item[2])
     def remove(yo, record):
-        item = record.record_table, record.record_number
+        item = record.record_table, record.record_number, yo.key(record)
         yo._list.remove(item)
-        yo._set.remove(item)
+        yo._set.remove(item[2])
     def reverse(yo):
         return yo._list.reverse()
     def top(yo):
@@ -2010,11 +2057,6 @@ class DbfList(object):
     def sort(yo, key=None, reverse=False):
         if key is None:
             return yo._list.sort(reverse=reverse)
-        #temp = []
-        #for item in yo._list:
-        #    temp.append((key(item[0].get_record(item[1])), item))
-        #temp.sort(reverse=reverse)
-        #yo._list[:] = temp[:]
         return yo._list.sort(key=lambda item: key(item[0].get_record(item[1])), reverse=reverse)
 
 class DbfCsv(csv.Dialect):

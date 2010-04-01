@@ -52,7 +52,7 @@ from dbf.exceptions import DbfWarning, Bof, Eof, DbfError, DataOverflow, FieldMi
 from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, DbfList, DbfCsv
 from dbf.tables import ascii, codepage, encoding, version_map
 
-version = (0, 87, 17)
+version = (0, 87, 18)
 
 __docformat__ = 'epytext'
 

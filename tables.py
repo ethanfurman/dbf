@@ -1400,23 +1400,22 @@ class DbfTable(object):
         newtable = []
         newindex = []
         index = 0
-        purged = [0] * len(yo._dbflists) # how many records have been purged from each list?
-        print "1 - purged: %r" % purged
+        offset = 0 # +1 for each purged record
         for record in yo._table:
+            found = False
             if record.has_been_deleted and _pack:
-                print "2 - purged: %r" % purged
                 for i, dbflist in enumerate(yo._dbflists):
-                    key = dbflist.key(record)
-                    if key in dbflist:
-                        dbflist.purge(record, record.record_number - purged[i], key)
-                        purged[i] += 1
-                        print "3 - purged: %r" % purged
+                    if dbflist._purge(record, record.record_number - offset, 1):
+                        found = True
                 record._recnum = -1
             else:
                 record._recnum = index
                 newtable.append(record)
                 newindex.append(index)
                 index += 1
+            if found:
+                offset += 1
+                found = False
         yo._table.clear()
         for record in newtable:
             yo._table.append(record)
@@ -1822,11 +1821,10 @@ class DbfList(object):
                 key.__doc__ = 'unknown'
         key = yo.key
         yo._current = -1
-        if isinstance(new_records, DbfList):
-            yo._list = new_records._list[:]
-            yo._set = new_records._set.copy()
-            yo.key = key
-            yo._current = 0
+        if isinstance(new_records, yo.__class__) and key is new_records.key:
+                yo._list = new_records._list[:]
+                yo._set = new_records._set.copy()
+                yo._current = 0
         elif new_records is not None:
             for record in new_records:
                 value = key(record)
@@ -1839,8 +1837,10 @@ class DbfList(object):
             yo._desc = desc
     def __add__(yo, other):
         key = yo.key
-        if isinstance(other, DbfList):
-            result = DbfList()
+        if isinstance(other, (DbfTable, list)):
+            other = yo.__class__(other, key=key)
+        if isinstance(other, yo.__class__):
+            result = yo.__class__()
             result._set = yo._set.copy()
             result._list[:] = yo._list[:]
             result.key = yo.key
@@ -1880,7 +1880,7 @@ class DbfList(object):
                 raise IndexError("Record %d is not in list." % key)
             return yo._get_record(*yo._list[key])
         elif isinstance(key, slice):
-            result = DbfList()
+            result = yo.__class__()
             result._list[:] = yo._list[key]
             result._set = set(result._list)
             result.key = yo.key
@@ -1898,13 +1898,15 @@ class DbfList(object):
         return yo.__add__(other)
     def __repr__(yo):
         if yo._desc:
-            return "DbfList(key=%s - %s - %d records)" % (yo.key.__doc__, yo._desc, len(yo._list))
+            return "%s(key=%s - %s - %d records)" % (yo.__class__, yo.key.__doc__, yo._desc, len(yo._list))
         else:
-            return "DbfList(key=%s - %d records)" % (yo.key.__doc__, len(yo._list))
+            return "%s(key=%s - %d records)" % (yo.__class__, yo.key.__doc__, len(yo._list))
     def __rsub__(yo, other):
-        if isinstance(other, DbfList):
-            key = yo.key
-            result = DbfList()
+        key = yo.key
+        if isinstance(other, (DbfTable, list)):
+            other = yo.__class__(other, key=key)
+        if isinstance(other, yo.__class__):
+            result = yo.__class__()
             result._list[:] = other._list[:]
             result._set = other._set.copy()
             result.key = key
@@ -1925,9 +1927,11 @@ class DbfList(object):
             return result
         return NotImplemented
     def __sub__(yo, other):
-        if isinstance(other, DbfList):
-            key = yo.key
-            result = DbfList()
+        key = yo.key
+        if isinstance(other, (DbfTable, list)):
+            other = yo.__class__(other, key=key)
+        if isinstance(other, yo.__class__):
+            result = yo.__class__()
             result._list[:] = yo._list[:]
             result._set = yo._set.copy()
             result.key = key
@@ -1955,6 +1959,31 @@ class DbfList(object):
         if table is rec_no is None:
             table, rec_no, value = yo._list[yo._current]
         return table.get_record(rec_no)
+    def _purge(yo, record, old_record_number, offset):
+        partial = record.record_table, old_record_number
+        records = sorted(yo._list, key=lambda item: (item[0], item[1]))
+        for item in records:
+            if partial == item[:2]:
+                found = True
+                break
+            elif partial[0] is item[0] and partial[1] < item[1]:
+                found = False
+                break
+        else:
+            found = False
+        if found:
+            yo._list.pop(yo._list.index(item))
+            yo._set.remove(item[2])
+        start = records.index(item) + found
+        for item in records[start:]:
+            if item[0] is not partial[0]:       # into other table's records
+                break
+            i = yo._list.index(item)
+            yo._set.remove(item[2])
+            item = item[0], (item[1] - offset), item[2]
+            yo._list[i] = item
+            yo._set.add(item[2])
+        return found
     def append(yo, new_record):
         yo._maybe_add((new_record.record_table, new_record.record_number, yo.key(new_record)))
         if yo._current == -1 and yo._list:
@@ -1976,7 +2005,7 @@ class DbfList(object):
         return yo._get_record()
     def extend(yo, new_records):
         key = yo.key
-        if isinstance(new_records, DbfList):
+        if isinstance(new_records, yo.__class__):
             if key is new_records.key:   # same key?  just compare key values
                 for item in new_records._list:
                     yo._maybe_add(item)
@@ -2031,18 +2060,6 @@ class DbfList(object):
             if yo._current > -1:
                 return yo._get_record()
         raise Bof()
-    def purge(yo, record, old_record_number, value):
-        records = sorted(yo._list, key=lambda item: item[1])
-        item = record.record_table, old_record_number, value
-        yo._list.pop(yo._list.index(item))
-        yo._set.remove(item[2])
-        start = records.index(item) + 1
-        for item in records[start:]:
-            i = yo._list.index(item)
-            yo._set.remove(item[2])
-            item = item[0], (item[1] - 1), item[2]
-            yo._list[i] = item
-            yo._set.add(item[2])
     def remove(yo, record):
         item = record.record_table, record.record_number, yo.key(record)
         yo._list.remove(item)

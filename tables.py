@@ -2026,6 +2026,26 @@ class DbfList(object):
                 return yo._get_record()
             raise DbfError("index %d not in DbfList of %d records" % (index_number, len(yo._list)))
         raise DbfError("DbfList is empty")
+    def index(yo, sort=None, reverse=False):
+        "sort= ((field_name, func), (field_name, func),) | 'ORIGINAL'"
+        if sort is None:
+            results = []
+            for field, func in yo._meta.index:
+                results.append("%s(%s)" % (func.__name__, field))
+            return ', '.join(results + ['reverse=%s' % yo._meta.index_reversed])
+        yo._meta.index_reversed = reverse
+        if sort == 'ORIGINAL':
+            yo._index = range(yo._meta.header.record_count)
+            yo._meta.index = 'ORIGINAL'
+            if reverse:
+                yo._index.reverse()
+            return
+        new_sort = _normalize_tuples(tuples=sort, length=2, filler=[_nop])
+        yo._meta.index = tuple(new_sort)
+        yo._meta.orderresults = [''] * len(yo)
+        for record in yo:
+            yo._meta.orderresults[record.record_number] = record()
+        yo._index.sort(key=lambda i: yo._meta.orderresults[i], reverse=reverse)
     def index(yo, record, start=None, stop=None):
         item = record.record_table, record.record_number, yo.key(record)
         if start is None:
@@ -2081,7 +2101,7 @@ class DbfCsv(csv.Dialect):
     delimiter = ','
     doublequote = True
     escapechar = None
-    lineterminator = '\r\n'
+    lineterminator = '\n'
     quotechar = '"'
     skipinitialspace = True
     quoting = csv.QUOTE_NONNUMERIC

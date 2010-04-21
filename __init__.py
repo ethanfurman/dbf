@@ -141,7 +141,7 @@ def first_record(table):
         print str(table[0])
     finally:
         table.close()
-def from_csv(csvfile, to_disk=False, filename=None, field_names='', extra_fields='', dbf_type='db3', memo_size=64, min_field_size=1):
+def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fields=None, dbf_type='db3', memo_size=64, min_field_size=1):
     """creates a Character table from a csv file
     to_disk will create a table with the same name
     filename will be used if provided

@@ -174,7 +174,7 @@ class Date(object):
         return cls(datetime.date.fromtimestamp(timestamp))
     @classmethod
     def fromymd(cls, yyyymmdd):
-        if yyyymmdd == '        ':
+        if yyyymmdd in ('', '        '):
             return cls()
         return cls(datetime.date(int(yyyymmdd[:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:])))
     def strftime(yo, format):

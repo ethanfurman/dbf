@@ -307,12 +307,22 @@ class _DbfRecord(object):
         return yo._layout.fields[:]
     def gather_fields(yo, dict, drop=False):
         "saves a dictionary into a records fields\nkeys with no matching field will raise a FieldMissing exception unless drop = True"
-        for key in dict:
-            if not key in yo.field_names:
-                if drop:
-                    continue
-                raise FieldMissing(key)
-            yo.__setattr__(key, dict[key])
+        ondisk = yo._layout.ondisk
+        yo._layout.ondisk = False
+        old_data = yo._data[:]
+        try:
+            for key in dict:
+                if not key in yo.field_names:
+                    if drop:
+                        continue
+                    raise FieldMissing(key)
+                yo.__setattr__(key, dict[key])
+        except:
+            yo._data[:] = old_data
+            raise
+        finally:
+            yo._layout.ondisk = ondisk
+        yo._update_disk()
     @property
     def has_been_deleted(yo):
         "marked for deletion?"

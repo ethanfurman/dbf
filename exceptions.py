@@ -29,3 +29,8 @@ class Bof(DbfWarning, StopIteration):
     message = 'Beginning of file reached'
     def __init__(yo):
         super(Bof, yo).__init__(yo.message)
+class DoNotIndex(DbfWarning):
+    "Returned by indexing functions to suppress a record from becoming part of the index"
+    message = 'Not indexing record'
+    def __init__(yo):
+        super(DoNotIndex, yo).__init__(yo.message)

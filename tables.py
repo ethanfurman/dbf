@@ -7,11 +7,12 @@ import locale
 import unicodedata
 import weakref
 from array import array
+from bisect import bisect_left, bisect_right
 from decimal import Decimal
 from shutil import copyfileobj
 from dbf import _io as io
 from dbf.dates import Date, DateTime, Time
-from dbf.exceptions import Bof, Eof, DbfError, DataOverflow, FieldMissing, NonUnicode
+from dbf.exceptions import Bof, Eof, DbfError, DataOverflow, FieldMissing, NonUnicode, DoNotIndex
 
 input_decoding = locale.getdefaultlocale()[1]    # treat non-unicode data as ...
 default_codepage = 'cp1252'  # if no codepage specified on dbf creation, use this
@@ -337,6 +338,9 @@ class _DbfRecord(object):
         if table is None:
             raise DbfError("table is no longer available")
         return table
+    def reindex(yo):
+        for dbfindex in yo._layout.table()._indexen:
+            dbfindex(yo)
     def reset_record(yo, keep_fields=None):
         "blanks record"
         if keep_fields is None:
@@ -539,6 +543,19 @@ class DbfTable(object):
         def add(yo, new_list):
             yo._lists.add(weakref.ref(new_list))
             yo._lists = set([s for s in yo._lists if s() is not None])
+    class _Indexen(object):
+        "implements the weakref structure for seperate indexes"
+        def __init__(yo):
+            yo._indexen = set()
+        def __iter__(yo):
+            yo._indexen = set([s for s in yo._indexen if s() is not None])    
+            return (s() for s in yo._indexen if s() is not None)
+        def __len__(yo):
+            yo._indexen = set([s for s in yo._indexen if s() is not None])
+            return len(yo._indexen)
+        def add(yo, new_list):
+            yo._indexen.add(weakref.ref(new_list))
+            yo._indexen = set([s for s in yo._indexen if s() is not None])
     class _MetaData(dict):
         blankrecord = None
         fields = None
@@ -880,6 +897,7 @@ class DbfTable(object):
         elif type(yo) is DbfTable:
             raise DbfError("only memory tables supported")
         yo._dbflists = yo._DbfLists()
+        yo._indexen = yo._Indexen()
         yo._meta = meta = yo._MetaData()
         meta.table = weakref.ref(yo)
         meta.index = 'ORIGINAL'
@@ -1113,6 +1131,8 @@ class DbfTable(object):
         elif kamikaze:
             for field in yo._meta.memofields:
                 newrecord[field] = kamikaze[field]
+        for dbfindex in yo._indexen:
+            dbfindex(newrecord)
         multiple -= 1
         if multiple:
             data = newrecord._data
@@ -1125,6 +1145,8 @@ class DbfTable(object):
                 for field in yo._meta.memofields:
                     multi_record[field] = newrecord[field]
                 single += 1
+                for dbfindex in yo._indexen:
+                    dbfindex(multi_record)
             yo._meta.header.record_count = total   # += multiple
             yo._meta.current = yo._meta.header.record_count - 1
             newrecord = multi_record
@@ -1407,6 +1429,8 @@ class DbfTable(object):
 
     def pack(yo, _pack=True):
         "physically removes all deleted records"
+        for dbfindex in yo._indexen:
+            dbfindex.clear()
         newtable = []
         newindex = []
         index = 0
@@ -1414,7 +1438,7 @@ class DbfTable(object):
         for record in yo._table:
             found = False
             if record.has_been_deleted and _pack:
-                for i, dbflist in enumerate(yo._dbflists):
+                for dbflist in yo._dbflists:
                     if dbflist._purge(record, record.record_number - offset, 1):
                         found = True
                 record._recnum = -1
@@ -1434,6 +1458,7 @@ class DbfTable(object):
         yo._current = -1
         yo._update_disk()
         yo.index(sort=yo._meta.index, reverse=yo._meta.index_reversed)
+        yo.reindex()
     def prev(yo):
         "set record pointer to previous (non-deleted) record, and return it"
         if yo.bof():
@@ -1455,6 +1480,9 @@ class DbfTable(object):
             if query_result['keep']:
                 possible.append(record)
         return possible
+    def reindex(yo):
+        for dbfindex in yo._indexen:
+            dbfindex.reindex()
     def rename_field(yo, oldname, newname):
         "renames an existing field"
         if yo:
@@ -1897,7 +1925,7 @@ class DbfList(object):
             result._current = 0 if result else -1
             return result
         else:
-            raise TypeError
+            raise TypeError('indices must be integers')
     def __iter__(yo):
         return (table.get_record(recno) for table, recno, value in yo._list)
     def __len__(yo):
@@ -2115,6 +2143,161 @@ class DbfCsv(csv.Dialect):
     quotechar = '"'
     skipinitialspace = True
     quoting = csv.QUOTE_NONNUMERIC
+class DbfIndex(object):
+    class IndexIterator(object):
+        "returns records using this index"
+        def __init__(yo, table, records):
+            yo.table = table
+            yo.records = records
+            yo.index = 0
+        def __iter__(yo):
+            return yo
+        def next(yo):
+            while yo.index < len(yo.records):
+                record = yo.table.get_record(yo.records[yo.index])
+                yo.index += 1
+                if not yo.table.use_deleted and record.has_been_deleted:
+                    continue
+                return record
+            else:
+                raise StopIteration
+    def __init__(yo, table, key):
+        yo._table = table
+        yo._values = []             # ordered list of values
+        yo._rec_by_val = []         # matching record numbers
+        yo._records = {}            # record numbers:values
+        yo.__doc__ = key.__doc__ or 'unknown'
+        yo.key = key
+        for record in table:
+            value = key(record)
+            if value is DoNotIndex:
+                continue
+            rec_num = record.record_number
+            if not isinstance(value, tuple):
+                value = (value, )
+            vindex = bisect_right(yo._values, value)
+            yo._values.insert(vindex, value)
+            yo._rec_by_val.insert(vindex, rec_num)
+            yo._records[rec_num] = value
+        table._indexen.add(yo)
+    def __call__(yo, record):
+        rec_num = record.record_number
+        if rec_num in yo:
+            value = yo._records[rec_num]
+            vindex = bisect_right(yo._values, value)
+            yo._values.pop(vindex)
+            yo._rec_by_val.pop(vindex)
+        value = yo.key(record)
+        if value is DoNotIndex:
+            return
+        if not isinstance(value, tuple):
+            value = (value, )
+        vindex = bisect_right(yo._values, value)
+        yo._values.insert(vindex, value)
+        yo._rec_by_val.insert(vindex, rec_num)
+        yo._records[rec_num] = value
+    def __contains__(yo, rec_num):
+        if isinstance(rec_num, _DbfRecord):
+            rec_num = rec_num.record_number
+        return rec_num in yo._records
+    def __getitem__(yo, key):
+        if isinstance(key, int):
+            count = len(yo._values)
+            if not -count <= key < count:
+                raise IndexError("Record %d is not in list." % key)
+            rec_num = yo._rec_by_val[key]
+            return yo._table.get_record(rec_num)
+        elif isinstance(key, slice):
+            result = DbfList()
+            yo._table._dbflists.add(result)
+            start, stop, step = key.start, key.stop, key.step
+            if start is None: start = 0
+            if stop is None: stop = len(yo._rec_by_val)
+            if step is None: step = 1
+            for loc in range(start, stop, step):
+                result._maybe_add(item=(yo._table, yo._rec_by_val[loc], yo._values[loc]))
+            result._current = 0 if result else -1
+            return result
+        else:
+            raise TypeError('indices must be integers')
+    def __iter__(yo):
+        return yo.IndexIterator(yo._table, yo._rec_by_val)
+    def __len__(yo):
+        return len(yo._records)
+    def _partial_match(yo, target, match):
+        target = target[:len(match)]
+        if isinstance(match[-1], (str, unicode)):
+            target = list(target)
+            target[-1] = target[-1][:len(match[-1])]
+            target = tuple(target)
+        return target == match
+    def _purge(yo, rec_num):
+        value = yo._records.get(rec_num)
+        if value is not None:
+            vindex = bisect_left(yo._values, value)
+            del yo._records[rec_num]
+            yo._values.pop(vindex)
+            yo._rec_by_val.pop(vindex)
+    def _search(yo, match, lo=0, hi=None):
+        if hi is None:
+            hi = len(yo._values)
+        return bisect_left(yo._values, match, lo, hi)
+    def clear(yo):
+        "removes all entries from index"
+        yo._values[:] = []
+        yo._rec_by_val[:] = []
+        yo._records.clear()
+    def find(yo, match, start=0, end=None, partial=False):
+        if not isinstance(match, tuple):
+            match = (match, )
+        loc = yo._search(match, start, end)
+        while loc < len(yo._values) and yo._values[loc] == match:
+            if not yo._table.use_deleted and yo._table.get_record(yo._rec_by_val[loc]).has_been_deleted:
+                loc += 1
+                continue
+            return loc
+        if partial:
+            while loc < len(yo._values) and yo._partial_match(yo._values[loc], match):
+                if not yo._table.use_deleted and yo._table.get_record(yo._rec_by_val[loc]).has_been_deleted:
+                    loc += 1
+                    continue
+                return loc
+        return -1
+    def index(yo, match, start=0, end=None, partial=False):
+        if not isinstance(match, tuple):
+            match = (match, )
+        loc = yo.find(match, start, end, partial)
+        if loc == -1:
+            raise ValueError("DbfIndex.index(x): (%s) not in index" % match)
+        return loc
+    def reindex(yo):
+        for record in yo._table:
+            yo(record)
+    def search(yo, match, partial=False):
+        result = DbfList()
+        yo._table._dbflists.add(result)
+        if not isinstance(match, tuple):
+            match = (match, )
+        loc = yo._search(match)
+        if loc == len(yo._values):
+            return result
+        while loc < len(yo._values) and yo._values[loc] == match:
+            record = yo._table.get_record(yo._rec_by_val[loc])
+            if not yo._table.use_deleted and record.has_been_deleted:
+                loc += 1
+                continue
+            result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))
+            loc += 1
+        if partial:
+            while loc < len(yo._values) and yo._partial_match(yo._values[loc], match):
+                record = yo._table.get_record(yo._rec_by_val[loc])
+                if not yo._table.use_deleted and record.has_been_deleted:
+                    loc += 1
+                    continue
+                result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))
+                loc += 1
+        return result
+
 csv.register_dialect('dbf', DbfCsv)
 
 def _nop(value):

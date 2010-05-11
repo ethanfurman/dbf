@@ -16,6 +16,8 @@ class Date(object):
             nd._date = year
         elif type(year) == Date:
             nd._date = year._date
+        elif year == 'no date':
+            pass    # date object is already False
         elif year is not None:
             nd._date = datetime.date(year, month, day)
         return nd
@@ -174,7 +176,7 @@ class Date(object):
         return cls(datetime.date.fromtimestamp(timestamp))
     @classmethod
     def fromymd(cls, yyyymmdd):
-        if yyyymmdd in ('', '        '):
+        if yyyymmdd in ('', '        ','no date'):
             return cls()
         return cls(datetime.date(int(yyyymmdd[:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:])))
     def strftime(yo, format):

@@ -173,7 +173,7 @@ class _DbfRecord(object):
         end = start + size
         blank[:len(bytes)] = bytes[:]
         yo._data[start:end] = blank[:]
-        yo._update_disk(yo._recnum * yo._layout.header.record_length + yo._layout.header.start, yo._data.tostring())
+        #- yo._update_disk(yo._recnum * yo._layout.header.record_length + yo._layout.header.start, yo._data.tostring())
     def _update_disk(yo, location='', data=None):
         if not yo._layout.inmemory:
             if yo._recnum < 0:
@@ -184,6 +184,8 @@ class _DbfRecord(object):
                 data = yo._data
             yo._layout.dfd.seek(location)
             yo._layout.dfd.write(data)
+        for index in yo.record_table._indexen:
+            index(yo)
     def __call__(yo, *specs):
         results = []
         if not specs:
@@ -262,7 +264,6 @@ class _DbfRecord(object):
             error.message = "field --%s-- is %s -> %s" % (name, yo._layout.fieldtypes[fielddef['type']]['Type'], error.message)
             error.data = name
             raise
-            raise DbfError(message)
     def __setitem__(yo, name, value):
         if type(name) == str:
             yo.__setattr__(name, value)
@@ -301,33 +302,42 @@ class _DbfRecord(object):
     def delete_record(yo):
         "marks record as deleted"
         yo._data[0] = '*'
-        yo._update_disk(data='*')
+        return yo
+        #- yo._update_disk(data='*')
     @property
     def field_names(yo):
         "fields in table/record"
         return yo._layout.fields[:]
-    def gather_fields(yo, dict, drop=False):
-        "saves a dictionary into a records fields\nkeys with no matching field will raise a FieldMissing exception unless drop = True"
-        ondisk = yo._layout.ondisk
-        yo._layout.ondisk = False
+    def gather_fields(yo, drop_missing=False, **kwargs):        # dict, drop_missing=False):
+        "saves a dictionary into a record's fields\nkeys with no matching field will raise a FieldMissing exception unless drop_missing = True"
+        #- ondisk = yo._layout.ondisk
+        #- yo._layout.ondisk = False
         old_data = yo._data[:]
         try:
-            for key in dict:
+            for key in kwargs:
                 if not key in yo.field_names:
-                    if drop:
+                    if drop_missing:
                         continue
                     raise FieldMissing(key)
-                yo.__setattr__(key, dict[key])
+                yo.__setattr__(key, kwargs[key])
         except:
             yo._data[:] = old_data
             raise
-        finally:
-            yo._layout.ondisk = ondisk
-        yo._update_disk()
+        return yo
+        #- finally:
+        #-     yo._layout.ondisk = ondisk
+        #- yo._update_disk()
     @property
     def has_been_deleted(yo):
         "marked for deletion?"
         return yo._data[0] == '*'
+    def read(yo):
+        "refresh record data from disk"
+        size = yo._layout.header.record_length
+        location = yo._recnum * size + yo._layout.header.start
+        yo._layout.dfd.seek(location)
+        yo._data[:] = yo._meta.dfd.read(size)
+        return yo
     @property
     def record_number(yo):
         "physical record number"
@@ -353,7 +363,8 @@ class _DbfRecord(object):
         yo._data[:] = yo._layout.blankrecord[:]
         for field in keep_fields:
             yo[field] = keep[field]
-        yo._update_disk()
+        return yo
+        #- yo._update_disk()
     def scatter_fields(yo, blank=False):
         "returns a dictionary of fieldnames and values which can be used with gather_fields().  if blank is True, values are empty."
         keys = yo._layout.fields
@@ -365,7 +376,12 @@ class _DbfRecord(object):
     def undelete_record(yo):
         "marks record as active"
         yo._data[0] = ' '
-        yo._update_disk(data=' ')
+        return yo
+        #- yo._update_disk(data=' ')
+    def write(yo):
+        "write record data to disk"
+        yo._update_disk()
+        return yo
 class _DbfMemo(object):
     """Provides access to memo fields as dictionaries
        must override _init, _get_memo, and _put_memo to
@@ -1124,7 +1140,7 @@ class DbfTable(object):
         #- yo._index.append(yo._meta.header.record_count)
         yo._meta.header.record_count += 1
         if dictdata:
-            newrecord.gather_fields(dictdata, drop)
+            newrecord.gather_fields(drop_missing=drop, **dictdata)
         elif tupledata:
             for index, item in enumerate(tupledata):
                 newrecord[index] = item
@@ -1134,8 +1150,7 @@ class DbfTable(object):
         elif kamikaze:
             for field in yo._meta.memofields:
                 newrecord[field] = kamikaze[field]
-        for dbfindex in yo._indexen:
-            dbfindex(newrecord)
+        newrecord.write()
         multiple -= 1
         if multiple:
             data = newrecord._data
@@ -1148,8 +1163,7 @@ class DbfTable(object):
                 for field in yo._meta.memofields:
                     multi_record[field] = newrecord[field]
                 single += 1
-                for dbfindex in yo._indexen:
-                    dbfindex(multi_record)
+                multi_record.write()
             yo._meta.header.record_count = total   # += multiple
             yo._meta.current = yo._meta.header.record_count - 1
             newrecord = multi_record

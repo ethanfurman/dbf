@@ -1453,6 +1453,7 @@ class DbfTable(object):
             query_result['keep'] = False
             g['query_result'] = query_result
             exec select in g, record
+            record.write()
             if query_result['keep']:
                 possible.append(record)
         return possible

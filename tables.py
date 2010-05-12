@@ -2114,7 +2114,8 @@ class Index(object):
             if stop is None: stop = len(yo._rec_by_val)
             if step is None: step = 1
             for loc in range(start, stop, step):
-                result._maybe_add(item=(yo._table, yo._rec_by_val[loc], yo._values[loc]))
+                record = yo._table.get_record(yo._rec_by_val[loc])
+                result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))
             result._current = 0 if result else -1
             return result
         else:

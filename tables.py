@@ -134,7 +134,7 @@ if sys.version_info[:2] < (2, 6):
 # Internal classes
 class _DbfRecord(object):
     """Provides routines to extract and save data within the fields of a dbf record."""
-    __slots__ = ['_recnum', '_layout', '_data', '__weakref__']
+    __slots__ = ['_recnum', '_layout', '_data', '_dirty', '__weakref__']
     def _retrieveFieldValue(yo, record_data, fielddef):
         """calls appropriate routine to fetch value stored in field from array
         @param record_data: the data portion of the record
@@ -173,6 +173,7 @@ class _DbfRecord(object):
         end = start + size
         blank[:len(bytes)] = bytes[:]
         yo._data[start:end] = blank[:]
+        yo._dirty = True
         #- yo._update_disk(yo._recnum * yo._layout.header.record_length + yo._layout.header.start, yo._data.tostring())
     def _update_disk(yo, location='', data=None):
         if not yo._layout.inmemory:
@@ -184,6 +185,7 @@ class _DbfRecord(object):
                 data = yo._data
             yo._layout.dfd.seek(location)
             yo._layout.dfd.write(data)
+            yo._dirty = False
         for index in yo.record_table._indexen:
             index(yo)
     def __call__(yo, *specs):
@@ -230,6 +232,7 @@ class _DbfRecord(object):
     def __new__(cls, recnum, layout, kamikaze='', _fromdisk=False):
         """record = ascii array of entire record; layout=record specification; memo = memo object for table"""
         record = object.__new__(cls)
+        record._dirty = False
         record._recnum = recnum
         record._layout = layout
         if layout.blankrecord is None and not _fromdisk:
@@ -302,6 +305,7 @@ class _DbfRecord(object):
     def delete_record(yo):
         "marks record as deleted"
         yo._data[0] = '*'
+        yo._dirty = True
         return yo
         #- yo._update_disk(data='*')
     @property
@@ -337,6 +341,7 @@ class _DbfRecord(object):
         location = yo._recnum * size + yo._layout.header.start
         yo._layout.dfd.seek(location)
         yo._data[:] = yo._meta.dfd.read(size)
+        yo._dirty = False
         return yo
     @property
     def record_number(yo):
@@ -363,6 +368,7 @@ class _DbfRecord(object):
         yo._data[:] = yo._layout.blankrecord[:]
         for field in keep_fields:
             yo[field] = keep[field]
+        yo._dirty = True
         return yo
         #- yo._update_disk()
     def scatter_fields(yo, blank=False):
@@ -376,12 +382,13 @@ class _DbfRecord(object):
     def undelete_record(yo):
         "marks record as active"
         yo._data[0] = ' '
+        yo._dirty = True
         return yo
         #- yo._update_disk(data=' ')
     def write(yo):
         "write record data to disk"
-        yo._update_disk()
-        return yo
+        if yo._dirty:
+            yo._update_disk()
 class _DbfMemo(object):
     """Provides access to memo fields as dictionaries
        must override _init, _get_memo, and _put_memo to
@@ -2203,7 +2210,7 @@ class Index(object):
         rec_num = record.record_number
         if rec_num in yo:
             value = yo._records[rec_num]
-            vindex = bisect_right(yo._values, value)
+            vindex = bisect_left(yo._values, value)
             yo._values.pop(vindex)
             yo._rec_by_val.pop(vindex)
         value = yo.key(record)

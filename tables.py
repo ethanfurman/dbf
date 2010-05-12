@@ -174,7 +174,6 @@ class _DbfRecord(object):
         blank[:len(bytes)] = bytes[:]
         yo._data[start:end] = blank[:]
         yo._dirty = True
-        #- yo._update_disk(yo._recnum * yo._layout.header.record_length + yo._layout.header.start, yo._data.tostring())
     def _update_disk(yo, location='', data=None):
         if not yo._layout.inmemory:
             if yo._recnum < 0:
@@ -307,30 +306,24 @@ class _DbfRecord(object):
         yo._data[0] = '*'
         yo._dirty = True
         return yo
-        #- yo._update_disk(data='*')
     @property
     def field_names(yo):
         "fields in table/record"
         return yo._layout.fields[:]
-    def gather_fields(yo, drop_missing=False, **kwargs):        # dict, drop_missing=False):
+    def gather_fields(yo, dictionary, drop=False):        # dict, drop_missing=False):
         "saves a dictionary into a record's fields\nkeys with no matching field will raise a FieldMissing exception unless drop_missing = True"
-        #- ondisk = yo._layout.ondisk
-        #- yo._layout.ondisk = False
         old_data = yo._data[:]
         try:
-            for key in kwargs:
+            for key in dictionary:
                 if not key in yo.field_names:
                     if drop_missing:
                         continue
                     raise FieldMissing(key)
-                yo.__setattr__(key, kwargs[key])
+                yo.__setattr__(key, dictionary[key])
         except:
             yo._data[:] = old_data
             raise
         return yo
-        #- finally:
-        #-     yo._layout.ondisk = ondisk
-        #- yo._update_disk()
     @property
     def has_been_deleted(yo):
         "marked for deletion?"
@@ -370,7 +363,6 @@ class _DbfRecord(object):
             yo[field] = keep[field]
         yo._dirty = True
         return yo
-        #- yo._update_disk()
     def scatter_fields(yo, blank=False):
         "returns a dictionary of fieldnames and values which can be used with gather_fields().  if blank is True, values are empty."
         keys = yo._layout.fields
@@ -384,9 +376,10 @@ class _DbfRecord(object):
         yo._data[0] = ' '
         yo._dirty = True
         return yo
-        #- yo._update_disk(data=' ')
-    def write(yo):
+    def write(yo, **kwargs):
         "write record data to disk"
+        if kwargs:
+            yo.gather_fields(kwargs)
         if yo._dirty:
             yo._update_disk()
 class _DbfMemo(object):
@@ -590,9 +583,6 @@ class DbfTable(object):
         mfd = None
         ignorememos = False
         memofields = None
-        #- index = []  # never mutated
-        #- index_reversed = False
-        #- orderresults = None
         current = -1
     class _TableHeader(object):
         def __init__(yo, data):
@@ -849,7 +839,6 @@ class DbfTable(object):
         for i in range(header.record_count):
             record_data = allrecords[length*i:length*i+length]
             yo._table.append(_DbfRecord(i, yo._meta, allrecords[length*i:length*i+length], _fromdisk=True))
-            #- yo._index.append(i)
         dfd.seek(0)
     def _list_fields(yo, specs, sep=','):
         if specs is None:
@@ -879,14 +868,11 @@ class DbfTable(object):
     def __exit__(yo, *exc_info):
         yo.close()
     def __getattr__(yo, name):
-        #- if name in ('_index','_table'):
         if name in ('_table'):
                 if yo._meta.ondisk:
                     yo._table = yo._Table(len(yo), yo._meta)
-                    #- yo._index = range(len(yo))
                 else:
                     yo._table = []
-                    #- yo._index = []
                     yo._loadtable()
         return object.__getattribute__(yo, name)
     def __getitem__(yo, value):
@@ -894,11 +880,9 @@ class DbfTable(object):
             if not -yo._meta.header.record_count <= value < yo._meta.header.record_count: 
                 raise IndexError("Record %d is not in table." % value)
             return yo._table[value]
-            #- return yo._table[yo._index[value]]
         elif type(value) == slice:
             sequence = List(desc='%s -->  %s' % (yo.filename, value))
             yo._dbflists.add(sequence)
-            #- for index in yo._index[value]:
             for index in range(len(yo))[value]:
                 record = yo._table[index]
                 if yo.use_deleted is True or not record.has_been_deleted:
@@ -926,8 +910,6 @@ class DbfTable(object):
         yo._indexen = yo._Indexen()
         yo._meta = meta = yo._MetaData()
         meta.table = weakref.ref(yo)
-        #- meta.index = 'ORIGINAL'
-        #- meta.index_reversed = False
         meta.filename = filename
         meta.fields = []
         meta.fieldtypes = yo._fieldtypes
@@ -946,7 +928,6 @@ class DbfTable(object):
         header.extra = yo._dbfTableHeaderExtra
         header.data        #force update of date
         if filename == ':memory:':
-            #- yo._index = []
             yo._table = []
             meta.ondisk = False
             meta.inmemory = True
@@ -1144,10 +1125,9 @@ class DbfTable(object):
                 kamikaze = ''
         newrecord = _DbfRecord(recnum=yo._meta.header.record_count, layout=yo._meta, kamikaze=kamikaze)
         yo._table.append(newrecord)
-        #- yo._index.append(yo._meta.header.record_count)
         yo._meta.header.record_count += 1
         if dictdata:
-            newrecord.gather_fields(drop_missing=drop, **dictdata)
+            newrecord.gather_fields(dictdata, drop=drop)
         elif tupledata:
             for index, item in enumerate(tupledata):
                 newrecord[index] = item
@@ -1166,7 +1146,6 @@ class DbfTable(object):
             while single < total:
                 multi_record = _DbfRecord(single, yo._meta, kamikaze=data)
                 yo._table.append(multi_record)
-                #- yo._index.append(single)
                 for field in yo._meta.memofields:
                     multi_record[field] = newrecord[field]
                 single += 1
@@ -1205,10 +1184,8 @@ class DbfTable(object):
         ensures table data is available if keep_table
         ensures memo data is available if keep_memos"""
         yo._meta.inmemory = True
-        #- if '_index' in dir(yo):
         if '_table' in dir(yo):
             del yo._table
-            #- del yo._index
         if keep_table:
             yo._table   # force read of table into memory
             yo._read_only = True
@@ -1258,7 +1235,6 @@ class DbfTable(object):
         if index:
             return yo._meta.current
         return yo._table[yo._meta.current]
-        #- return yo._table[yo._index[yo._meta.current]]
     def delete_fields(yo, doomed):
         """removes field(s) from the table
         creates backup files with _backup appended to the file name,
@@ -1376,26 +1352,6 @@ class DbfTable(object):
             if results == match:
                 return record
         return yo.goto(current)
-    #- def index(yo, sort=None, reverse=False):
-    #-     "sort= ((field_name, func), (field_name, func),) | 'ORIGINAL'"
-    #-     if sort is None:
-    #-         results = []
-    #-         for field, func in yo._meta.index:
-    #-             results.append("%s(%s)" % (func.__name__, field))
-    #-         return ', '.join(results + ['reverse=%s' % yo._meta.index_reversed])
-    #-     yo._meta.index_reversed = reverse
-    #-     if sort == 'ORIGINAL':
-    #-         yo._index = range(yo._meta.header.record_count)
-    #-         yo._meta.index = 'ORIGINAL'
-    #-         if reverse:
-    #-             yo._index.reverse()
-    #-         return
-    #-     new_sort = _normalize_tuples(tuples=sort, length=2, filler=[_nop])
-    #-     yo._meta.index = tuple(new_sort)
-    #-     yo._meta.orderresults = [''] * len(yo)
-    #-     for record in yo:
-    #-         yo._meta.orderresults[record.record_number] = record()
-    #-     yo._index.sort(key=lambda i: yo._meta.orderresults[i], reverse=reverse)
     def is_memotype(yo, name):
         "returns True if name is a memo type field"
         return yo._meta[name]['type'] in yo._memotypes
@@ -1421,10 +1377,8 @@ class DbfTable(object):
         meta.ondisk = True
         yo._read_only = False
         yo._meta_only = False
-        #- if '_index' in dir(yo):
         if '_table' in dir(yo):
             del yo._table
-            #- del yo._index
         dfd = meta.dfd = open(meta.filename, 'r+b')
         dfd.seek(0)
         meta.header = header = yo._TableHeader(dfd.read(32))
@@ -1458,7 +1412,6 @@ class DbfTable(object):
         for dbfindex in yo._indexen:
             dbfindex.clear()
         newtable = []
-        #- newindex = []
         index = 0
         offset = 0 # +1 for each purged record
         for record in yo._table:
@@ -1471,7 +1424,6 @@ class DbfTable(object):
             else:
                 record._recnum = index
                 newtable.append(record)
-                #- newindex.append(index)
                 index += 1
             if found:
                 offset += 1
@@ -1479,11 +1431,9 @@ class DbfTable(object):
         yo._table.clear()
         for record in newtable:
             yo._table.append(record)
-        #- yo._index = newindex
         yo._meta.header.record_count = index
         yo._current = -1
         yo._update_disk()
-        #- yo.index(sort=yo._meta.index, reverse=yo._meta.index_reversed)
         yo.reindex()
     def prev(yo):
         "set record pointer to previous (non-deleted) record, and return it"
@@ -1526,81 +1476,6 @@ class DbfTable(object):
         yo._meta.fields[yo._meta.fields.index(oldname)] = newname
         yo._buildHeaderFields()
         yo._update_disk(headeronly=True)
-    #- def search(yo, match, fuzzy=None, indices=False):
-    #-     """match=(value1, value2, value3), fuzzy=function to use for close-match
-    #-     searches using a binary algorythm 
-    #-     looking for records that match the criteria in match, which is a tuple 
-    #-     with a data item per ordered field.  table must be sorted.  if index, 
-    #-     returns a list of records' indices from the current sort order.
-    #-     """
-    #-     if yo._meta.index is 'ORIGINAL':
-    #-         raise DbfError('table must be indexed to use Search')
-    #-     matchlen = len(match)
-    #-     if fuzzy:
-    #-         matchlen -= 1
-    #-         fuzzy_match = match[-1]
-    #-         fuzzy_field = yo._meta.index[matchlen][0]
-    #-         match = match[:-1]
-    #-         records = DbfList(desc="%s -->  search: index=%s, match=%s, fuzzy=%s(%s))" % (yo.filename, yo.index(), match, fuzzy.__name__, fuzzy_match))
-    #-     else:
-    #-         records = DbfList(desc="%s -->  search: index=%s, match=%s)" % (yo.filename, yo.index(), match))
-    #-     yo._dbflists.add(records)
-    #-     if indices:
-    #-         records = []
-    #-     if not isinstance(match, tuple):
-    #-         match = tuple(match)
-    #-     segment = len(yo)
-    #-     current = 0
-    #-     toosoon = True
-    #-     notFound = True
-    #-     while notFound:
-    #-         segment = segment // 2
-    #-         if toosoon:
-    #-             current += segment
-    #-         else:
-    #-             current -= segment
-    #-         if current % 2:
-    #-             segment += 1
-    #-         if current == len(yo) or segment == 0:
-    #-             break
-    #-         value = yo._meta.orderresults[yo[current].record_number][:matchlen]
-    #-         if value < match:
-    #-             toosoon = True
-    #-         elif value > match:
-    #-             toosoon = False
-    #-         else:
-    #-             notFound = False
-    #-             break
-    #-         if current == 0:
-    #-             break
-    #-     if notFound:
-    #-         return records
-    #-     while current > 0:
-    #-         current -= 1
-    #-         value = yo._meta.orderresults[yo[current].record_number][:matchlen]
-    #-         if value != match:
-    #-             current += 1
-    #-             break
-    #-     while True:
-    #-         value = yo._meta.orderresults[yo[current].record_number][:matchlen]
-    #-         if value != match:
-    #-             break
-    #-         if yo.use_deleted or not yo[current].has_been_deleted:
-    #-             if indices:
-    #-                 records.append(current)
-    #-             else:
-    #-                 records.append(yo[current])
-    #-         current += 1
-    #-         if current == len(yo):
-    #-             break
-    #-         if fuzzy:
-    #-             if indices:
-    #-                 records = [rec for rec in records if fuzzy(yo[rec][fuzzy_field]) == fuzzy_match]
-    #-             else:
-    #-                 final_records = [rec for rec in records if fuzzy(rec[fuzzy_field]) == fuzzy_match]
-    #-                 records.clear()
-    #-                 records.extend(final_records)
-    #-     return records
     def size(yo, field):
         "returns size of field as a tuple of (length, decimals)"
         if field in yo:
@@ -1641,10 +1516,8 @@ class DbfTable(object):
                 yo._table = []
             else:
                 yo._table.clear()
-            #- yo._index = []
             yo._meta.header.record_count = 0
             yo._current = -1
-            #- yo._meta.index = 'ORIGINAL'
             yo._update_disk()
         else:
             raise DbfError("You must say you are sure to wipe the table")

@@ -316,7 +316,7 @@ class _DbfRecord(object):
         try:
             for key in dictionary:
                 if not key in yo.field_names:
-                    if drop_missing:
+                    if drop:
                         continue
                     raise FieldMissing(key)
                 yo.__setattr__(key, dictionary[key])

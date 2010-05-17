@@ -2148,10 +2148,11 @@ class Index(object):
         yo._values[:] = []
         yo._rec_by_val[:] = []
         yo._records.clear()
-    def find(yo, match, start=0, end=None, partial=False):
+    def find(yo, match, partial=False):
+        "returns numeric index of (partial) match, or -1"
         if not isinstance(match, tuple):
             match = (match, )
-        loc = yo._search(match, start, end)
+        loc = yo._search(match)
         while loc < len(yo._values) and yo._values[loc] == match:
             if not yo._table.use_deleted and yo._table.get_record(yo._rec_by_val[loc]).has_been_deleted:
                 loc += 1
@@ -2164,17 +2165,20 @@ class Index(object):
                     continue
                 return loc
         return -1
-    def index(yo, match, start=0, end=None, partial=False):
+    def index(yo, match, partial=False):
+        "returns numeric index of (partial) match, or raises ValueError"
         if not isinstance(match, tuple):
             match = (match, )
-        loc = yo.find(match, start, end, partial)
+        loc = yo.find(match, partial)
         if loc == -1:
             raise ValueError("dbf.Index.index(x): (%s) not in index" % match)
         return loc
     def reindex(yo):
+        "reindexes all records"
         for record in yo._table:
             yo(record)
     def search(yo, match, partial=False):
+        "returns dbf.List of all (partially) matching records"
         result = List()
         yo._table._dbflists.add(result)
         if not isinstance(match, tuple):

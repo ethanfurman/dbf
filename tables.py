@@ -2165,6 +2165,12 @@ class Index(object):
                     continue
                 return loc
         return -1
+    def find_index(yo, match):
+        "returns numeric index of either (partial) match, or position of where match would be"
+        if not isinstance(match, tuple):
+            match = (match, )
+        loc = yo._search(match)
+        return loc
     def index(yo, match, partial=False):
         "returns numeric index of (partial) match, or raises ValueError"
         if not isinstance(match, tuple):

@@ -48,11 +48,11 @@ import os
 import csv
 
 from dbf.dates import Date, DateTime, Time
-from dbf.exceptions import DbfWarning, Bof, Eof, DbfError, DataOverflow, FieldMissing
+from dbf.exceptions import DbfWarning, Bof, Eof, DbfError, DataOverflow, FieldMissing, DoNotIndex
 from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, List, DbfCsv
 from dbf.tables import ascii, codepage, encoding, version_map
 
-version = (0, 88, 04)
+version = (0, 88, 05)
 
 __docformat__ = 'epytext'
 

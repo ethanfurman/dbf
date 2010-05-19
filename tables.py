@@ -2150,6 +2150,11 @@ class Index(object):
         yo._records.clear()
     def find(yo, match, partial=False):
         "returns numeric index of (partial) match, or -1"
+        if isinstance(match, _DbfRecord):
+            if match.record_number in yo._records:
+                return yo._values.index(yo._records[match.record_number])
+            else:
+                return -1
         if not isinstance(match, tuple):
             match = (match, )
         loc = yo._search(match)
@@ -2167,22 +2172,45 @@ class Index(object):
         return -1
     def find_index(yo, match):
         "returns numeric index of either (partial) match, or position of where match would be"
+        if isinstance(match, _DbfRecord):
+            if match.record_number in yo._records:
+                return yo._values.index(yo._records[match.record_number])
+            else:
+                match = yo.key(match)
         if not isinstance(match, tuple):
             match = (match, )
         loc = yo._search(match)
         return loc
     def index(yo, match, partial=False):
         "returns numeric index of (partial) match, or raises ValueError"
-        if not isinstance(match, tuple):
-            match = (match, )
         loc = yo.find(match, partial)
         if loc == -1:
-            raise ValueError("dbf.Index.index(x): (%s) not in index" % match)
+            if isinstance(match, _DbfRecord):
+                raise ValueError("table <%s> record [%d] not in index <%s>" % (yo._table.filename, match.record_number, yo.__doc__))
+            else:
+                raise ValueError("match criteria <%s> not in index" % (match, ))
         return loc
     def reindex(yo):
         "reindexes all records"
         for record in yo._table:
             yo(record)
+    def query(yo, sql=None, python=None):
+        "uses exec to perform python queries on the table"
+        if python is None:
+            raise DbfError("query: python parameter must be specified")
+        possible = List(desc="%s -->  %s" % (yo._table.filename, python))
+        yo._table._dbflists.add(possible)
+        query_result = {}
+        select = 'query_result["keep"] = %s' % python
+        g = {}
+        for record in yo:
+            query_result['keep'] = False
+            g['query_result'] = query_result
+            exec select in g, record
+            record.write()
+            if query_result['keep']:
+                possible.append(record)
+        return possible
     def search(yo, match, partial=False):
         "returns dbf.List of all (partially) matching records"
         result = List()

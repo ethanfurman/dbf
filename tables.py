@@ -1355,17 +1355,17 @@ class DbfTable(object):
     def is_memotype(yo, name):
         "returns True if name is a memo type field"
         return yo._meta[name]['type'] in yo._memotypes
-    def new(yo, filename, _field_specs=None):
+    def new(yo, filename, field_specs=None):
         "returns a new table of the same type"
-        if _field_specs is None:
-            _field_specs = yo.structure()
+        if field_specs is None:
+            field_specs = yo.structure()
         if filename != ':memory:':
             path, name = os.path.split(filename)
             if path == "":
                 filename = os.path.join(os.path.split(yo.filename)[0], filename)
             elif name == "":
                 filename = os.path.join(path, os.path.split(yo.filename)[1])
-        return yo.__class__(filename, _field_specs)
+        return yo.__class__(filename, field_specs)
     def next(yo):
         "set record pointer to next (non-deleted) record, and return it"
         if yo.eof():

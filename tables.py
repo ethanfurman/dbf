@@ -901,9 +901,9 @@ class DbfTable(object):
         keep_memos will also load any memo fields into memory
         meta_only will ignore all records, keeping only basic table information
         codepage will override whatever is set in the table itself"""
-        if filename == ':memory:':
+        if filename[0] == filename[-1] == ':':
             if field_specs is None:
-                raise DbfError("field list must be specified for in-memory tables")
+                raise DbfError("field list must be specified for memory tables")
         elif type(yo) is DbfTable:
             raise DbfError("only memory tables supported")
         yo._dbflists = yo._DbfLists()
@@ -927,11 +927,11 @@ class DbfTable(object):
         meta.header = header = yo._TableHeader(yo._dbfTableHeader)
         header.extra = yo._dbfTableHeaderExtra
         header.data        #force update of date
-        if filename == ':memory:':
+        if filename[0] == filename[-1] == ':':
             yo._table = []
             meta.ondisk = False
             meta.inmemory = True
-            meta.memoname = ':memory:'
+            meta.memoname = filename
         else:
             base, ext = os.path.splitext(filename)
             if ext == '':
@@ -944,9 +944,10 @@ class DbfTable(object):
                 meta.dfd = open(meta.filename, 'w+b')
                 meta.newmemofile = True
             yo.add_fields(field_specs)
-            header.codepage = codepage or default_codepage
-            meta.decoder = codecs.getdecoder(header.codepage) 
-            meta.encoder = codecs.getencoder(header.codepage)
+            header.codepage(codepage or default_codepage)
+            cp, sd, ld = _codepage_lookup(meta.header.codepage())
+            meta.decoder = codecs.getdecoder(sd) 
+            meta.encoder = codecs.getencoder(sd)
             return
         dfd = meta.dfd = open(meta.filename, 'r+b')
         dfd.seek(0)
@@ -1210,7 +1211,7 @@ class DbfTable(object):
         yo._meta.ondisk = False
     def create_backup(yo, new_name=None, overwrite=False):
         "creates a backup table -- ignored if memory table"
-        if yo.filename.startswith(':memory:'):
+        if yo.filename[0] == yo.filename[-1] == ':':
             return
         if new_name is None:
             new_name = os.path.splitext(yo.filename)[0] + '_backup.dbf'
@@ -1224,8 +1225,8 @@ class DbfTable(object):
                 yo._backed_up = True
             finally:
                 bkup.close()
-    def create_index(yo, function):
-        return Index(yo, function)
+    def create_index(yo, key):
+        return Index(yo, key)
     def current(yo, index=False):
         "returns current logical record, or its index"
         if yo._meta.current < 0:
@@ -1352,6 +1353,9 @@ class DbfTable(object):
             if results == match:
                 return record
         return yo.goto(current)
+    def is_decimal(yo, name):
+        "returns True if name is a variable-length field type"
+        return yo._meta[name]['type'] in yo._decimal_fields
     def is_memotype(yo, name):
         "returns True if name is a memo type field"
         return yo._meta[name]['type'] in yo._memotypes
@@ -1359,7 +1363,7 @@ class DbfTable(object):
         "returns a new table of the same type"
         if field_specs is None:
             field_specs = yo.structure()
-        if filename != ':memory:':
+        if not (filename[0] == filename[-1] == ':'):
             path, name = os.path.split(filename)
             if path == "":
                 filename = os.path.join(os.path.split(yo.filename)[0], filename)
@@ -1440,22 +1444,25 @@ class DbfTable(object):
         if yo.bof():
             raise Bof
         return yo.current()
-    def query(yo, sql=None, python=None):
-        "uses exec to perform python queries on the table"
-        if python is None:
+    def query(yo, sql_command=None, python=None):
+        "uses exec to perform queries on the table"
+        if sql_command:
+            return sql(yo, sql_command)
+        elif python is None:
             raise DbfError("query: python parameter must be specified")
         possible = List(desc="%s -->  %s" % (yo.filename, python))
         yo._dbflists.add(possible)
         query_result = {}
         select = 'query_result["keep"] = %s' % python
         g = {}
+        use_deleted = yo.use_deleted
         for record in yo:
             query_result['keep'] = False
             g['query_result'] = query_result
             exec select in g, record
-            record.write()
             if query_result['keep']:
                 possible.append(record)
+            record.write()
         return possible
     def reindex(yo):
         for dbfindex in yo._indexen:
@@ -2082,7 +2089,7 @@ class Index(object):
         table._indexen.add(yo)
     def __call__(yo, record):
         rec_num = record.record_number
-        if rec_num in yo:
+        if rec_num in yo._records:
             value = yo._records[rec_num]
             vindex = bisect_left(yo._values, value)
             yo._values.pop(vindex)
@@ -2096,10 +2103,14 @@ class Index(object):
         yo._values.insert(vindex, value)
         yo._rec_by_val.insert(vindex, rec_num)
         yo._records[rec_num] = value
-    def __contains__(yo, rec_num):
-        if isinstance(rec_num, _DbfRecord):
-            rec_num = rec_num.record_number
-        return rec_num in yo._records
+    def __contains__(yo, match):
+        if isinstance(match, _DbfRecord):
+            if match.record_table is yo._table:
+                return match.record_number in yo._records
+            match = yo.key(match)
+        elif not isinstance(match, tuple):
+            match = (match, )
+        return yo.find(match) != -1
     def __getitem__(yo, key):
         if isinstance(key, int):
             count = len(yo._values)
@@ -2119,8 +2130,25 @@ class Index(object):
                 result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))
             result._current = 0 if result else -1
             return result
+        elif isinstance (key, (str, unicode, tuple, _DbfRecord)):
+            if isinstance(key, _DbfRecord):
+                key = yo.key(key)
+            elif not isinstance(key, tuple):
+                key = (key, )
+            loc = yo.find(key)
+            if loc == -1:
+                raise KeyError(key)
+            return yo._table.get_record(yo._rec_by_val[loc])
         else:
-            raise TypeError('indices must be integers')
+            raise TypeError('indices must be integers, match objects must by strings or tuples')
+    def __enter__(yo):
+        return yo
+    def __exit__(yo, *exc_info):
+        yo._table.close()
+        yo._values[:] = []
+        yo._rec_by_val[:] = []
+        yo._records.clear()
+        return False
     def __iter__(yo):
         return yo.IndexIterator(yo._table, yo._rec_by_val)
     def __len__(yo):
@@ -2148,6 +2176,7 @@ class Index(object):
         yo._values[:] = []
         yo._rec_by_val[:] = []
         yo._records.clear()
+    close = __exit__
     def find(yo, match, partial=False):
         "returns numeric index of (partial) match, or -1"
         if isinstance(match, _DbfRecord):
@@ -2194,9 +2223,11 @@ class Index(object):
         "reindexes all records"
         for record in yo._table:
             yo(record)
-    def query(yo, sql=None, python=None):
-        "uses exec to perform python queries on the table"
-        if python is None:
+    def query(yo, sql_command=None, python=None):
+        """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, and RECALL"""
+        if sql_command:
+            return sql(yo, command)
+        elif python is None:
             raise DbfError("query: python parameter must be specified")
         possible = List(desc="%s -->  %s" % (yo._table.filename, python))
         yo._table._dbflists.add(possible)
@@ -2207,9 +2238,9 @@ class Index(object):
             query_result['keep'] = False
             g['query_result'] = query_result
             exec select in g, record
-            record.write()
             if query_result['keep']:
                 possible.append(record)
+            record.write()
         return possible
     def search(yo, match, partial=False):
         "returns dbf.List of all (partially) matching records"
@@ -2239,6 +2270,92 @@ class Index(object):
 
 csv.register_dialect('dbf', DbfCsv)
 
+def sql_to_function(criteria, field_names):
+    "creates a function matching the sql criteria"
+    function = """def func(rec):\n    "%s"\n    %s\n    return %s"""
+    fields = []
+    for field in field_names:
+        if field in criteria:
+            fields.append(field)
+    fields = '\n    '.join(['%s = rec.%s' % (field, field) for field in fields])
+    g = {}
+    function %= (criteria, fields, criteria)
+    print function
+    exec function in g
+    return g['func']
+def sql(records, command):
+    """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, and RECALL"""
+    table = records[0].record_table
+    sql_command = command
+    no_condition = False
+    if ' for ' in command:
+        command, condition = command.split(' for ')
+        condition = sql_to_function(condition, table.field_names)
+    else:
+        def condition(**kwds):
+            return True
+        no_condition = True
+    name, command = command.split(' ', 1)
+    name = name.lower()
+    if name == 'select':
+        if command.strip() == '*':
+            select_fields = table.field_names
+        else:
+            select_fields = command.replace(' ','').split(',')
+    command = sql_to_function(command, table.field_names)
+    if name not in ('delete','insert','recall','select','update'):
+        raise DbfError("unrecognized sql command: %s" % name.upper())
+    if name == 'insert' and not no_condition:
+        raise DbfError("FOR clause not allowed with INSERT")
+    possible = List(desc=sql_command)
+    tables = set()
+    if name == 'insert':
+        #raise DbfError("INSERT not currently implemented")
+        record = table.append()
+        command(record)
+        record.write()
+        record.reindex()
+        possible.append(record)
+    else:
+        for record in records:
+            if no_condition or condition(record):
+                possible.append(record)
+                tables.add(record.record_table)
+                if name == 'delete':
+                    record.delete_record()
+                elif name == 'recall':
+                    record.undelete_record()
+                elif name == 'select':
+                    pass
+                elif name == 'update':
+                    command(record)
+                else:
+                    raise DbfError("unrecognized sql command: %s" % sql.upper)
+            record.write()
+    if name == 'select':
+        field_sizes = dict([(field, table.size(field)) for field in select_fields])
+        for t in tables:
+            for field in select_fields:
+                field_sizes[field] = max(field_sizes[field], t.size(field))
+        field_specs = []
+        for field in select_fields:
+            type = table.type(field)
+            length, decimals = field_sizes[field]
+            if type in table._decimal_fields:
+                description = "%s %s(%d,%d)" % (field, type, length, decimals)
+            elif type in table._fixed_fields:
+                description = "%s %s" % (field, type)
+            else:
+                description = "%s %s(%d)" % (field, type, length)
+            field_specs.append(description)
+        select = table.new(filename=':%s:' % sql_command, field_specs=field_specs)
+        for record in possible:
+            select.append(record.scatter_fields(), drop=True)
+        return select
+    else:
+        for list_table in tables:
+            list_table._dbflists.add(possible)
+    return possible
 def _nop(value):
     "returns parameter unchanged"
     return value

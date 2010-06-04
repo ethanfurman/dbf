@@ -52,7 +52,7 @@ from dbf.exceptions import DbfWarning, Bof, Eof, DbfError, DataOverflow, FieldMi
 from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, List, DbfCsv
 from dbf.tables import sql, ascii, codepage, encoding, version_map
 
-version = (0, 88, 10)
+version = (0, 88, 11)
 
 __docformat__ = 'epytext'
 
@@ -161,6 +161,8 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
             mtable.add_fields(field_names[fields_so_far])
             fields_so_far += 1
         mtable.append(tuple(row))
+    if filename:
+        to_disk = True
     if not to_disk:
         if extra_fields:
             mtable.add_fields(extra_fields)

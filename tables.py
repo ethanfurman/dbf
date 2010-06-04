@@ -328,7 +328,7 @@ class _DbfRecord(object):
     def has_been_deleted(yo):
         "marked for deletion?"
         return yo._data[0] == '*'
-    def read(yo):
+    def read_record(yo):
         "refresh record data from disk"
         size = yo._layout.header.record_length
         location = yo._recnum * size + yo._layout.header.start
@@ -346,7 +346,7 @@ class _DbfRecord(object):
         if table is None:
             raise DbfError("table is no longer available")
         return table
-    def reindex(yo):
+    def check_index(yo):
         for dbfindex in yo._layout.table()._indexen:
             dbfindex(yo)
     def reset_record(yo, keep_fields=None):
@@ -376,7 +376,7 @@ class _DbfRecord(object):
         yo._data[0] = ' '
         yo._dirty = True
         return yo
-    def write(yo, **kwargs):
+    def write_record(yo, **kwargs):
         "write record data to disk"
         if kwargs:
             yo.gather_fields(kwargs)
@@ -1138,7 +1138,7 @@ class DbfTable(object):
         elif kamikaze:
             for field in yo._meta.memofields:
                 newrecord[field] = kamikaze[field]
-        newrecord.write()
+        newrecord.write_record()
         multiple -= 1
         if multiple:
             data = newrecord._data
@@ -1150,7 +1150,7 @@ class DbfTable(object):
                 for field in yo._meta.memofields:
                     multi_record[field] = newrecord[field]
                 single += 1
-                multi_record.write()
+                multi_record.write_record()
             yo._meta.header.record_count = total   # += multiple
             yo._meta.current = yo._meta.header.record_count - 1
             newrecord = multi_record
@@ -1462,7 +1462,7 @@ class DbfTable(object):
             exec select in g, record
             if query_result['keep']:
                 possible.append(record)
-            record.write()
+            record.write_record()
         return possible
     def reindex(yo):
         for dbfindex in yo._indexen:
@@ -2240,7 +2240,7 @@ class Index(object):
             exec select in g, record
             if query_result['keep']:
                 possible.append(record)
-            record.write()
+            record.write_record()
         return possible
     def search(yo, match, partial=False):
         "returns dbf.List of all (partially) matching records"
@@ -2313,8 +2313,8 @@ def sql(records, command):
         #raise DbfError("INSERT not currently implemented")
         record = table.append()
         command(record)
-        record.write()
-        record.reindex()
+        record.write_record()
+        record.check_index()
         possible.append(record)
     else:
         for record in records:
@@ -2331,7 +2331,7 @@ def sql(records, command):
                     command(record)
                 else:
                     raise DbfError("unrecognized sql command: %s" % sql.upper)
-            record.write()
+            record.write_record()
     if name == 'select':
         field_sizes = dict([(field, table.size(field)) for field in select_fields])
         for t in tables:

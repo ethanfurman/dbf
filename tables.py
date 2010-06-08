@@ -2176,7 +2176,8 @@ class Index(object):
         yo._values[:] = []
         yo._rec_by_val[:] = []
         yo._records.clear()
-    close = __exit__
+    def close(yo):
+        yo._table.close()
     def find(yo, match, partial=False):
         "returns numeric index of (partial) match, or -1"
         if isinstance(match, _DbfRecord):
@@ -2270,7 +2271,7 @@ class Index(object):
 
 csv.register_dialect('dbf', DbfCsv)
 
-def sql_to_function(criteria, field_names):
+def sql_for(criteria, field_names):
     "creates a function matching the sql criteria"
     function = """def func(rec):\n    "%s"\n    %s\n    return %s"""
     fields = []
@@ -2280,7 +2281,18 @@ def sql_to_function(criteria, field_names):
     fields = '\n    '.join(['%s = rec.%s' % (field, field) for field in fields])
     g = {}
     function %= (criteria, fields, criteria)
-    print function
+    exec function in g
+    return g['func']
+def sql_update(criteria, field_names):
+    "creates a function matching the sql criteria"
+    function = """def func(rec):\n    "%s"\n    %s\n    rec.write_record()"""
+    fields = []
+    for field in field_names:
+        if field in criteria:
+            fields.append(field)
+    fields = '\n    '.join(['%s\n    rec.%s = %s' % (criteria, field, field) for field in fields])
+    g = {}
+    function %= (criteria, fields)
     exec function in g
     return g['func']
 def sql(records, command):
@@ -2290,7 +2302,7 @@ def sql(records, command):
     no_condition = False
     if ' for ' in command:
         command, condition = command.split(' for ')
-        condition = sql_to_function(condition, table.field_names)
+        condition = sql_for(condition, table.field_names)
     else:
         def condition(**kwds):
             return True
@@ -2302,9 +2314,9 @@ def sql(records, command):
             select_fields = table.field_names
         else:
             select_fields = command.replace(' ','').split(',')
-    command = sql_to_function(command, table.field_names)
     if name not in ('delete','insert','recall','select','update'):
         raise DbfError("unrecognized sql command: %s" % name.upper())
+    command = sql_update(command, table.field_names)
     if name == 'insert' and not no_condition:
         raise DbfError("FOR clause not allowed with INSERT")
     possible = List(desc=sql_command)

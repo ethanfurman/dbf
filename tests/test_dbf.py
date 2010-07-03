@@ -73,7 +73,7 @@ for number in numbers:
     floats.append(float(number ** 2 / last))
     last = number
 
-if dbf.version != (0, 88, 11):
+if dbf.version != (0, 88, 12):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%d.%d\n" % dbf.version
@@ -735,6 +735,10 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.use_deleted = True
         for word in unordered:
             records = name_index.search(match=word)
+            yo.assertEqual(len(records), unordered.count(word))
+            records = table.query(python="name == %r" % word)
+            yo.assertEqual(len(records), unordered.count(word))
+            records = table.query("select * for name == %r" % word)
             yo.assertEqual(len(records), unordered.count(word))
 
         # ordering by two fields

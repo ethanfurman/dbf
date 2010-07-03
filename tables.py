@@ -881,7 +881,7 @@ class DbfTable(object):
                 raise IndexError("Record %d is not in table." % value)
             return yo._table[value]
         elif type(value) == slice:
-            sequence = List(desc='%s -->  %s' % (yo.filename, value))
+            sequence = List(desc='%s -->  %s' % (yo.filename, value), field_names=yo.field_names)
             yo._dbflists.add(sequence)
             for index in range(len(yo))[value]:
                 record = yo._table[index]
@@ -1450,7 +1450,7 @@ class DbfTable(object):
             return sql(yo, sql_command)
         elif python is None:
             raise DbfError("query: python parameter must be specified")
-        possible = List(desc="%s -->  %s" % (yo.filename, python))
+        possible = List(desc="%s -->  %s" % (yo.filename, python), field_names=yo.field_names)
         yo._dbflists.add(possible)
         query_result = {}
         select = 'query_result["keep"] = %s' % python
@@ -1757,7 +1757,8 @@ class VfpTable(DbfTable):
 class List(object):
     "list of Dbf records, with set-like behavior"
     _desc = ''
-    def __init__(yo, new_records=None, desc=None, key=None):
+    def __init__(yo, new_records=None, desc=None, key=None, field_names=None):
+        yo.field_names = field_names
         yo._list = []
         yo._set = set()
         if key is not None:
@@ -2068,13 +2069,14 @@ class Index(object):
                 return record
             else:
                 raise StopIteration
-    def __init__(yo, table, key):
+    def __init__(yo, table, key, field_names=None):
         yo._table = table
         yo._values = []             # ordered list of values
         yo._rec_by_val = []         # matching record numbers
         yo._records = {}            # record numbers:values
         yo.__doc__ = key.__doc__ or 'unknown'
         yo.key = key
+        yo.field_names = field_names or table.field_names
         for record in table:
             value = key(record)
             if value is DoNotIndex:
@@ -2119,7 +2121,7 @@ class Index(object):
             rec_num = yo._rec_by_val[key]
             return yo._table.get_record(rec_num)
         elif isinstance(key, slice):
-            result = List()
+            result = List(field_names=yo._table.field_names)
             yo._table._dbflists.add(result)
             start, stop, step = key.start, key.stop, key.step
             if start is None: start = 0
@@ -2230,7 +2232,7 @@ class Index(object):
             return sql(yo, command)
         elif python is None:
             raise DbfError("query: python parameter must be specified")
-        possible = List(desc="%s -->  %s" % (yo._table.filename, python))
+        possible = List(desc="%s -->  %s" % (yo._table.filename, python), field_names=yo._table.field_names)
         yo._table._dbflists.add(possible)
         query_result = {}
         select = 'query_result["keep"] = %s' % python
@@ -2245,7 +2247,7 @@ class Index(object):
         return possible
     def search(yo, match, partial=False):
         "returns dbf.List of all (partially) matching records"
-        result = List()
+        result = List(field_names=yo._table.field_names)
         yo._table._dbflists.add(result)
         if not isinstance(match, tuple):
             match = (match, )
@@ -2271,30 +2273,61 @@ class Index(object):
 
 csv.register_dialect('dbf', DbfCsv)
 
-def sql_for(criteria, field_names):
+sql_functions = {
+        'select':None,
+        'update':None,
+        'insert':None,
+        'delete':None,
+        'count': None}
+def sql_criteria(records, criteria):
     "creates a function matching the sql criteria"
-    function = """def func(rec):\n    "%s"\n    %s\n    return %s"""
+    function = """def func(records):
+    "%s"
+    matched = List(field_names=records[0].field_names)
+    for rec in records:
+        %s
+
+        if %s:
+            matched.append(rec)
+    return matched"""
     fields = []
-    for field in field_names:
+    for field in records[0].field_names:
         if field in criteria:
             fields.append(field)
-    fields = '\n    '.join(['%s = rec.%s' % (field, field) for field in fields])
-    g = {}
+    fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
+    g = {'List':List}
     function %= (criteria, fields, criteria)
+    print function
     exec function in g
     return g['func']
-def sql_update(criteria, field_names):
-    "creates a function matching the sql criteria"
-    function = """def func(rec):\n    "%s"\n    %s\n    rec.write_record()"""
+
+def sql_command(records, command):
+    "creates a function matching to apply command to each record in records"
+    function = """def func(records):
+    "%s"
+    for rec in records:
+        %s
+
+        %s
+
+        %s
+        rec.write_record()"""
     fields = []
-    for field in field_names:
-        if field in criteria:
+    #print "field_names: ", records[0].field_names
+    for field in records[0].field_names:
+        if field in command:
             fields.append(field)
-    fields = '\n    '.join(['%s\n    rec.%s = %s' % (criteria, field, field) for field in fields])
+    #print 'Fields: ', fields
+    pre_fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
+    #print "pre_fields: ", pre_fields
+    post_fields = '\n        '.join(['rec.%s = %s' % (field, field) for field in fields])
+    #print "post_fields: ", post_fields
     g = {}
-    function %= (criteria, fields)
+    function %= (command, pre_fields, command, post_fields)
+    print function
     exec function in g
     return g['func']
+
 def sql(records, command):
     """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, and RECALL"""
     table = records[0].record_table
@@ -2302,10 +2335,10 @@ def sql(records, command):
     no_condition = False
     if ' for ' in command:
         command, condition = command.split(' for ')
-        condition = sql_for(condition, table.field_names)
+        condition = sql_criteria(records, condition)
     else:
-        def condition(**kwds):
-            return True
+        def condition(records):
+            return records[:]
         no_condition = True
     name, command = command.split(' ', 1)
     name = name.lower()
@@ -2314,36 +2347,40 @@ def sql(records, command):
             select_fields = table.field_names
         else:
             select_fields = command.replace(' ','').split(',')
+        def command(records):
+            return
+    else:
+        command = sql_command(records, command)
     if name not in ('delete','insert','recall','select','update'):
         raise DbfError("unrecognized sql command: %s" % name.upper())
-    command = sql_update(command, table.field_names)
     if name == 'insert' and not no_condition:
         raise DbfError("FOR clause not allowed with INSERT")
-    possible = List(desc=sql_command)
+    possible = List(desc=sql_command, field_names=records[0].field_names)
     tables = set()
     if name == 'insert':
-        #raise DbfError("INSERT not currently implemented")
+        raise DbfError("INSERT not currently implemented")
         record = table.append()
         command(record)
         record.write_record()
         record.check_index()
         possible.append(record)
     else:
-        for record in records:
-            if no_condition or condition(record):
-                possible.append(record)
-                tables.add(record.record_table)
-                if name == 'delete':
-                    record.delete_record()
-                elif name == 'recall':
-                    record.undelete_record()
-                elif name == 'select':
-                    pass
-                elif name == 'update':
-                    command(record)
-                else:
-                    raise DbfError("unrecognized sql command: %s" % sql.upper)
-            record.write_record()
+        possible = condition(records)
+        command(possible)
+        for record in possible:
+            tables.add(record.record_table)
+            if name == 'delete':
+                record.delete_record()
+            elif name == 'recall':
+                record.undelete_record()
+            elif name == 'select':
+                pass
+            elif name == 'update':
+                pass
+                #command(record)
+            else:
+                raise DbfError("unrecognized sql command: %s" % sql.upper)
+        record.write_record()
     if name == 'select':
         field_sizes = dict([(field, table.size(field)) for field in select_fields])
         for t in tables:
@@ -2363,7 +2400,7 @@ def sql(records, command):
         select = table.new(filename=':%s:' % sql_command, field_specs=field_specs)
         for record in possible:
             select.append(record.scatter_fields(), drop=True)
-        return select
+        return select[:]
     else:
         for list_table in tables:
             list_table._dbflists.add(possible)

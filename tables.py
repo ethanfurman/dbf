@@ -716,7 +716,11 @@ class DbfTable(object):
                 size = yo._meta.header.record_length
                 location = index * size + yo._meta.header.start
                 yo._meta.dfd.seek(location)
+                if yo._meta.dfd.tell() != location:
+                    raise ValueError("unable to seek to offset %d in file" % location)
                 bytes = yo._meta.dfd.read(size)
+                if not bytes:
+                    raise ValueError("unable to read record data from %s at location %d" % (yo._meta.filename, location))
                 maybe = _DbfRecord(recnum=index, layout=yo._meta, kamikaze=bytes, _fromdisk=True)
                 yo._weakref_list[index] = weakref.ref(maybe)
             return maybe
@@ -1808,7 +1812,7 @@ class List(object):
         if isinstance(record, tuple):
             item = record
         else:
-            item = record.record_table, record.record_number, yo.key(record)
+            item = yo.key(record)
         return item in yo._set
     def __delitem__(yo, key):
         if isinstance(key, int):
@@ -2229,7 +2233,7 @@ class Index(object):
     def query(yo, sql_command=None, python=None):
         """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, and RECALL"""
         if sql_command:
-            return sql(yo, command)
+            return sql(yo, sql_command)
         elif python is None:
             raise DbfError("query: python parameter must be specified")
         possible = List(desc="%s -->  %s" % (yo._table.filename, python), field_names=yo._table.field_names)
@@ -2282,7 +2286,7 @@ sql_functions = {
 def sql_criteria(records, criteria):
     "creates a function matching the sql criteria"
     function = """def func(records):
-    "%s"
+    \"\"\"%s\"\"\"
     matched = List(field_names=records[0].field_names)
     for rec in records:
         %s
@@ -2301,10 +2305,10 @@ def sql_criteria(records, criteria):
     exec function in g
     return g['func']
 
-def sql_command(records, command):
+def sql_cmd(records, command):
     "creates a function matching to apply command to each record in records"
     function = """def func(records):
-    "%s"
+    \"\"\"%s\"\"\"
     for rec in records:
         %s
 
@@ -2315,6 +2319,7 @@ def sql_command(records, command):
     fields = []
     #print "field_names: ", records[0].field_names
     for field in records[0].field_names:
+        #- print field
         if field in command:
             fields.append(field)
     #print 'Fields: ', fields
@@ -2350,7 +2355,7 @@ def sql(records, command):
         def command(records):
             return
     else:
-        command = sql_command(records, command)
+        command = sql_cmd(records, command)
     if name not in ('delete','insert','recall','select','update'):
         raise DbfError("unrecognized sql command: %s" % name.upper())
     if name == 'insert' and not no_condition:
@@ -2380,7 +2385,7 @@ def sql(records, command):
                 #command(record)
             else:
                 raise DbfError("unrecognized sql command: %s" % sql.upper)
-        record.write_record()
+            record.write_record()
     if name == 'select':
         field_sizes = dict([(field, table.size(field)) for field in select_fields])
         for t in tables:

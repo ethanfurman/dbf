@@ -545,7 +545,7 @@ class DbfTable(object):
     _read_only = False
     _meta_only = False
     _use_deleted = True
-    _backed_up = False
+    backup = False
     class _DbfLists(object):
         "implements the weakref structure for DbfLists"
         def __init__(yo):
@@ -953,7 +953,10 @@ class DbfTable(object):
             meta.decoder = codecs.getdecoder(sd) 
             meta.encoder = codecs.getencoder(sd)
             return
-        dfd = meta.dfd = open(meta.filename, 'r+b')
+        try:
+            dfd = meta.dfd = open(meta.filename, 'r+b')
+        except IOError, e:
+            raise DbfError(str(e))
         dfd.seek(0)
         meta.header = header = yo._TableHeader(dfd.read(32))
         if not header.version in yo._supported_tables:
@@ -1221,12 +1224,12 @@ class DbfTable(object):
             new_name = os.path.splitext(yo.filename)[0] + '_backup.dbf'
         else:
             overwrite = True
-        if overwrite or not yo._backed_up:
+        if overwrite or not yo.backup:
             bkup = open(new_name, 'wb')
             try:
                 yo._meta.dfd.seek(0)
                 copyfileobj(yo._meta.dfd, bkup)
-                yo._backed_up = True
+                yo.backup = new_name
             finally:
                 bkup.close()
     def create_index(yo, key):

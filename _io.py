@@ -4,6 +4,7 @@ import struct
 from decimal import Decimal
 from dbf.exceptions import DbfError, DataOverflow
 from dbf.dates import Date, DateTime, Time
+from math import floor
 
 
 # Constants
@@ -151,7 +152,7 @@ def updateNumeric(value, fielddef, memo=None):
     if decimalsize:
         decimalsize += 1
     maxintegersize = fielddef['length']-decimalsize
-    integersize = len("%.0f" % value)
+    integersize = len("%.0f" % floor(value))
     if integersize > maxintegersize:
         raise DataOverflow('Integer portion too big')
     return "%*.*f" % (fielddef['length'], fielddef['decimals'], value)

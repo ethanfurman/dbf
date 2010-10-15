@@ -197,12 +197,16 @@ class _DbfRecord(object):
         return tuple(results)
 
     def __contains__(yo, key):
-        return key in yo._layout.fields
+        return key in yo._layout.fields or key in ['record_number','delete_flag']
     def __iter__(yo):
         return (yo[field] for field in yo._layout.fields)
     def __getattr__(yo, name):
         if name[0:2] == '__' and name[-2:] == '__':
             raise AttributeError, 'Method %s is not implemented.' % name
+        elif name == 'record_number':
+            return yo._recnum
+        elif name == 'delete_flag':
+            return yo._data[0] != ' '
         elif not name in yo._layout.fields:
             raise FieldMissing(name)
         try:
@@ -1094,7 +1098,7 @@ class DbfTable(object):
             try:
                 name, format = field.split()
                 if name[0] == '_' or name[0].isdigit() or not name.replace('_','').isalnum():
-                    raise DbfError("Field names cannot start with _ or digits, and can only contain the _, letters, and digits")
+                    raise DbfError("%s invalid:  field names must start with a letter, and can only contain letters, digits, and _" % name)
                 name = name.lower()
                 if name in meta.fields:
                     raise DbfError("Field '%s' already exists" % name)
@@ -1366,7 +1370,7 @@ class DbfTable(object):
     def is_memotype(yo, name):
         "returns True if name is a memo type field"
         return yo._meta[name]['type'] in yo._memotypes
-    def new(yo, filename, field_specs=None):
+    def new(yo, filename, field_specs=None, codepage=None):
         "returns a new table of the same type"
         if field_specs is None:
             field_specs = yo.structure()
@@ -1376,7 +1380,9 @@ class DbfTable(object):
                 filename = os.path.join(os.path.split(yo.filename)[0], filename)
             elif name == "":
                 filename = os.path.join(path, os.path.split(yo.filename)[1])
-        return yo.__class__(filename, field_specs)
+        if codepage is None:
+            codepage = yo._meta.header.codepage()[0]
+        return yo.__class__(filename, field_specs, codepage=codepage)
     def next(yo):
         "set record pointer to next (non-deleted) record, and return it"
         if yo.eof():

@@ -219,7 +219,9 @@ def addNumeric(format):
     length, decimals = format[2:-1].split(',')
     length = int(length)
     decimals = int(decimals)
-    if not (0 < length < 18 and 0 <= decimals <= length - 2):
+    if not 0 < length < 18:
+        raise ValueError
+    if decimals and not 0 < decimals <= length - 2:
         raise ValueError
     return length, decimals
 def addVfpCurrency(format):
@@ -248,6 +250,8 @@ def addVfpNumeric(format):
     length, decimals = format[2:-1].split(',')
     length = int(length)
     decimals = int(decimals)
-    if not (0 < length < 21 and 0 <= decimals <= length - 2):
+    if not 0 < length < 21:
+        raise ValueError
+    if decimals and not 0 < decimals <= length - 2:
         raise ValueError
     return length, decimals

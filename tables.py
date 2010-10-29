@@ -16,7 +16,7 @@ from dbf.exceptions import Bof, Eof, DbfError, DataOverflow, FieldMissing, NonUn
 
 input_decoding = locale.getdefaultlocale()[1]    # treat non-unicode data as ...
 default_codepage = 'cp1252'  # if no codepage specified on dbf creation, use this
-return_ascii = True         # convert back to icky ascii, losing chars if no mapping
+return_ascii = True         # if True -- convert back to icky ascii, losing chars if no mapping
 
 version_map = {
         '\x02' : 'FoxBASE',
@@ -867,8 +867,14 @@ class DbfTable(object):
         if not headeronly:
             for record in yo._table:
                 record._update_disk()
+                fd.flush()
+                fd.truncate(yo._meta.header.start + yo._meta.header.record_count * yo._meta.header.record_length)
+        if 'db3' in yo._versionabbv:
+            fd.seek(0, os.SEEK_END)
+            fd.write('\x1a')        # required for dBase III
             fd.flush()
-            fd.truncate(yo._meta.header.start + yo._meta.header.record_count * yo._meta.header.record_length)
+            fd.truncate(yo._meta.header.start + yo._meta.header.record_count * yo._meta.header.record_length + 1)
+
     def __contains__(yo, key):
         return key in yo.field_names
     def __enter__(yo):
@@ -2326,17 +2332,15 @@ def sql_cmd(records, command):
         %s
         rec.write_record()"""
     fields = []
-    #print "field_names: ", records[0].field_names
     for field in records[0].field_names:
-        #- print field
         if field in command:
             fields.append(field)
-    #print 'Fields: ', fields
     pre_fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
-    #print "pre_fields: ", pre_fields
     post_fields = '\n        '.join(['rec.%s = %s' % (field, field) for field in fields])
-    #print "post_fields: ", post_fields
     g = {}
+    if '=' not in command and ' with ' in command.lower():
+        offset = command.lower().index(' with ')
+        command = command[:offset] + ' = ' + command[offset+6:]
     function %= (command, pre_fields, command, post_fields)
     print function
     exec function in g

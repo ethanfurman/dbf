@@ -52,13 +52,18 @@ from dbf.exceptions import DbfWarning, Bof, Eof, DbfError, DataOverflow, FieldMi
 from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, List, DbfCsv
 from dbf.tables import sql, ascii, codepage, encoding, version_map
 
-version = (0, 88, 12)
+version = (0, 88, 14)
+
+default_type = 'db3'    # default format if none specified
 
 __docformat__ = 'epytext'
 
 def Table(filename, field_specs='', memo_size=128, ignore_memos=False, \
           read_only=False, keep_memos=False, meta_only=False, dbf_type=None, codepage=None):
     "returns an open table of the correct dbf_type, or creates it if field_specs is given"
+    #- print "dbf.Table(%s)" % ', '.join(['%r' % arg for arg in (filename, field_specs, dbf_type, codepage)])
+    if field_specs and dbf_type is None:
+        dbf_type = default_type
     if dbf_type is not None:
         dbf_type = dbf_type.lower()
         if dbf_type == 'db3':
@@ -76,12 +81,15 @@ def Table(filename, field_specs='', memo_size=128, ignore_memos=False, \
         if len(possibles) == 1:
             return possibles[0][2](filename, field_specs, memo_size, ignore_memos, \
                                  read_only, keep_memos, meta_only)
-        elif len(possibles) > 1:
-            types = ', '.join(["%s" % item[1] for item in possibles])
-            abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'
-            raise DbfError("Table could be any of %s.  Please specify %s when opening" % (types, abbrs))
         else:
-            raise DbfError("Shouldn't have gotten here -- yell at programmer!")
+            for type, desc, cls in possibles:
+                if type == default_type:
+                    return cls(filename, field_specs, memo_size, ignore_memos, \
+                                 read_only, keep_memos, meta_only)
+            else:
+                types = ', '.join(["%s" % item[1] for item in possibles])
+                abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'
+                raise DbfError("Table could be any of %s.  Please specify %s when opening" % (types, abbrs))
 def index(sequence):
     "returns integers 0 - len(sequence)"
     for i in xrange(len(sequence)):

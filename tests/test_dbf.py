@@ -73,7 +73,7 @@ for number in numbers:
     floats.append(float(number ** 2 / last))
     last = number
 
-if dbf.version != (0, 88, 12):
+if dbf.version != (0, 88, 14):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%d.%d\n" % dbf.version
@@ -236,6 +236,8 @@ class Test_Dbf_Functions(unittest.TestCase):
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
+                last_byte = open(table.filename, 'rb').read()[-1]
+                yo.assertEqual(last_byte, '\x1a')
     def test03(yo):
         "fp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
@@ -300,6 +302,8 @@ class Test_Dbf_Functions(unittest.TestCase):
             orderlist.append(orderdate)
             desclist.append(desc)
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
+            last_byte = open(table.filename, 'rb').read()[-1]
+            yo.assertEqual(last_byte, '\x1a')
             yo.assertEqual(record.name, name)
             yo.assertEqual(record.paid, paid)
             yo.assertEqual(record.qty, qty)
@@ -308,6 +312,8 @@ class Test_Dbf_Functions(unittest.TestCase):
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
         table.close()
+        last_byte = open(table.filename, 'rb').read()[-1]
+        yo.assertEqual(last_byte, '\x1a')
         table = dbf.Table('temptable', dbf_type='db3')
         yo.assertEqual(len(table), len(floats))
         for field in table.field_names:

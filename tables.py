@@ -10,6 +10,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 from decimal import Decimal
 from shutil import copyfileobj
+import dbf
 from dbf import _io as io
 from dbf.dates import Date, DateTime, Time
 from dbf.exceptions import Bof, Eof, DbfError, DataOverflow, FieldMissing, NonUnicode, DoNotIndex
@@ -386,6 +387,8 @@ class _DbfRecord(object):
             yo.gather_fields(kwargs)
         if yo._dirty:
             yo._update_disk()
+            return 1
+        return 0
 class _DbfMemo(object):
     """Provides access to memo fields as dictionaries
        must override _init, _get_memo, and _put_memo to
@@ -1953,6 +1956,7 @@ class List(object):
         yo._maybe_add((new_record.record_table, new_record.record_number, yo.key(new_record)))
         if yo._current == -1 and yo._list:
             yo._current = 0
+        return new_record
     def bottom(yo):
         if yo._list:
             yo._current = len(yo._list) - 1
@@ -2246,7 +2250,7 @@ class Index(object):
         for record in yo._table:
             yo(record)
     def query(yo, sql_command=None, python=None):
-        """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, and RECALL"""
+        """recognized sql commands are SELECT, UPDATE, REPLACE, INSERT, DELETE, and RECALL"""
         if sql_command:
             return sql(yo, sql_command)
         elif python is None:
@@ -2324,20 +2328,22 @@ def sql_cmd(records, command):
     "creates a function matching to apply command to each record in records"
     function = """def func(records):
     \"\"\"%s\"\"\"
+    changed = 0
     for rec in records:
         %s
 
         %s
 
         %s
-        rec.write_record()"""
+        changed += rec.write_record()
+    return changed"""
     fields = []
     for field in records[0].field_names:
         if field in command:
             fields.append(field)
     pre_fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
     post_fields = '\n        '.join(['rec.%s = %s' % (field, field) for field in fields])
-    g = {}
+    g = dbf.sql_user_functions.copy()
     if '=' not in command and ' with ' in command.lower():
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset+6:]
@@ -2360,20 +2366,19 @@ def sql(records, command):
         no_condition = True
     name, command = command.split(' ', 1)
     name = name.lower()
+    field_names = table.field_names
     if name == 'select':
-        if command.strip() == '*':
-            select_fields = table.field_names
-        else:
-            select_fields = command.replace(' ','').split(',')
+        if command.strip() != '*':
+            field_names = command.replace(' ','').split(',')
         def command(records):
             return
     else:
         command = sql_cmd(records, command)
-    if name not in ('delete','insert','recall','select','update'):
+    if name not in ('delete','insert','recall','select','update','replace'):
         raise DbfError("unrecognized sql command: %s" % name.upper())
     if name == 'insert' and not no_condition:
         raise DbfError("FOR clause not allowed with INSERT")
-    possible = List(desc=sql_command, field_names=records[0].field_names)
+    possible = List(desc=sql_command, field_names=field_names)
     tables = set()
     if name == 'insert':
         raise DbfError("INSERT not currently implemented")
@@ -2382,9 +2387,11 @@ def sql(records, command):
         record.write_record()
         record.check_index()
         possible.append(record)
+        changed = 0
     else:
         possible = condition(records)
-        command(possible)
+        possible.field_names = field_names
+        changed = command(possible)
         for record in possible:
             tables.add(record.record_table)
             if name == 'delete':
@@ -2393,35 +2400,36 @@ def sql(records, command):
                 record.undelete_record()
             elif name == 'select':
                 pass
-            elif name == 'update':
+            elif name == 'update' or name == 'replace':
                 pass
                 #command(record)
             else:
                 raise DbfError("unrecognized sql command: %s" % sql.upper)
             record.write_record()
-    if name == 'select':
-        field_sizes = dict([(field, table.size(field)) for field in select_fields])
-        for t in tables:
-            for field in select_fields:
-                field_sizes[field] = max(field_sizes[field], t.size(field))
-        field_specs = []
-        for field in select_fields:
-            type = table.type(field)
-            length, decimals = field_sizes[field]
-            if type in table._decimal_fields:
-                description = "%s %s(%d,%d)" % (field, type, length, decimals)
-            elif type in table._fixed_fields:
-                description = "%s %s" % (field, type)
-            else:
-                description = "%s %s(%d)" % (field, type, length)
-            field_specs.append(description)
-        select = table.new(filename=':%s:' % sql_command, field_specs=field_specs)
-        for record in possible:
-            select.append(record.scatter_fields(), drop=True)
-        return select[:]
-    else:
-        for list_table in tables:
-            list_table._dbflists.add(possible)
+    #- if name == 'select':
+    #-     field_sizes = dict([(field, table.size(field)) for field in select_fields])
+    #-     for t in tables:
+    #-         for field in select_fields:
+    #-             field_sizes[field] = max(field_sizes[field], t.size(field))
+    #-     field_specs = []
+    #-     for field in select_fields:
+    #-         type = table.type(field)
+    #-         length, decimals = field_sizes[field]
+    #-         if type in table._decimal_fields:
+    #-             description = "%s %s(%d,%d)" % (field, type, length, decimals)
+    #-         elif type in table._fixed_fields:
+    #-             description = "%s %s" % (field, type)
+    #-         else:
+    #-             description = "%s %s(%d)" % (field, type, length)
+    #-         field_specs.append(description)
+    #-     select = table.new(filename=':%s:' % sql_command, field_specs=field_specs)
+    #-     for record in possible:
+    #-         select.append(record.scatter_fields(), drop=True)
+    #-     return select[:]
+    #- else:
+    for list_table in tables:
+        list_table._dbflists.add(possible)
+    possible.modified = changed
     return possible
 def _nop(value):
     "returns parameter unchanged"

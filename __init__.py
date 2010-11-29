@@ -55,6 +55,7 @@ from dbf.tables import sql, ascii, codepage, encoding, version_map
 version = (0, 88, 14)
 
 default_type = 'db3'    # default format if none specified
+sql_user_functions = {}      # user-defined sql functions
 
 __docformat__ = 'epytext'
 

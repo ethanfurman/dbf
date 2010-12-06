@@ -1178,16 +1178,21 @@ class DbfTable(object):
         if empty_table:
             yo._meta.current = 0
         return newrecord
-    def bof(yo):
+    def bof(yo, _move=False):
         "moves record pointer to previous usable record; returns True if no more usable records"
-        while yo._meta.current > 0:
-            yo._meta.current -= 1
-            if yo.use_deleted or not yo.current().has_been_deleted:
-                break
-        else:
-            yo._meta.current = -1
-            return True
-        return False    
+        current = yo._meta.current
+        try:
+            while yo._meta.current > 0:
+                yo._meta.current -= 1
+                if yo.use_deleted or not yo.current().has_been_deleted:
+                    break
+            else:
+                yo._meta.current = -1
+                return True
+            return False
+        finally:
+            if not _move:
+                yo._meta.current = current
     def bottom(yo, get_record=False):
         """sets record pointer to bottom of table
         if get_record, seeks to and returns last (non-deleted) record
@@ -1205,15 +1210,13 @@ class DbfTable(object):
         ensures table data is available if keep_table
         ensures memo data is available if keep_memos"""
         yo._meta.inmemory = True
-        if '_table' in dir(yo):
-            del yo._table
         if keep_table:
-            yo._table   # force read of table into memory
-            yo._read_only = True
+            replacement_table = []
+            for record in yo._table:
+                replacement_table.append(record)
+            yo._table = replacement_table
         else:
             if yo._meta.ondisk:
-                yo._meta.dfd.close()
-                yo._meta.dfd = None
                 yo._meta_only = True
         if yo._meta.mfd is not None:
             if not keep_memos:
@@ -1228,6 +1231,11 @@ class DbfTable(object):
                         record[field] = record[field]
             yo._meta.mfd.close()
             yo._meta.mfd = None
+        if yo._meta.ondisk:
+            yo._meta.dfd.close()
+            yo._meta.dfd = None
+        if keep_table:
+            yo._read_only = True
         yo._meta.ondisk = False
     def create_backup(yo, new_name=None, overwrite=False):
         "creates a backup table -- ignored if memory table"
@@ -1280,16 +1288,21 @@ class DbfTable(object):
                     start = yo._meta[field]['end']
             yo._buildHeaderFields()
         yo._update_disk()
-    def eof(yo):
+    def eof(yo, _move=False):
         "moves record pointer to next usable record; returns True if no more usable records"
-        while yo._meta.current < yo._meta.header.record_count - 1:
-            yo._meta.current += 1
-            if yo.use_deleted or not yo.current().has_been_deleted:
-                break
-        else:
-            yo._meta.current = yo._meta.header.record_count
-            return True
-        return False
+        current = yo._meta.current
+        try:
+            while yo._meta.current < yo._meta.header.record_count - 1:
+                yo._meta.current += 1
+                if yo.use_deleted or not yo.current().has_been_deleted:
+                    break
+            else:
+                yo._meta.current = yo._meta.header.record_count
+                return True
+            return False
+        finally:
+            if not _move:
+                yo._meta.current = current
     def export(yo, records=None, filename=None, field_specs=None, format='csv', header=True):
         """writes the table using CSV or tab-delimited format, using the filename
         given if specified, otherwise the table name"""
@@ -1394,7 +1407,7 @@ class DbfTable(object):
         return yo.__class__(filename, field_specs, codepage=codepage)
     def next(yo):
         "set record pointer to next (non-deleted) record, and return it"
-        if yo.eof():
+        if yo.eof(_move=True):
             raise Eof()
         return yo.current()
     def open(yo):
@@ -1463,7 +1476,7 @@ class DbfTable(object):
         yo.reindex()
     def prev(yo):
         "set record pointer to previous (non-deleted) record, and return it"
-        if yo.bof():
+        if yo.bof(_move=True):
             raise Bof
         return yo.current()
     def query(yo, sql_command=None, python=None):
@@ -1551,7 +1564,6 @@ class DbfTable(object):
             yo._update_disk()
         else:
             raise DbfError("You must say you are sure to wipe the table")
-    # these asignments are for backward compatibility, and will go away
 class Db3Table(DbfTable):
     """Provides an interface for working with dBase III tables."""
     _version = 'dBase III Plus'
@@ -2320,7 +2332,7 @@ def sql_criteria(records, criteria):
     fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
     g = {'List':List}
     function %= (criteria, fields, criteria)
-    print function
+#-     print function
     exec function in g
     return g['func']
 
@@ -2348,7 +2360,7 @@ def sql_cmd(records, command):
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset+6:]
     function %= (command, pre_fields, command, post_fields)
-    print function
+#-     print function
     exec function in g
     return g['func']
 
@@ -2406,27 +2418,6 @@ def sql(records, command):
             else:
                 raise DbfError("unrecognized sql command: %s" % sql.upper)
             record.write_record()
-    #- if name == 'select':
-    #-     field_sizes = dict([(field, table.size(field)) for field in select_fields])
-    #-     for t in tables:
-    #-         for field in select_fields:
-    #-             field_sizes[field] = max(field_sizes[field], t.size(field))
-    #-     field_specs = []
-    #-     for field in select_fields:
-    #-         type = table.type(field)
-    #-         length, decimals = field_sizes[field]
-    #-         if type in table._decimal_fields:
-    #-             description = "%s %s(%d,%d)" % (field, type, length, decimals)
-    #-         elif type in table._fixed_fields:
-    #-             description = "%s %s" % (field, type)
-    #-         else:
-    #-             description = "%s %s(%d)" % (field, type, length)
-    #-         field_specs.append(description)
-    #-     select = table.new(filename=':%s:' % sql_command, field_specs=field_specs)
-    #-     for record in possible:
-    #-         select.append(record.scatter_fields(), drop=True)
-    #-     return select[:]
-    #- else:
     for list_table in tables:
         list_table._dbflists.add(possible)
     possible.modified = changed

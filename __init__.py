@@ -52,7 +52,7 @@ from dbf.exceptions import DbfWarning, Bof, Eof, DbfError, DataOverflow, FieldMi
 from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, List, DbfCsv
 from dbf.tables import sql, ascii, codepage, encoding, version_map
 
-version = (0, 88, 14)
+version = (0, 88, 16)
 
 default_type = 'db3'    # default format if none specified
 sql_user_functions = {}      # user-defined sql functions

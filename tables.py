@@ -18,6 +18,7 @@ from dbf.exceptions import Bof, Eof, DbfError, DataOverflow, FieldMissing, NonUn
 input_decoding = locale.getdefaultlocale()[1]    # treat non-unicode data as ...
 default_codepage = 'cp1252'  # if no codepage specified on dbf creation, use this
 return_ascii = True         # if True -- convert back to icky ascii, losing chars if no mapping
+temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TEMP") or ""
 
 version_map = {
         '\x02' : 'FoxBASE',
@@ -1242,7 +1243,10 @@ class DbfTable(object):
         if yo.filename[0] == yo.filename[-1] == ':':
             return
         if new_name is None:
-            new_name = os.path.splitext(yo.filename)[0] + '_backup.dbf'
+            upper = yo.filename.isupper()
+            name, ext = os.path.splitext(os.path.split(yo.filename)[1])
+            extra = '_BACKUP' if upper else '_backup'
+            new_name = os.path.join(temp_dir, name + extra + ext)
         else:
             overwrite = True
         if overwrite or not yo.backup:

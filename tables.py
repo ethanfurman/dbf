@@ -2369,7 +2369,7 @@ def sql_cmd(records, command):
     return g['func']
 
 def sql(records, command):
-    """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, and RECALL"""
+    """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, RECALL, DROP"""
     table = records[0].record_table
     sql_command = command
     no_condition = False
@@ -2383,7 +2383,10 @@ def sql(records, command):
     name, command = command.split(' ', 1)
     name = name.lower()
     field_names = table.field_names
-    if name == 'select':
+    if name == 'drop':
+        table.delete_fields(command)
+        return records
+    elif name == 'select':
         if command.strip() != '*':
             field_names = command.replace(' ','').split(',')
         def command(records):

@@ -2383,9 +2383,16 @@ def sql(records, command):
     name, command = command.split(' ', 1)
     name = name.lower()
     field_names = table.field_names
-    if name == 'drop':
+    if name == 'delete':
         table.delete_fields(command)
-        return records
+        result = List(records)
+        result.modified = len(result)
+        return result
+    elif name == 'add':
+        table.add_fields(command)
+        result = List(records)
+        result.modified = len(result)
+        return result
     elif name == 'select':
         if command.strip() != '*':
             field_names = command.replace(' ','').split(',')

@@ -2312,12 +2312,89 @@ class Index(object):
 
 csv.register_dialect('dbf', DbfCsv)
 
+def sql_select(records, chosen_fields, condition, field_names):
+    if chosen_fields != '*':
+        field_names = chosen_fields.replace(' ','').split(',')
+    result = condition(records)
+    result.modified = 0
+    result.field_names = field_names
+    return result
+
+def sql_update(records, command, condition, field_names):
+    possible = condition(records)
+    possible.modified = sql_cmd(command, field_names)(records)
+    return possible
+
+def sql_delete(records, dead_fields, condition, field_names):
+    deleted = condition(records)
+    deleted.modified = len(deleted)
+    deleted.field_names = field_names
+    if dead_fields == '*':
+        for record in deleted:
+            record.delete_record()
+            record.write_record()
+    else:
+        keep = [f for f in field_names if f not in dead_fields.replace(' ','').split(',')]
+        for record in deleted:
+            record.reset_record(keep_fields=keep)
+            record.write_record()
+    return deleted
+
+def sql_recall(records, all_fields, condition, field_names):
+    if all_fields != '*':
+        raise DbfError('SQL RECALL: fields must be * (only able to recover at the record level)')
+    revivified = List()
+    tables = set()
+    for record in records:
+        tables.add(record_table)
+    old_setting = dict()
+    for table in tables:
+        old_setting[table] = table.use_deleted
+        table.use_deleted = True
+    for record in condition(records):
+        if record.has_been_deleted:
+            revivified.append(record)
+            record.undelete_record()
+            record.write_record()
+    for table in tables:
+        table.use_deleted = old_setting[table]
+    revivified.modfied = len(revivified)
+    revivified.field_names = field_names
+    return revivified
+
+def sql_add(records, new_fields, condition, field_names):
+    tables = set()
+    possible = condition(records)
+    for record in possible:
+        tables.add(record.record_table)
+    for table in tables:
+        table.add_fields(new_fields)
+    possible.modified = len(tables)
+    possible.field_names = field_names
+    return possible
+
+def sql_drop(records, dead_fields, condition, field_names):
+    tables = set()
+    possible = condition(records)
+    for record in possible:
+        tables.add(record.record_table)
+    for table in tables:
+        table.delete_fields(dead_fields)
+    possible.modified = len(tables)
+    possible.field_names = field_names
+    return possible
+
 sql_functions = {
-        'select':None,
-        'update':None,
-        'insert':None,
-        'delete':None,
-        'count': None}
+        'select' : sql_select,
+        'update' : sql_update,
+        'replace': sql_update,
+        'insert' : None,
+        'delete' : sql_delete,
+        'recall' : sql_recall,
+        'add'    : sql_add,
+        'drop'   : sql_drop,
+        'count'  : None,
+        }
 def sql_criteria(records, criteria):
     "creates a function matching the sql criteria"
     function = """def func(records):
@@ -2340,7 +2417,7 @@ def sql_criteria(records, criteria):
     exec function in g
     return g['func']
 
-def sql_cmd(records, command):
+def sql_cmd(command, field_names):
     "creates a function matching to apply command to each record in records"
     function = """def func(records):
     \"\"\"%s\"\"\"
@@ -2354,7 +2431,7 @@ def sql_cmd(records, command):
         changed += rec.write_record()
     return changed"""
     fields = []
-    for field in records[0].field_names:
+    for field in field_names:
         if field in command:
             fields.append(field)
     pre_fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
@@ -2369,73 +2446,27 @@ def sql_cmd(records, command):
     return g['func']
 
 def sql(records, command):
-    """recognized sql commands are SELECT, UPDATE, INSERT, DELETE, RECALL, DROP"""
-    table = records[0].record_table
+    """recognized sql commands are SELECT, UPDATE | REPLACE, DELETE, RECALL, ADD, DROP"""
     sql_command = command
-    no_condition = False
     if ' for ' in command:
         command, condition = command.split(' for ')
         condition = sql_criteria(records, condition)
     else:
         def condition(records):
             return records[:]
-        no_condition = True
     name, command = command.split(' ', 1)
+    command = command.strip()
     name = name.lower()
-    field_names = table.field_names
-    if name == 'delete':
-        table.delete_fields(command)
-        result = List(records)
-        result.modified = len(result)
-        return result
-    elif name == 'add':
-        table.add_fields(command)
-        result = List(records)
-        result.modified = len(result)
-        return result
-    elif name == 'select':
-        if command.strip() != '*':
-            field_names = command.replace(' ','').split(',')
-        def command(records):
-            return
-    else:
-        command = sql_cmd(records, command)
-    if name not in ('delete','insert','recall','select','update','replace'):
-        raise DbfError("unrecognized sql command: %s" % name.upper())
-    if name == 'insert' and not no_condition:
-        raise DbfError("FOR clause not allowed with INSERT")
-    possible = List(desc=sql_command, field_names=field_names)
+    field_names = records[0].field_names
+    if sql_functions.get(name) is None:
+        raise DbfError('unknown SQL command: %s' % name.upper())
+    result = sql_functions[name](records, command, condition, field_names)
     tables = set()
-    if name == 'insert':
-        raise DbfError("INSERT not currently implemented")
-        record = table.append()
-        command(record)
-        record.write_record()
-        record.check_index()
-        possible.append(record)
-        changed = 0
-    else:
-        possible = condition(records)
-        possible.field_names = field_names
-        changed = command(possible)
-        for record in possible:
-            tables.add(record.record_table)
-            if name == 'delete':
-                record.delete_record()
-            elif name == 'recall':
-                record.undelete_record()
-            elif name == 'select':
-                pass
-            elif name == 'update' or name == 'replace':
-                pass
-                #command(record)
-            else:
-                raise DbfError("unrecognized sql command: %s" % sql.upper)
-            record.write_record()
+    for record in result:
+        tables.add(record.record_table)
     for list_table in tables:
-        list_table._dbflists.add(possible)
-    possible.modified = changed
-    return possible
+        list_table._dbflists.add(result)
+    return result
 def _nop(value):
     "returns parameter unchanged"
     return value

@@ -73,7 +73,7 @@ for number in numbers:
     floats.append(float(number ** 2 / last))
     last = number
 
-if dbf.version != (0, 88, 16):
+if dbf.version != (0, 88, 17):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%d.%d\n" % dbf.version

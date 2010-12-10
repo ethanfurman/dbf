@@ -2411,7 +2411,8 @@ def sql_criteria(records, criteria):
         if field in criteria:
             fields.append(field)
     fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
-    g = {'List':List}
+    g = dbf.sql_user_functions.copy()
+    g['List'] = List
     function %= (criteria, fields, criteria)
 #-     print function
     exec function in g

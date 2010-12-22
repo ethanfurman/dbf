@@ -1523,6 +1523,36 @@ class DbfTable(object):
         yo._meta.fields[yo._meta.fields.index(oldname)] = newname
         yo._buildHeaderFields()
         yo._update_disk(headeronly=True)
+    def resize_field(yo, doomed, new_size):
+        """resizes field (C only at this time)
+        creates backup file, then modifies current structure"""
+        if 0 < new_size < 256:
+            raise DbfError("new_size must be between 1 and 255 (use delete_fields to remove a field)")
+        doomed = yo._list_fields(doomed)
+        for victim in doomed:
+            if victim not in yo._meta.fields:
+                raise DbfError("field %s not in table -- resize aborted" % victim)
+        all_records = [record for record in yo]
+        yo.create_backup()
+        for victim in doomed:
+            start = yo._meta[victim]['start']
+            end = yo._meta[victim]['end']
+            eff_end = min(yo._meta[victim]['length'], new_size)
+            yo._meta[victim]['length'] = new_size
+            yo._meta[victim]['end'] = start + new_size
+            blank = array('c', ' ' * new_size)
+            for record in yo:
+                new_data = blank[:]
+                new_data[:eff_end] = record._data[start:start+eff_end]
+                record._data = record._data[:start] + new_data + record._data[end:]
+            for field in yo._meta.fields:
+                if yo._meta[field]['start'] == end:
+                    end = yo._meta[field]['end']
+                    yo._meta[field]['start'] = start + new_size
+                    yo._meta[field]['end'] = start + new_size + yo._meta[field]['length']
+                    start = yo._meta[field]['end']
+            yo._buildHeaderFields()
+        yo._update_disk()
     def size(yo, field):
         "returns size of field as a tuple of (length, decimals)"
         if field in yo:
@@ -2322,7 +2352,7 @@ def sql_select(records, chosen_fields, condition, field_names):
 
 def sql_update(records, command, condition, field_names):
     possible = condition(records)
-    possible.modified = sql_cmd(command, field_names)(records)
+    possible.modified = sql_cmd(command, field_names)(possible)
     return possible
 
 def sql_delete(records, dead_fields, condition, field_names):
@@ -2414,7 +2444,7 @@ def sql_criteria(records, criteria):
     g = dbf.sql_user_functions.copy()
     g['List'] = List
     function %= (criteria, fields, criteria)
-#-     print function
+    print function
     exec function in g
     return g['func']
 
@@ -2442,7 +2472,7 @@ def sql_cmd(command, field_names):
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset+6:]
     function %= (command, pre_fields, command, post_fields)
-#-     print function
+    print function
     exec function in g
     return g['func']
 

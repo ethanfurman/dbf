@@ -872,7 +872,7 @@ class DbfTable(object):
             for record in yo._table:
                 record._update_disk()
                 fd.flush()
-                fd.truncate(yo._meta.header.start + yo._meta.header.record_count * yo._meta.header.record_length)
+            fd.truncate(yo._meta.header.start + yo._meta.header.record_count * yo._meta.header.record_length)
         if 'db3' in yo._versionabbv:
             fd.seek(0, os.SEEK_END)
             fd.write('\x1a')        # required for dBase III
@@ -2480,7 +2480,7 @@ def sql(records, command):
     """recognized sql commands are SELECT, UPDATE | REPLACE, DELETE, RECALL, ADD, DROP"""
     sql_command = command
     if ' for ' in command:
-        command, condition = command.split(' for ')
+        command, condition = command.split(' for ', 1)
         condition = sql_criteria(records, condition)
     else:
         def condition(records):

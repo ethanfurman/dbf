@@ -2414,6 +2414,17 @@ def sql_drop(records, dead_fields, condition, field_names):
     possible.field_names = field_names
     return possible
 
+def sql_pack(records, *args):
+    tables = set()
+    possible = records
+    for record in possible:
+        tables.add(record.record_table)
+    for table in tables:
+        table.pack()
+    possible.modified = len(tables)
+    possible.field_names = field_names
+    return possible
+
 sql_functions = {
         'select' : sql_select,
         'update' : sql_update,
@@ -2424,6 +2435,7 @@ sql_functions = {
         'add'    : sql_add,
         'drop'   : sql_drop,
         'count'  : None,
+        'pack'   : sql_pack,
         }
 def sql_criteria(records, criteria):
     "creates a function matching the sql criteria"

@@ -62,7 +62,8 @@ __docformat__ = 'epytext'
 def Table(filename, field_specs='', memo_size=128, ignore_memos=False, \
           read_only=False, keep_memos=False, meta_only=False, dbf_type=None, codepage=None):
     "returns an open table of the correct dbf_type, or creates it if field_specs is given"
-    #- print "dbf.Table(%s)" % ', '.join(['%r' % arg for arg in (filename, field_specs, dbf_type, codepage)])
+    if dbf_type is None and isinstance(filename, DbfTable):
+        return filename
     if field_specs and dbf_type is None:
         dbf_type = default_type
     if dbf_type is not None:

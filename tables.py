@@ -736,6 +736,8 @@ class DbfTable(object):
             yo._weakref_list.append(weakref.ref(record))
         def clear(yo):
             yo._weakref_list[:] = []
+        def pop(yo):
+            return yo._weakref_list.pop()
     class DbfIterator(object):
         "returns records using current index"
         def __init__(yo, table):
@@ -1148,18 +1150,23 @@ class DbfTable(object):
         newrecord = _DbfRecord(recnum=yo._meta.header.record_count, layout=yo._meta, kamikaze=kamikaze)
         yo._table.append(newrecord)
         yo._meta.header.record_count += 1
-        if dictdata:
-            newrecord.gather_fields(dictdata, drop=drop)
-        elif tupledata:
-            for index, item in enumerate(tupledata):
-                newrecord[index] = item
-        elif kamikaze == str:
-            for field in yo._meta.memofields:
-                newrecord[field] = ''
-        elif kamikaze:
-            for field in yo._meta.memofields:
-                newrecord[field] = kamikaze[field]
-        newrecord.write_record()
+        try:
+            if dictdata:
+                newrecord.gather_fields(dictdata, drop=drop)
+            elif tupledata:
+                for index, item in enumerate(tupledata):
+                    newrecord[index] = item
+            elif kamikaze == str:
+                for field in yo._meta.memofields:
+                    newrecord[field] = ''
+            elif kamikaze:
+                for field in yo._meta.memofields:
+                    newrecord[field] = kamikaze[field]
+        except Exception:
+            yo._table.pop()     # discard failed record
+            yo._meta.header.record_count = yo._meta.header.record_count - 1
+            yo._update_disk()
+            raise
         multiple -= 1
         if multiple:
             data = newrecord._data
@@ -2414,7 +2421,7 @@ def sql_drop(records, dead_fields, condition, field_names):
     possible.field_names = field_names
     return possible
 
-def sql_pack(records, *args):
+def sql_pack(records, arg1, arg2, field_names):
     tables = set()
     possible = records
     for record in possible:
@@ -2491,8 +2498,8 @@ def sql_cmd(command, field_names):
 def sql(records, command):
     """recognized sql commands are SELECT, UPDATE | REPLACE, DELETE, RECALL, ADD, DROP"""
     sql_command = command
-    if ' for ' in command:
-        command, condition = command.split(' for ', 1)
+    if ' where ' in command:
+        command, condition = command.split(' where ', 1)
         condition = sql_criteria(records, condition)
     else:
         def condition(records):

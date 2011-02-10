@@ -1162,6 +1162,7 @@ class DbfTable(object):
             elif kamikaze:
                 for field in yo._meta.memofields:
                     newrecord[field] = kamikaze[field]
+            newrecord.write_record()
         except Exception:
             yo._table.pop()     # discard failed record
             yo._meta.header.record_count = yo._meta.header.record_count - 1
@@ -1533,7 +1534,7 @@ class DbfTable(object):
     def resize_field(yo, doomed, new_size):
         """resizes field (C only at this time)
         creates backup file, then modifies current structure"""
-        if 0 < new_size < 256:
+        if not 0 < new_size < 256:
             raise DbfError("new_size must be between 1 and 255 (use delete_fields to remove a field)")
         doomed = yo._list_fields(doomed)
         for victim in doomed:
@@ -2353,18 +2354,19 @@ def sql_select(records, chosen_fields, condition, field_names):
     if chosen_fields != '*':
         field_names = chosen_fields.replace(' ','').split(',')
     result = condition(records)
-    result.modified = 0
+    result.modified = 0, 'record' + ('','s')[len(result)>1]
     result.field_names = field_names
     return result
 
 def sql_update(records, command, condition, field_names):
     possible = condition(records)
-    possible.modified = sql_cmd(command, field_names)(possible)
+    modified = sql_cmd(command, field_names)(possible)
+    possible.modified = modified, 'record' + ('','s')[modified>1]
     return possible
 
 def sql_delete(records, dead_fields, condition, field_names):
     deleted = condition(records)
-    deleted.modified = len(deleted)
+    deleted.modified = len(deleted), 'record' + ('','s')[len(deleted)>1]
     deleted.field_names = field_names
     if dead_fields == '*':
         for record in deleted:
@@ -2395,7 +2397,7 @@ def sql_recall(records, all_fields, condition, field_names):
             record.write_record()
     for table in tables:
         table.use_deleted = old_setting[table]
-    revivified.modfied = len(revivified)
+    revivified.modfied = len(revivified), 'record' + ('','s')[len(revivified)>1]
     revivified.field_names = field_names
     return revivified
 
@@ -2406,7 +2408,7 @@ def sql_add(records, new_fields, condition, field_names):
         tables.add(record.record_table)
     for table in tables:
         table.add_fields(new_fields)
-    possible.modified = len(tables)
+    possible.modified = len(tables), 'table' + ('','s')[len(tables)>1]
     possible.field_names = field_names
     return possible
 
@@ -2417,18 +2419,31 @@ def sql_drop(records, dead_fields, condition, field_names):
         tables.add(record.record_table)
     for table in tables:
         table.delete_fields(dead_fields)
-    possible.modified = len(tables)
+    possible.modified = len(tables), 'table' + ('','s')[len(tables)>1]
     possible.field_names = field_names
     return possible
 
-def sql_pack(records, arg1, arg2, field_names):
+def sql_pack(records, command, condition, field_names):
     tables = set()
-    possible = records
+    possible = condition(records)
     for record in possible:
         tables.add(record.record_table)
     for table in tables:
         table.pack()
-    possible.modified = len(tables)
+    possible.modified = len(tables), 'table' + ('','s')[len(tables)>1]
+    possible.field_names = field_names
+    return possible
+
+def sql_resize(records, fieldname_newsize, condition, field_names):
+    tables = set()
+    possible = condition(records)
+    for record in possible:
+        tables.add(record.record_table)
+    fieldname, newsize = fieldname_newsize.split()
+    newsize = int(newsize)
+    for table in tables:
+        table.resize_field(fieldname, newsize)
+    possible.modified = len(tables), 'table' + ('','s')[len(tables)>1]
     possible.field_names = field_names
     return possible
 
@@ -2443,7 +2458,9 @@ sql_functions = {
         'drop'   : sql_drop,
         'count'  : None,
         'pack'   : sql_pack,
+        'resize' : sql_resize,
         }
+
 def sql_criteria(records, criteria):
     "creates a function matching the sql criteria"
     function = """def func(records):

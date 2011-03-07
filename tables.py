@@ -1121,7 +1121,7 @@ class DbfTable(object):
                     raise DbfError("Unknown field type:  %s" % field_type)
                 length, decimals = yo._meta.fieldtypes[field_type]['Init'](format)
             except ValueError:
-                raise DbfError("invalid field specifier: %s" % field)
+                raise DbfError("invalid field specifier: %s (multiple fields should be separated with ';'" % field)
             start = offset
             end = offset + length
             offset = end

@@ -44,6 +44,8 @@ Goals:  programming style with databases
 
 NOTE:  Of the VFP data types, auto-increment and null settings are not implemented.
 """
+__docformat__ = 'epytext'
+
 import os
 import csv
 
@@ -51,16 +53,34 @@ from dbf.dates import Date, DateTime, Time
 from dbf.exceptions import DbfWarning, Bof, Eof, DbfError, DataOverflow, FieldMissing, DoNotIndex
 from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, List, DbfCsv
 from dbf.tables import sql, ascii, codepage, encoding, version_map
+from decimal import Decimal
 
-version = (0, 88, 17)
+version = (0, 88, 18)
 
 default_type = 'db3'    # default format if none specified
 sql_user_functions = {}      # user-defined sql functions
 
-__docformat__ = 'epytext'
+tables = {
+    'db3' : Db3Table,
+    'fp'  : FpTable,
+    'vfp' : VfpTable,
+    'dbf' : DbfTable,
+    }
 
-def Table(filename, field_specs='', memo_size=128, ignore_memos=False, \
-          read_only=False, keep_memos=False, meta_only=False, dbf_type=None, codepage=None):
+def Table(
+        filename, 
+        field_specs='', 
+        memo_size=128, 
+        ignore_memos=False,
+        read_only=False, 
+        keep_memos=False, 
+        meta_only=False, 
+        dbf_type=None, 
+        codepage=None,
+        numbers='default',
+        strings=str,
+        currency=Decimal,
+        ):
     "returns an open table of the correct dbf_type, or creates it if field_specs is given"
     if dbf_type is None and isinstance(filename, DbfTable):
         return filename
@@ -68,26 +88,20 @@ def Table(filename, field_specs='', memo_size=128, ignore_memos=False, \
         dbf_type = default_type
     if dbf_type is not None:
         dbf_type = dbf_type.lower()
-        if dbf_type == 'db3':
-            return Db3Table(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage)
-        elif dbf_type == 'fp':
-            return FpTable(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage)
-        elif dbf_type == 'vfp':
-            return VfpTable(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage)
-        elif dbf_type == 'dbf':
-            return DbfTable(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage)
-        else:
+        table = tables.get(dbf_type)
+        if table is None:
             raise DbfError("Unknown table type: %s" % dbf_type)
+        return table(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
     else:
         possibles = guess_table_type(filename)
         if len(possibles) == 1:
             return possibles[0][2](filename, field_specs, memo_size, ignore_memos, \
-                                 read_only, keep_memos, meta_only)
+                                 read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
         else:
             for type, desc, cls in possibles:
                 if type == default_type:
                     return cls(filename, field_specs, memo_size, ignore_memos, \
-                                 read_only, keep_memos, meta_only)
+                                 read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
             else:
                 types = ', '.join(["%s" % item[1] for item in possibles])
                 abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'

@@ -146,8 +146,12 @@ class _DbfRecord(object):
         @returns: python data stored in field"""
 
         field_type = fielddef['type']
+        classtype = yo._layout.fieldtypes[field_type]['Class']
         retrieve = yo._layout.fieldtypes[field_type]['Retrieve']
-        datum = retrieve(record_data, fielddef, yo._layout.memo)
+        if classtype is not None:
+            datum = retrieve(record_data, fielddef, yo._layout.memo, classtype)
+        else:
+            datum = retrieve(record_data, fielddef, yo._layout.memo)
         if field_type in yo._layout.character_fields:
             datum = yo._layout.decoder(datum)[0]
             if yo._layout.return_ascii:
@@ -529,9 +533,9 @@ class DbfTable(object):
     _version = 'basic memory table'
     _versionabbv = 'dbf'
     _fieldtypes = {
-            'D' : { 'Type':'Date',    'Init':io.addDate,    'Blank':Date.today, 'Retrieve':io.retrieveDate,    'Update':io.updateDate, },
-            'L' : { 'Type':'Logical', 'Init':io.addLogical, 'Blank':bool,       'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, },
-            'M' : { 'Type':'Memo',    'Init':io.addMemo,    'Blank':str,        'Retrieve':io.retrieveMemo,    'Update':io.updateMemo, } }
+            'D' : { 'Type':'Date',    'Init':io.addDate,    'Blank':Date.today, 'Retrieve':io.retrieveDate,    'Update':io.updateDate, 'Class':None},
+            'L' : { 'Type':'Logical', 'Init':io.addLogical, 'Blank':bool,       'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Class':None},
+            'M' : { 'Type':'Memo',    'Init':io.addMemo,    'Blank':str,        'Retrieve':io.retrieveMemo,    'Update':io.updateMemo, 'Class':None} }
     _memoext = ''
     _memotypes = tuple('M', )
     _memoClass = _DbfMemo
@@ -542,6 +546,7 @@ class DbfTable(object):
     _character_fields = tuple('M', )        # field representing character data
     _decimal_fields = tuple()               # text-based numeric fields
     _numeric_fields = tuple()               # fields representing a number
+    _currency_fields = tuple()
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x00'             # table type - none
     _dbfTableHeader[8:10] = array('c', io.packShortInt(33))
@@ -911,7 +916,8 @@ class DbfTable(object):
         else:
             raise TypeError('type <%s> not valid for indexing' % type(value))
     def __init__(yo, filename=':memory:', field_specs=None, memo_size=128, ignore_memos=False, 
-                 read_only=False, keep_memos=False, meta_only=False, codepage=None):
+                 read_only=False, keep_memos=False, meta_only=False, codepage=None, 
+                 numbers='default', strings=str, currency=Decimal):
         """open/create dbf file
         filename should include path if needed
         field_specs can be either a ;-delimited string or a list of strings
@@ -929,6 +935,15 @@ class DbfTable(object):
         yo._dbflists = yo._DbfLists()
         yo._indexen = yo._Indexen()
         yo._meta = meta = yo._MetaData()
+        for datatype, classtype in (
+                (yo._character_fields, strings),
+                (yo._numeric_fields, numbers),
+                (yo._currency_fields, currency),
+                ):
+            yo._fieldtypes[datatype] = classtype
+        meta.numbers = numbers
+        meta.strings = strings
+        meta.currency = currency
         meta.table = weakref.ref(yo)
         meta.filename = filename
         meta.fields = []
@@ -1611,11 +1626,11 @@ class Db3Table(DbfTable):
     _version = 'dBase III Plus'
     _versionabbv = 'db3'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter},
-            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate},
-            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical},
-            'M' : {'Type':'Memo', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo},
-            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addNumeric} }
+            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical, 'Class':None},
+            'M' : {'Type':'Memo', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo, 'Class':None},
+            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addNumeric, 'Class':None} }
     _memoext = '.dbt'
     _memotypes = ('M',)
     _memoClass = _Db3Memo
@@ -1626,6 +1641,7 @@ class Db3Table(DbfTable):
     _character_fields = ('C','M') 
     _decimal_fields = ('N',)
     _numeric_fields = ('N',)
+    _currency_fields = tuple()
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x03'         # version - dBase III w/o memo's
     _dbfTableHeader[8:10] = array('c', io.packShortInt(33))
@@ -1686,15 +1702,15 @@ class FpTable(DbfTable):
     _version = 'Foxpro'
     _versionabbv = 'fp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter},
-            'F' : {'Type':'Float', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':float, 'Init':io.addVfpNumeric},
-            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addVfpNumeric},
-            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical},
-            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate},
-            'M' : {'Type':'Memo', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addVfpMemo},
-            'G' : {'Type':'General', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo},
-            'P' : {'Type':'Picture', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo},
-            '0' : {'Type':'_NullFlags', 'Retrieve':io.unsupportedType, 'Update':io.unsupportedType, 'Blank':int, 'Init':None} }
+            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter, 'Class':None},
+            'F' : {'Type':'Float', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':float, 'Init':io.addVfpNumeric, 'Class':None},
+            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addVfpNumeric, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate, 'Class':None},
+            'M' : {'Type':'Memo', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
+            'G' : {'Type':'General', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo, 'Class':None},
+            'P' : {'Type':'Picture', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo, 'Class':None},
+            '0' : {'Type':'_NullFlags', 'Retrieve':io.unsupportedType, 'Update':io.unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -1704,7 +1720,8 @@ class FpTable(DbfTable):
     _variable_fields = ('C','F','N')
     _character_fields = ('C','M')       # field representing character data
     _decimal_fields = ('F','N')
-    _numeric_fields = ('B','F','I','N','Y')
+    _numeric_fields = ('F','N')
+    _currency_fields = tuple()
     _supported_tables = ('\x03', '\xf5')
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
@@ -1761,19 +1778,19 @@ class VfpTable(DbfTable):
     _version = 'Visual Foxpro v6'
     _versionabbv = 'vfp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter},
-            'Y' : {'Type':'Currency', 'Retrieve':io.retrieveCurrency, 'Update':io.updateCurrency, 'Blank':Decimal(), 'Init':io.addVfpCurrency},
-            'B' : {'Type':'Double', 'Retrieve':io.retrieveDouble, 'Update':io.updateDouble, 'Blank':float, 'Init':io.addVfpDouble},
-            'F' : {'Type':'Float', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':float, 'Init':io.addVfpNumeric},
-            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addVfpNumeric},
-            'I' : {'Type':'Integer', 'Retrieve':io.retrieveInteger, 'Update':io.updateInteger, 'Blank':int, 'Init':io.addVfpInteger},
-            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical},
-            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate},
-            'T' : {'Type':'DateTime', 'Retrieve':io.retrieveVfpDateTime, 'Update':io.updateVfpDateTime, 'Blank':DateTime.now, 'Init':io.addVfpDateTime},
-            'M' : {'Type':'Memo', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo},
-            'G' : {'Type':'General', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo},
-            'P' : {'Type':'Picture', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo},
-            '0' : {'Type':'_NullFlags', 'Retrieve':io.unsupportedType, 'Update':io.unsupportedType, 'Blank':int, 'Init':None} }
+            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter, 'Class':None},
+            'Y' : {'Type':'Currency', 'Retrieve':io.retrieveCurrency, 'Update':io.updateCurrency, 'Blank':Decimal(), 'Init':io.addVfpCurrency, 'Class':None},
+            'B' : {'Type':'Double', 'Retrieve':io.retrieveDouble, 'Update':io.updateDouble, 'Blank':float, 'Init':io.addVfpDouble, 'Class':None},
+            'F' : {'Type':'Float', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':float, 'Init':io.addVfpNumeric, 'Class':None},
+            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addVfpNumeric, 'Class':None},
+            'I' : {'Type':'Integer', 'Retrieve':io.retrieveInteger, 'Update':io.updateInteger, 'Blank':int, 'Init':io.addVfpInteger, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate, 'Class':None},
+            'T' : {'Type':'DateTime', 'Retrieve':io.retrieveVfpDateTime, 'Update':io.updateVfpDateTime, 'Blank':DateTime.now, 'Init':io.addVfpDateTime, 'Class':None},
+            'M' : {'Type':'Memo', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
+            'G' : {'Type':'General', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
+            'P' : {'Type':'Picture', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
+            '0' : {'Type':'_NullFlags', 'Retrieve':io.unsupportedType, 'Update':io.unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -1784,6 +1801,7 @@ class VfpTable(DbfTable):
     _character_fields = ('C','M')       # field representing character data
     _decimal_fields = ('F','N')
     _numeric_fields = ('B','F','I','N','Y')
+    _currency_fields = ('Y',)
     _supported_tables = ('\x30',)
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
@@ -2605,6 +2623,7 @@ class _Db4Table(DbfTable):
     _character_fields = ('C','M')       # field representing character data
     _decimal_fields = ('F','N')
     _numeric_fields = ('B','F','I','N','Y')
+    _currency_fields = ('Y',)
     _supported_tables = ('\x04', '\x8b')
     _dbfTableHeader = ['\x00'] * 32
     _dbfTableHeader[0] = '\x8b'         # version - Foxpro 6  0011 0000

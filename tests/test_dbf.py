@@ -74,7 +74,7 @@ for number in numbers:
     floats.append(float(number ** 2 / last))
     last = number
 
-if dbf.version != (0, 88, 18):
+if dbf.version != (0, 88, 19):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%d.%d\n" % dbf.version
@@ -285,7 +285,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                 yo.assertEqual(fieldlist, actualFields)
     def test07(yo):
         "dbf table:  adding records; adding and deleting fields"
-        table = dbf.Table('temptable', 'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3', numbers=Decimal)
+        table = dbf.Table('temptable', 'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3')
         namelist = []
         paidlist = []
         qtylist = []

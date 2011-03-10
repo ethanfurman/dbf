@@ -63,19 +63,19 @@ def convertToBool(value):
         return bool(value.lower() in ['t', 'y', 'true', 'yes'])
     else:
         return bool(value)
-def unsupportedType(something, field, memo=None, typ=str):
+def unsupportedType(something, field, memo=None, typ=None):
     "called if a data type is not supported for that style of table"
     raise DbfError('field type is not supported.')
-def retrieveCharacter(bytes, fielddef={}, memo=None, typ=str):
+def retrieveCharacter(bytes, fielddef={}, memo=None, typ=None):
     "Returns the string in bytes with trailing white space removed"
     return typ(bytes.tostring().rstrip())
 def updateCharacter(string, fielddef, memo=None):
     "returns the string, truncating if string is longer than it's field"
     string = str(string)
     return string.rstrip()
-def retrieveCurrency(bytes, fielddef={}, memo=None, typ=Decimal):
+def retrieveCurrency(bytes, fielddef={}, memo=None, typ=None):
     value = struct.unpack('<q', bytes)[0]
-    return typ("%de-4" % value)
+    return typ(("%de-4" % value).strip())
 def updateCurrency(value, fielddef={}, memo=None):
     currency = int(value * 10000)
     if not -9223372036854775808 < currency < 9223372036854775808:
@@ -89,13 +89,16 @@ def updateDate(moment, fielddef={}, memo=None):
     if moment:
         return "%04d%02d%02d" % moment.timetuple()[:3]
     return '        '
-def retrieveDouble(bytes, fielddef={}, memo=None, typ=float):
+def retrieveDouble(bytes, fielddef={}, memo=None, typ=None):
     return float(struct.unpack('<d', bytes)[0])
 def updateDouble(value, fielddef={}, memo=None):
     return struct.pack('<d', float(value))
-def retrieveInteger(bytes, fielddef={}, memo=None, typ=int):
+def retrieveInteger(bytes, fielddef={}, memo=None, typ=None):
     "Returns the binary number stored in bytes in little-endian format"
-    return typ(struct.unpack('<i', bytes)[0])
+    if typ is None or typ == 'default':
+        return struct.unpack('<i', bytes)[0]
+    else:
+        return typ(struct.unpack('<i', bytes)[0])
 def updateInteger(value, fielddef={}, memo=None):
     "returns value in little-endian binary format"
     try:
@@ -118,7 +121,7 @@ def updateLogical(logical, fielddef={}, memo=None):
     if type(logical) <> bool:
         raise DbfError('Value %s is not logical.' % logical)
     return logical and 'T' or 'F'
-def retrieveMemo(bytes, fielddef, memo):
+def retrieveMemo(bytes, fielddef, memo, typ):
     "Returns the block of data from a memo file"
     stringval = bytes.tostring()
     if stringval.strip():
@@ -132,7 +135,7 @@ def updateMemo(string, fielddef, memo):
     if block == 0:
         block = ''
     return "%*s" % (fielddef['length'], block)
-def retrieveNumeric(bytes, fielddef, memo=None, typ='default'):
+def retrieveNumeric(bytes, fielddef, memo=None, typ=None):
     "Returns the number stored in bytes as integer if field spec for decimals is 0, float otherwise"
     string = bytes.tostring()
     if string[0:1] == '*':  # value too big to store (Visual FoxPro idiocy)
@@ -145,7 +148,7 @@ def retrieveNumeric(bytes, fielddef, memo=None, typ='default'):
         else:
             return float(string)
     else:
-        return typ(string)
+        return typ(string.strip())
 def updateNumeric(value, fielddef, memo=None):
     "returns value as ascii representation, rounding decimal portion as necessary"
     try:
@@ -189,7 +192,7 @@ def updateVfpDateTime(moment, fielddef={}, memo=None):
     bytes[4:] = updateInteger(time)
     bytes[:4] = updateInteger(moment.toordinal() + VFPTIME)
     return ''.join(bytes)
-def retrieveVfpMemo(bytes, fielddef, memo):
+def retrieveVfpMemo(bytes, fielddef, memo, typ=None):
     "Returns the block of data from a memo file"
     block = struct.unpack('<i', bytes)[0]
     return memo.get_memo(block, fielddef)

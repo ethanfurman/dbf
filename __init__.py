@@ -1,11 +1,11 @@
 """
 Copyright
 =========
-    - Copyright: 2008-2009 Ad-Mail, Inc -- All rights reserved.
+    - Copyright: 2008-2011 Ad-Mail, Inc -- All rights reserved.
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.87.003 as of 03 Dec 2009
+    - Version: 0.88.019 as of 10 Mar 2011
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -55,12 +55,12 @@ from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, List, DbfCsv
 from dbf.tables import sql, ascii, codepage, encoding, version_map
 from decimal import Decimal
 
-version = (0, 88, 18)
+version = (0, 88, 19)
 
 default_type = 'db3'    # default format if none specified
 sql_user_functions = {}      # user-defined sql functions
 
-tables = {
+table_types = {
     'db3' : Db3Table,
     'fp'  : FpTable,
     'vfp' : VfpTable,
@@ -88,7 +88,7 @@ def Table(
         dbf_type = default_type
     if dbf_type is not None:
         dbf_type = dbf_type.lower()
-        table = tables.get(dbf_type)
+        table = table_types.get(dbf_type)
         if table is None:
             raise DbfError("Unknown table type: %s" % dbf_type)
         return table(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage, numbers, strings, currency)

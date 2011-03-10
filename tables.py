@@ -17,7 +17,7 @@ from dbf.exceptions import Bof, Eof, DbfError, DataOverflow, FieldMissing, NonUn
 
 input_decoding = locale.getdefaultlocale()[1]    # treat non-unicode data as ...
 default_codepage = 'cp1252'  # if no codepage specified on dbf creation, use this
-return_ascii = True         # if True -- convert back to icky ascii, losing chars if no mapping
+return_ascii = False         # if True -- convert back to icky ascii, losing chars if no mapping
 temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TEMP") or ""
 
 version_map = {
@@ -935,12 +935,13 @@ class DbfTable(object):
         yo._dbflists = yo._DbfLists()
         yo._indexen = yo._Indexen()
         yo._meta = meta = yo._MetaData()
-        for datatype, classtype in (
+        for datatypes, classtype in (
                 (yo._character_fields, strings),
                 (yo._numeric_fields, numbers),
                 (yo._currency_fields, currency),
                 ):
-            yo._fieldtypes[datatype] = classtype
+            for datatype in datatypes:
+                yo._fieldtypes[datatype]['Class'] = classtype
         meta.numbers = numbers
         meta.strings = strings
         meta.currency = currency
@@ -2498,7 +2499,7 @@ def sql_criteria(records, criteria):
     g = dbf.sql_user_functions.copy()
     g['List'] = List
     function %= (criteria, fields, criteria)
-    print function
+    #print function
     exec function in g
     return g['func']
 
@@ -2526,7 +2527,7 @@ def sql_cmd(command, field_names):
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset+6:]
     function %= (command, pre_fields, command, post_fields)
-    print function
+    #print function
     exec function in g
     return g['func']
 

@@ -55,7 +55,13 @@ def unpackDate(bytestr):
         return Date(year, month, day)
 def unpackStr(chars):
         "Returns a normal, lower-cased string from a null-padded byte string"
-        return struct.unpack('%ds' % len(chars), chars)[0].replace('\x00','').lower()
+        field = struct.unpack('%ds' % len(chars), chars)[0]
+        name = []
+        for ch in field:
+            if ch == '\x00':
+                break
+            name.append(ch.lower())
+        return ''.join(name)
 def convertToBool(value):
     """Returns boolean true or false; normal rules apply to non-string values; string values
     must be 'y','t', 'yes', or 'true' (case insensitive) to be True"""

@@ -1912,6 +1912,10 @@ class List(object):
         elif isinstance(key, slice):
             yo._set.difference_update([item[2] for item in yo._list[key]])
             yo._list.__delitem__(key)
+        elif isinstance(key, _DbfRecord):
+            index = yo.index(key)
+            item = yo._list.pop[index]
+            yo._set.remove(item[2])
         else:
             raise TypeError
     def __getitem__(yo, key):
@@ -1927,6 +1931,9 @@ class List(object):
             result.key = yo.key
             result._current = 0 if result else -1
             return result
+        elif isinstance(key, _DbfRecord):
+            index = yo.index(key)
+            return yo._get_record(*yo._list[index])
         else:
             raise TypeError('indices must be integers')
     def __iter__(yo):
@@ -2029,7 +2036,7 @@ class List(object):
         yo._maybe_add((new_record.record_table, new_record.record_number, yo.key(new_record)))
         if yo._current == -1 and yo._list:
             yo._current = 0
-        return new_record
+        #return new_record
     def bottom(yo):
         if yo._list:
             yo._current = len(yo._list) - 1
@@ -2090,11 +2097,16 @@ class List(object):
         yo._index.sort(key=lambda i: yo._meta.orderresults[i], reverse=reverse)
     def index(yo, record, start=None, stop=None):
         item = record.record_table, record.record_number, yo.key(record)
+        key = yo.key(record)
         if start is None:
             start = 0
         if stop is None:
             stop = len(yo._list)
-        return yo._list.index(item, start, stop)
+        for i in range(start, stop):
+            if yo._list[i][2] == key:
+                return i
+        else:
+            raise ValueError("dbf.List.index(x): <x=%r> not in list" % key)
     def insert(yo, i, record):
         item = record.record_table, record.record_number, yo.key(record)
         if item not in yo._set:

@@ -55,7 +55,7 @@ from dbf.tables import DbfTable, Db3Table, VfpTable, FpTable, List, DbfCsv
 from dbf.tables import sql, ascii, codepage, encoding, version_map
 from decimal import Decimal
 
-version = (0, 88, 19)
+version = (0, 88, 20)
 
 default_type = 'db3'    # default format if none specified
 sql_user_functions = {}      # user-defined sql functions

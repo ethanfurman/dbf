@@ -193,15 +193,6 @@ class _DbfRecord(object):
             yo._dirty = False
         for index in yo.record_table._indexen:
             index(yo)
-    def __call__(yo, *specs):
-        results = []
-        if not specs:
-            specs = yo._layout.index
-        specs = _normalize_tuples(tuples=specs, length=2, filler=[_nop])
-        for field, func in specs:
-            results.append(func(yo[field]))
-        return tuple(results)
-
     def __contains__(yo, key):
         return key in yo._layout.fields or key in ['record_number','delete_flag']
     def __iter__(yo):
@@ -994,7 +985,11 @@ class DbfTable(object):
         if not header.version in yo._supported_tables:
             dfd.close()
             dfd = None
-            raise DbfError("Unsupported dbf type: %s [%x]" % (version_map.get(meta.header.version, 'Unknown: %s' % meta.header.version), ord(meta.header.version)))
+            raise DbfError(
+                "%s does not support %s [%x]" % 
+                (yo._version,
+                version_map.get(meta.header.version, 'Unknown: %s' % meta.header.version),
+                ord(meta.header.version)))
         cp, sd, ld = _codepage_lookup(meta.header.codepage())
         yo._meta.decoder = codecs.getdecoder(sd) 
         yo._meta.encoder = codecs.getencoder(sd)
@@ -1389,6 +1384,22 @@ class DbfTable(object):
             fd.close()
             fd = None
         return len(records)
+    def find(yo, command):
+        "uses exec to perform queries on the table"
+        possible = List(desc="%s -->  %s" % (yo.filename, command), field_names=yo.field_names)
+        yo._dbflists.add(possible)
+        result = {}
+        select = 'result["keep"] = %s' % command
+        g = {}
+        use_deleted = yo.use_deleted
+        for record in yo:
+            result['keep'] = False
+            g['result'] = result
+            exec select in g, record
+            if result['keep']:
+                possible.append(record)
+            record.write_record()
+        return possible
     def get_record(yo, recno):
         "returns record at physical_index[recno]"
         return yo._table[recno]
@@ -1508,25 +1519,12 @@ class DbfTable(object):
             raise Bof
         return yo.current()
     def query(yo, sql_command=None, python=None):
-        "uses exec to perform queries on the table"
+        "deprecated: use .find or .sql"
         if sql_command:
-            return sql(yo, sql_command)
-        elif python is None:
-            raise DbfError("query: python parameter must be specified")
-        possible = List(desc="%s -->  %s" % (yo.filename, python), field_names=yo.field_names)
-        yo._dbflists.add(possible)
-        query_result = {}
-        select = 'query_result["keep"] = %s' % python
-        g = {}
-        use_deleted = yo.use_deleted
-        for record in yo:
-            query_result['keep'] = False
-            g['query_result'] = query_result
-            exec select in g, record
-            if query_result['keep']:
-                possible.append(record)
-            record.write_record()
-        return possible
+            return yo.sql(sql_command)
+        elif python:
+            return yo.find(python)
+        raise DbfError("query: python parameter must be specified")
     def reindex(yo):
         for dbfindex in yo._indexen:
             dbfindex.reindex()
@@ -1582,6 +1580,9 @@ class DbfTable(object):
         if field in yo:
             return (yo._meta[field]['length'], yo._meta[field]['decimals'])
         raise DbfError("%s is not a field in %s" % (field, yo.filename))
+    def sql(yo, command):
+        "passes calls through to module level sql function"
+        return sql(yo, command)
     def structure(yo, fields=None):
         """return list of fields suitable for creating same table layout
         @param fields: list of fields or None for all fields"""
@@ -2106,7 +2107,7 @@ class List(object):
             if yo._list[i][2] == key:
                 return i
         else:
-            raise ValueError("dbf.List.index(x): <x=%r> not in list" % key)
+            raise ValueError("dbf.List.index(x): <x=%r> not in list" % (key,))
     def insert(yo, i, record):
         item = record.record_table, record.record_number, yo.key(record)
         if item not in yo._set:

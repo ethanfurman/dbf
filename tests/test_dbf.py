@@ -74,7 +74,7 @@ for number in numbers:
     floats.append(float(number ** 2 / last))
     last = number
 
-if dbf.version != (0, 88, 19):
+if dbf.version != (0, 88, 20):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%d.%d\n" % dbf.version
@@ -917,7 +917,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         yo.assertEqual(table3[0].name, table3[1].name)
         table3[0].write_record(name='Python rocks!')
         yo.assertNotEqual(table3[0].name, table3[1].name)
-    def test18(yo):
+    def notest18(yo):
         "callable record"
         table = dbf.Table('temptable', dbf_type='db3')
         for record in table:
@@ -1064,4 +1064,11 @@ class Test_Dbf_Lists(unittest.TestCase):
         for trec, lrec in zip(index, list4):
             yo.assertEqual(trec.record_number, lrec.record_number)
         table1.close()
+    def test05(yo):
+        "keys"
+        table1 = dbf.Table('temptable', dbf_type='db3')
+        field = table1.field_names[0]
+        list1 = dbf.List(table1, key=lambda rec: rec[field])
+        for rec in table1:
+            yo.assertEqual(rec[field], list1[rec][field])
 unittest.main()

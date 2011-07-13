@@ -1,107 +1,90 @@
-"table definitions"
-import os
-import sys
-import csv
+"""
+Copyright
+=========
+    - Copyright: 2008-2011 Ad-Mail, Inc -- All rights reserved.
+    - Author: Ethan Furman
+    - Contact: ethanf@admailinc.com
+    - Organization: Ad-Mail, Inc.
+    - Version: 0.88.019 as of 10 Mar 2011
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    - Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    - Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    - Neither the name of Ad-Mail, Inc nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY Ad-Mail, Inc ''AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL Ad-Mail, Inc BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+B{I{Summary}}
+
+Python package for reading/writing dBase III and VFP 6 tables and memos
+
+The entire table is read into memory, and all operations occur on the in-memory
+table, with data changes being written to disk as they occur.
+
+Goals:  programming style with databases
+    - C{table = dbf.table('table name' [, fielddesc[, fielddesc[, ....]]])}
+        - fielddesc examples:  C{name C(30); age N(3,0); wisdom M; marriage D}
+    - C{record = [ table.current() | table[int] | table.append() | table.[next|prev|top|bottom|goto]() ]}
+    - C{record.field | record['field']} accesses the field
+
+NOTE:  Of the VFP data types, auto-increment and null settings are not implemented.
+"""
+version = (0, 88, 22)
+__docformat__ = 'epytext'
+
+__all__ = (
+        'Table', 'List', 'Date', 'DateTime', 'Time',
+        'DbfError', 'DataOverflow', 'FieldMissing', 'NonUnicode',
+        'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
+        )
+
+
 import codecs
+import csv
+import datetime
 import locale
+import os
+import struct
+import sys
+import time
 import unicodedata
 import weakref
+
 from array import array
 from bisect import bisect_left, bisect_right
 from decimal import Decimal
+from math import floor
 from shutil import copyfileobj
-import dbf
-from dbf import _io as io
-from dbf.dates import Date, DateTime, Time
-from dbf.exceptions import Bof, Eof, DbfError, DataOverflow, FieldMissing, NonUnicode, DoNotIndex
+
+__metaclass__ = type
 
 input_decoding = locale.getdefaultlocale()[1]    # treat non-unicode data as ...
-default_codepage = 'cp1252'  # if no codepage specified on dbf creation, use this
+default_codepage = input_decoding  # if no codepage specified on dbf creation, use this
 return_ascii = False         # if True -- convert back to icky ascii, losing chars if no mapping
 temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TEMP") or ""
 
-version_map = {
-        '\x02' : 'FoxBASE',
-        '\x03' : 'dBase III Plus',
-        '\x04' : 'dBase IV',
-        '\x05' : 'dBase V',
-        '\x30' : 'Visual FoxPro',
-        '\x31' : 'Visual FoxPro (auto increment field)',
-        '\x43' : 'dBase IV SQL',
-        '\x7b' : 'dBase IV w/memos',
-        '\x83' : 'dBase III Plus w/memos',
-        '\x8b' : 'dBase IV w/memos',
-        '\x8e' : 'dBase IV w/SQL table',
-        '\xf5' : 'FoxPro w/memos'}
+default_type = 'db3'    # default format if none specified
+sql_user_functions = {}      # user-defined sql functions
 
-code_pages = {
-        '\x00' : ('ascii', "plain ol' ascii"),
-        '\x01' : ('cp437', 'U.S. MS-DOS'),
-        '\x02' : ('cp850', 'International MS-DOS'),
-        '\x03' : ('cp1252', 'Windows ANSI'),
-        '\x04' : ('mac_roman', 'Standard Macintosh'),
-        '\x08' : ('cp865', 'Danish OEM'),
-        '\x09' : ('cp437', 'Dutch OEM'),
-        '\x0A' : ('cp850', 'Dutch OEM (secondary)'),
-        '\x0B' : ('cp437', 'Finnish OEM'),
-        '\x0D' : ('cp437', 'French OEM'),
-        '\x0E' : ('cp850', 'French OEM (secondary)'),
-        '\x0F' : ('cp437', 'German OEM'),
-        '\x10' : ('cp850', 'German OEM (secondary)'),
-        '\x11' : ('cp437', 'Italian OEM'),
-        '\x12' : ('cp850', 'Italian OEM (secondary)'),
-        '\x13' : ('cp932', 'Japanese Shift-JIS'),
-        '\x14' : ('cp850', 'Spanish OEM (secondary)'),
-        '\x15' : ('cp437', 'Swedish OEM'),
-        '\x16' : ('cp850', 'Swedish OEM (secondary)'),
-        '\x17' : ('cp865', 'Norwegian OEM'),
-        '\x18' : ('cp437', 'Spanish OEM'),
-        '\x19' : ('cp437', 'English OEM (Britain)'),
-        '\x1A' : ('cp850', 'English OEM (Britain) (secondary)'),
-        '\x1B' : ('cp437', 'English OEM (U.S.)'),
-        '\x1C' : ('cp863', 'French OEM (Canada)'),
-        '\x1D' : ('cp850', 'French OEM (secondary)'),
-        '\x1F' : ('cp852', 'Czech OEM'),
-        '\x22' : ('cp852', 'Hungarian OEM'),
-        '\x23' : ('cp852', 'Polish OEM'),
-        '\x24' : ('cp860', 'Portugese OEM'),
-        '\x25' : ('cp850', 'Potugese OEM (secondary)'),
-        '\x26' : ('cp866', 'Russian OEM'),
-        '\x37' : ('cp850', 'English OEM (U.S.) (secondary)'),
-        '\x40' : ('cp852', 'Romanian OEM'),
-        '\x4D' : ('cp936', 'Chinese GBK (PRC)'),
-        '\x4E' : ('cp949', 'Korean (ANSI/OEM)'),
-        '\x4F' : ('cp950', 'Chinese Big 5 (Taiwan)'),
-        '\x50' : ('cp874', 'Thai (ANSI/OEM)'),
-        '\x57' : ('cp1252', 'ANSI'),
-        '\x58' : ('cp1252', 'Western European ANSI'),
-        '\x59' : ('cp1252', 'Spanish ANSI'),
-        '\x64' : ('cp852', 'Eastern European MS-DOS'),
-        '\x65' : ('cp866', 'Russian MS-DOS'),
-        '\x66' : ('cp865', 'Nordic MS-DOS'),
-        '\x67' : ('cp861', 'Icelandic MS-DOS'),
-        '\x68' : (None, 'Kamenicky (Czech) MS-DOS'),
-        '\x69' : (None, 'Mazovia (Polish) MS-DOS'),
-        '\x6a' : ('cp737', 'Greek MS-DOS (437G)'),
-        '\x6b' : ('cp857', 'Turkish MS-DOS'),
-        '\x78' : ('cp950', 'Traditional Chinese (Hong Kong SAR, Taiwan) Windows'),
-        '\x79' : ('cp949', 'Korean Windows'),
-        '\x7a' : ('cp936', 'Chinese Simplified (PRC, Singapore) Windows'),
-        '\x7b' : ('cp932', 'Japanese Windows'),
-        '\x7c' : ('cp874', 'Thai Windows'),
-        '\x7d' : ('cp1255', 'Hebrew Windows'),
-        '\x7e' : ('cp1256', 'Arabic Windows'),
-        '\xc8' : ('cp1250', 'Eastern European Windows'),
-        '\xc9' : ('cp1251', 'Russian Windows'),
-        '\xca' : ('cp1254', 'Turkish Windows'),
-        '\xcb' : ('cp1253', 'Greek Windows'),
-        '\x96' : ('mac_cyrillic', 'Russian Macintosh'),
-        '\x97' : ('mac_latin2', 'Macintosh EE'),
-        '\x98' : ('mac_greek', 'Greek Macintosh') }
-
+# 2.6+ property for 2.5-
 if sys.version_info[:2] < (2, 6):
     # define our own property type
-    class property(object):
+    class property():
         "Emulate PyProperty_Type() in Objects/descrobject.c"
     
         def __init__(self, fget=None, fset=None, fdel=None, doc=None):
@@ -117,15 +100,15 @@ if sys.version_info[:2] < (2, 6):
             if obj is None:
                 return self         
             if self.fget is None:
-                raise AttributeError, "unreadable attribute"
+                raise AttributeError("unreadable attribute")
             return self.fget(obj)
         def __set__(self, obj, value):
             if self.fset is None:
-                raise AttributeError, "can't set attribute"
+                raise AttributeError("can't set attribute")
             self.fset(obj, value)
         def __delete__(self, obj):
             if self.fdel is None:
-                raise AttributeError, "can't delete attribute"
+                raise AttributeError("can't delete attribute")
             self.fdel(obj)
         def setter(self, func):
             self.fset = func
@@ -133,8 +116,761 @@ if sys.version_info[:2] < (2, 6):
         def deleter(self, func):
             self.fdel = func
             return self
+
+# warnings and errors
+
+class DbfError(Exception):
+    "Fatal errors elicit this response."
+    pass
+class DataOverflow(DbfError):
+    "Data too large for field"
+    def __init__(yo, message, data=None):
+        super(DataOverflow, yo).__init__(message)
+        yo.data = data
+class FieldMissing(KeyError, DbfError):
+    "Field does not exist in table"
+    def __init__(yo, fieldname):
+        super(FieldMissing, yo).__init__('%s:  no such field in table' % fieldname)
+        yo.data = fieldname
+class NonUnicode(DbfError):
+    "Data for table not in unicode"
+    def __init__(yo, message=None):
+        super(NonUnicode, yo).__init__(message)
+class DbfWarning(Exception):
+    "Normal operations elicit this response"
+class Eof(DbfWarning, StopIteration):
+    "End of file reached"
+    message = 'End of file reached'
+    def __init__(yo):
+        super(Eof, yo).__init__(yo.message)
+class Bof(DbfWarning, StopIteration):
+    "Beginning of file reached"
+    message = 'Beginning of file reached'
+    def __init__(yo):
+        super(Bof, yo).__init__(yo.message)
+class DoNotIndex(DbfWarning):
+    "Returned by indexing functions to suppress a record from becoming part of the index"
+    message = 'Not indexing record'
+    def __init__(yo):
+        super(DoNotIndex, yo).__init__(yo.message)
+# wrappers around datetime and logical objects to allow null values
+
+class Date():
+    "adds null capable datetime.date constructs"
+    __slots__ = ['_date']
+    def __new__(cls, year=None, month=0, day=0):
+        """date should be either a datetime.date, a string in yyyymmdd format, 
+        or date/month/day should all be appropriate integers"""
+        nd = object.__new__(cls)
+        nd._date = False
+        if type(year) == datetime.date:
+            nd._date = year
+        elif type(year) == Date:
+            nd._date = year._date
+        elif year == 'no date':
+            pass    # date object is already False
+        elif year is not None:
+            nd._date = datetime.date(year, month, day)
+        return nd
+    def __add__(yo, other):
+        if yo and type(other) == datetime.timedelta:
+            return Date(yo._date + other)
+        else:
+            return NotImplemented
+    def __eq__(yo, other):
+        if yo:
+            if type(other) == datetime.date:
+                return yo._date == other
+            elif type(other) == Date:
+                if other:
+                    return yo._date == other._date
+                return False
+        else:
+            if type(other) == datetime.date:
+                return False
+            elif type(other) == Date:
+                if other:
+                    return False
+                return True
+        return NotImplemented
+    def __getattr__(yo, name):
+        if yo:
+            attribute = yo._date.__getattribute__(name)
+            return attribute
+        else:
+            raise AttributeError('null Date object has no attribute %s' % name)
+    def __ge__(yo, other):
+        if yo:
+            if type(other) == datetime.date:
+                return yo._date >= other
+            elif type(other) == Date:
+                if other:
+                    return yo._date >= other._date
+                return False
+        else:
+            if type(other) == datetime.date:
+                return False
+            elif type(other) == Date:
+                if other:
+                    return False
+                return True
+        return NotImplemented
+    def __gt__(yo, other):
+        if yo:
+            if type(other) == datetime.date:
+                return yo._date > other
+            elif type(other) == Date:
+                if other:
+                    return yo._date > other._date
+                return True
+        else:
+            if type(other) == datetime.date:
+                return False
+            elif type(other) == Date:
+                if other:
+                    return False
+                return False
+        return NotImplemented
+    def __hash__(yo):
+        return yo._date.__hash__()
+    def __le__(yo, other):
+        if yo:
+            if type(other) == datetime.date:
+                return yo._date <= other
+            elif type(other) == Date:
+                if other:
+                    return yo._date <= other._date
+                return False
+        else:
+            if type(other) == datetime.date:
+                return True
+            elif type(other) == Date:
+                if other:
+                    return True
+                return True
+        return NotImplemented
+    def __lt__(yo, other):
+        if yo:
+            if type(other) == datetime.date:
+                return yo._date < other
+            elif type(other) == Date:
+                if other:
+                    return yo._date < other._date
+                return False
+        else:
+            if type(other) == datetime.date:
+                return True
+            elif type(other) == Date:
+                if other:
+                    return True
+                return False
+        return NotImplemented
+    def __ne__(yo, other):
+        if yo:
+            if type(other) == datetime.date:
+                return yo._date != other
+            elif type(other) == Date:
+                if other:
+                    return yo._date != other._date
+                return True
+        else:
+            if type(other) == datetime.date:
+                return True
+            elif type(other) == Date:
+                if other:
+                    return True
+                return False
+        return NotImplemented
+    def __nonzero__(yo):
+        if yo._date:
+            return True
+        return False
+    __radd__ = __add__
+    def __rsub__(yo, other):
+        if yo and type(other) == datetime.date:
+            return other - yo._date
+        elif yo and type(other) == Date:
+            return other._date - yo._date
+        elif yo and type(other) == datetime.timedelta:
+            return Date(other - yo._date)
+        else:
+            return NotImplemented
+    def __repr__(yo):
+        if yo:
+            return "Date(%d, %d, %d)" % yo.timetuple()[:3]
+        else:
+            return "Date()"
+    def __str__(yo):
+        if yo:
+            return yo.isoformat()
+        return "no date"
+    def __sub__(yo, other):
+        if yo and type(other) == datetime.date:
+            return yo._date - other
+        elif yo and type(other) == Date:
+            return yo._date - other._date
+        elif yo and type(other) == datetime.timedelta:
+            return Date(yo._date - other)
+        else:
+            return NotImplemented
+    def date(yo):
+        if yo:
+            return yo._date
+        return None
+    @classmethod
+    def fromordinal(cls, number):
+        if number:
+            return cls(datetime.date.fromordinal(number))
+        return cls()
+    @classmethod
+    def fromtimestamp(cls, timestamp):
+        return cls(datetime.date.fromtimestamp(timestamp))
+    @classmethod
+    def fromymd(cls, yyyymmdd):
+        if yyyymmdd in ('', '        ','no date'):
+            return cls()
+        return cls(datetime.date(int(yyyymmdd[:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:])))
+    def strftime(yo, format):
+        if yo:
+            return yo._date.strftime(format)
+        return '<no date>'
+    @classmethod
+    def today(cls):
+        return cls(datetime.date.today())
+    def ymd(yo):
+        if yo:
+            return "%04d%02d%02d" % yo.timetuple()[:3]
+        else:
+            return '        '
+Date.max = Date(datetime.date.max)
+Date.min = Date(datetime.date.min)
+class DateTime():
+    "adds null capable datetime.datetime constructs"
+    __slots__ = ['_datetime']
+    def __new__(cls, year=None, month=0, day=0, hour=0, minute=0, second=0, microsec=0):
+        """year may be a datetime.datetime"""
+        ndt = object.__new__(cls)
+        ndt._datetime = False
+        if type(year) == datetime.datetime:
+            ndt._datetime = year
+        elif type(year) == DateTime:
+            ndt._datetime = year._datetime
+        elif year is not None:
+            ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsec)
+        return ndt
+    def __add__(yo, other):
+        if yo and type(other) == datetime.timedelta:
+            return DateTime(yo._datetime + other)
+        else:
+            return NotImplemented
+    def __eq__(yo, other):
+        if yo:
+            if type(other) == datetime.datetime:
+                return yo._datetime == other
+            elif type(other) == DateTime:
+                if other:
+                    return yo._datetime == other._datetime
+                return False
+        else:
+            if type(other) == datetime.datetime:
+                return False
+            elif type(other) == DateTime:
+                if other:
+                    return False
+                return True
+        return NotImplemented
+    def __getattr__(yo, name):
+        if yo:
+            attribute = yo._datetime.__getattribute__(name)
+            return attribute
+        else:
+            raise AttributeError('null DateTime object has no attribute %s' % name)
+    def __ge__(yo, other):
+        if yo:
+            if type(other) == datetime.datetime:
+                return yo._datetime >= other
+            elif type(other) == DateTime:
+                if other:
+                    return yo._datetime >= other._datetime
+                return False
+        else:
+            if type(other) == datetime.datetime:
+                return False
+            elif type(other) == DateTime:
+                if other:
+                    return False
+                return True
+        return NotImplemented
+    def __gt__(yo, other):
+        if yo:
+            if type(other) == datetime.datetime:
+                return yo._datetime > other
+            elif type(other) == DateTime:
+                if other:
+                    return yo._datetime > other._datetime
+                return True
+        else:
+            if type(other) == datetime.datetime:
+                return False
+            elif type(other) == DateTime:
+                if other:
+                    return False
+                return False
+        return NotImplemented
+    def __hash__(yo):
+        return yo._datetime.__hash__()
+    def __le__(yo, other):
+        if yo:
+            if type(other) == datetime.datetime:
+                return yo._datetime <= other
+            elif type(other) == DateTime:
+                if other:
+                    return yo._datetime <= other._datetime
+                return False
+        else:
+            if type(other) == datetime.datetime:
+                return True
+            elif type(other) == DateTime:
+                if other:
+                    return True
+                return True
+        return NotImplemented
+    def __lt__(yo, other):
+        if yo:
+            if type(other) == datetime.datetime:
+                return yo._datetime < other
+            elif type(other) == DateTime:
+                if other:
+                    return yo._datetime < other._datetime
+                return False
+        else:
+            if type(other) == datetime.datetime:
+                return True
+            elif type(other) == DateTime:
+                if other:
+                    return True
+                return False
+        return NotImplemented
+    def __ne__(yo, other):
+        if yo:
+            if type(other) == datetime.datetime:
+                return yo._datetime != other
+            elif type(other) == DateTime:
+                if other:
+                    return yo._datetime != other._datetime
+                return True
+        else:
+            if type(other) == datetime.datetime:
+                return True
+            elif type(other) == DateTime:
+                if other:
+                    return True
+                return False
+        return NotImplemented
+    def __nonzero__(yo):
+        if yo._datetime is not False:
+            return True
+        return False
+    __radd__ = __add__
+    def __rsub__(yo, other):
+        if yo and type(other) == datetime.datetime:
+            return other - yo._datetime
+        elif yo and type(other) == DateTime:
+            return other._datetime - yo._datetime
+        elif yo and type(other) == datetime.timedelta:
+            return DateTime(other - yo._datetime)
+        else:
+            return NotImplemented
+    def __repr__(yo):
+        if yo:
+            return "DateTime(%d, %d, %d, %d, %d, %d, %d, %d, %d)" % yo._datetime.timetuple()[:]
+        else:
+            return "DateTime()"
+    def __str__(yo):
+        if yo:
+            return yo.isoformat()
+        return "no datetime"
+    def __sub__(yo, other):
+        if yo and type(other) == datetime.datetime:
+            return yo._datetime - other
+        elif yo and type(other) == DateTime:
+            return yo._datetime - other._datetime
+        elif yo and type(other) == datetime.timedelta:
+            return DateTime(yo._datetime - other)
+        else:
+            return NotImplemented
+    @classmethod
+    def combine(cls, date, time):
+        if Date(date) and Time(time):
+            return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond)
+        return cls()
+    def date(yo):
+        if yo:
+            return Date(yo.year, yo.month, yo.day)
+        return Date()
+    def datetime(yo):
+        if yo:
+            return yo._datetime
+        return None
+    @classmethod    
+    def fromordinal(cls, number):
+        if number:
+            return cls(datetime.datetime.fromordinal(number))
+        else:
+            return cls()
+    @classmethod
+    def fromtimestamp(cls, timestamp):
+        return DateTime(datetime.datetime.fromtimestamp(timestamp))
+    @classmethod
+    def now(cls):
+        return cls(datetime.datetime.now())
+    def time(yo):
+        if yo:
+            return Time(yo.hour, yo.minute, yo.second, yo.microsecond)
+        return Time()
+    @classmethod
+    def utcnow(cls):
+        return cls(datetime.datetime.utcnow())
+    @classmethod
+    def today(cls):
+        return cls(datetime.datetime.today())
+DateTime.max = DateTime(datetime.datetime.max)
+DateTime.min = DateTime(datetime.datetime.min)
+class Time():
+    "adds null capable datetime.time constructs"
+    __slots__ = ['_time']
+    def __new__(cls, hour=None, minute=0, second=0, microsec=0):
+        """hour may be a datetime.time"""
+        nt = object.__new__(cls)
+        nt._time = False
+        if type(hour) == datetime.time:
+            nt._time = hour
+        elif type(hour) == Time:
+            nt._time = hour._time
+        elif hour is not None:
+            nt._time = datetime.time(hour, minute, second, microsec)
+        return nt
+    def __add__(yo, other):
+        if yo and type(other) == datetime.timedelta:
+            return Time(yo._time + other)
+        else:
+            return NotImplemented
+    def __eq__(yo, other):
+        if yo:
+            if type(other) == datetime.time:
+                return yo._time == other
+            elif type(other) == Time:
+                if other:
+                    return yo._time == other._time
+                return False
+        else:
+            if type(other) == datetime.time:
+                return False
+            elif type(other) == Time:
+                if other:
+                    return False
+                return True
+        return NotImplemented
+    def __getattr__(yo, name):
+        if yo:
+            attribute = yo._time.__getattribute__(name)
+            return attribute
+        else:
+            raise AttributeError('null Time object has no attribute %s' % name)
+    def __ge__(yo, other):
+        if yo:
+            if type(other) == datetime.time:
+                return yo._time >= other
+            elif type(other) == Time:
+                if other:
+                    return yo._time >= other._time
+                return False
+        else:
+            if type(other) == datetime.time:
+                return False
+            elif type(other) == Time:
+                if other:
+                    return False
+                return True
+        return NotImplemented
+    def __gt__(yo, other):
+        if yo:
+            if type(other) == datetime.time:
+                return yo._time > other
+            elif type(other) == DateTime:
+                if other:
+                    return yo._time > other._time
+                return True
+        else:
+            if type(other) == datetime.time:
+                return False
+            elif type(other) == Time:
+                if other:
+                    return False
+                return False
+        return NotImplemented
+    def __hash__(yo):
+        return yo._datetime.__hash__()
+    def __le__(yo, other):
+        if yo:
+            if type(other) == datetime.time:
+                return yo._time <= other
+            elif type(other) == Time:
+                if other:
+                    return yo._time <= other._time
+                return False
+        else:
+            if type(other) == datetime.time:
+                return True
+            elif type(other) == Time:
+                if other:
+                    return True
+                return True
+        return NotImplemented
+    def __lt__(yo, other):
+        if yo:
+            if type(other) == datetime.time:
+                return yo._time < other
+            elif type(other) == Time:
+                if other:
+                    return yo._time < other._time
+                return False
+        else:
+            if type(other) == datetime.time:
+                return True
+            elif type(other) == Time:
+                if other:
+                    return True
+                return False
+        return NotImplemented
+    def __ne__(yo, other):
+        if yo:
+            if type(other) == datetime.time:
+                return yo._time != other
+            elif type(other) == Time:
+                if other:
+                    return yo._time != other._time
+                return True
+        else:
+            if type(other) == datetime.time:
+                return True
+            elif type(other) == Time:
+                if other:
+                    return True
+                return False
+        return NotImplemented
+    def __nonzero__(yo):
+        if yo._time is not False:
+            return True
+        return False
+    __radd__ = __add__
+    def __rsub__(yo, other):
+        if yo and type(other) == datetime.time:
+            return other - yo._time
+        elif yo and type(other) == Time:
+            return other._time - yo._time
+        elif yo and type(other) == datetime.timedelta:
+            return Time(other - yo._datetime)
+        else:
+            return NotImplemented
+    def __repr__(yo):
+        if yo:
+            return "Time(%d, %d, %d, %d)" % (yo.hour, yo.minute, yo.second, yo.microsecond)
+        else:
+            return "Time()"
+    def __str__(yo):
+        if yo:
+            return yo.isoformat()
+        return "no time"
+    def __sub__(yo, other):
+        if yo and type(other) == datetime.time:
+            return yo._time - other
+        elif yo and type(other) == Time:
+            return yo._time - other._time
+        elif yo and type(other) == datetime.timedelta:
+            return Time(yo._time - other)
+        else:
+            return NotImplemented
+Time.max = Time(datetime.time.max)
+Time.min = Time(datetime.time.min)
+
+class Logical():
+    "return type for Logical fields; implements boolean algebra"
+    _need_init = True
+    def A(x, y):
+        "OR (disjunction): x | y => True iff at least one of x, y is True"
+        if not isinstance(y, (x.__class__, bool, type(None))):
+            return NotImplemented
+        if x.value is None or y == None:
+            return x.unknown
+        elif x.value is True or y == True:
+            return x.true
+        return x.false
+    def _C_material(x, y):
+        "IMP (material implication) x >> y => False iff x == True and y == False"
+        if not isinstance(y, (x.__class__, bool, type(None))):
+            return NotImplemented
+        if x.value is None or y == None:
+            return x.unknown
+        elif y == False and x.value is True:
+            return x.false
+        return x.true
+    def _C_material_reversed(y, x):
+        "IMP (material implication) x >> y => False iff x = True and y = False"
+        if not isinstance(x, (y.__class__, bool, type(None))):
+            return NotImplemented
+        if x == None or y.value is None:
+            return y.unknown
+        elif x == True and y.value is False:
+            return y.false
+        return y.true
+    def _C_relevant(x, y):
+        "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if x is False"
+        if not isinstance(y, (x.__class__, bool, type(None))):
+            return NotImplemented
+        if x.value is True and y == True:
+            return x.true
+        if x.value is True and y == False:
+            return x.false
+        return x.unknown
+    def _C_relevant_reversed(y, x):
+        "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if y is False"
+        if not isinstance(x, (y.__class__, bool, type(None))):
+            return NotImplemented
+        if x == True and y.value is True:
+            return y.true
+        if  x == True and y.value is False:
+            return y.false
+        return y.unknown
+    def D(x, y):
+        "NAND (negative AND) x.D(y): False iff x and y are both True"
+        if not isinstance(y, (x.__class__, bool, type(None))):
+            return NotImplemented
+        if x.value is None or y == None:
+            return x.unknown
+        elif x.value is True and y == True:
+            return x.false
+        return x.true
+    def E(x, y):
+        "EQV (equivalence) x.E(y): True iff x and y are the same"
+        if not isinstance(y, (x.__class__, bool, type(None))):
+            return NotImplemented
+        if x.value is None or y == None:
+            return x.unknown
+        elif y == True:
+            return (x.false, x.true)[x]
+        elif y == False:
+            return (x.true, x.false)[x]
+    def J(x, y):
+        "XOR (parity) x ^ y: True iff only one of x,y is True"
+        if not isinstance(y, (x.__class__, bool, type(None))):
+            return NotImplemented
+        if x.value is None or y == None:
+            return x.unknown
+        elif y == True:
+            return (x.true, x.false)[x]
+        elif y == False:
+            return (x.false, x.true)[x]
+    def K(x, y):
+        "AND (conjunction) x & y: True iff both x, y are True"
+        if not isinstance(y, (x.__class__, bool, type(None))):
+            return NotImplemented
+        if x.value is None or y == None:
+            return x.unknown
+        elif y == True:
+            return (x.false, x.true)[x]
+        elif y == False:
+            return x.false
+    def N(x):
+        "NEG (negation) -x: True iff x = False"
+        if x is x.true:
+            return x.false
+        elif x is x.false:
+            return x.true
+        else:
+            return x.unknown
+    @classmethod
+    def set_implication(cls, method):
+        "sets IMP to material or relevant"
+        if not isinstance(method, (str, unicode)) or method.lower() not in ('material','relevant'):
+            raise ValueError("method should be 'material' (for strict boolean) or 'relevant', not %r'" % method)
+        if method.lower() == 'material':
+            cls.C = cls._C_material
+            cls.__rshift__ = cls._C_material
+            cls.__rrshift__ = cls._C_material_reversed
+        elif method.lower() == 'relevant':
+            cls.C = cls._C_relevant
+            cls.__rshift__ = cls._C_relevant
+            cls.__rrshift__ = cls._C_relevant_reversed
+    def __new__(cls, value=None):
+        if value is None:
+            return cls.unknown
+        elif isinstance(value, (str, unicode)):
+            if value.lower() in ('t','true','y','yes','on'):
+                return cls.true
+            elif value.lower() in ('f','false','n','no','off'):
+                return cls.false
+            elif value.lower() in ('?','unknown','null','none',' '):
+                return cls.unknown
+            else:
+                raise ValueError('unknown value for Logical: %s' % value)
+        else:
+            return (cls.false, cls.true)[bool(value)]
+    def __eq__(x, y):
+        if isinstance(y, (bool, type(None))):
+            return x.__class__(x.value == y)
+        if isinstance(y, x.__class__):
+            return x.__class__(x.value == y.value)
+        return NotImplemented
+    def __hash__(x):
+        return hash(x.value)
+    def __index__(x):
+        if x.value is False:
+            return 0
+        if x.value is True:
+            return 1
+        if x.value is None:
+            return 2
+    def __ne__(x, y):
+        if isinstance(y, (bool, type(None))):
+            return x.__class__(x.value != y)
+        if isinstance(y, x.__class__):
+            return x.__class__(x.value != y.value)
+        return NotImplemented
+    def __nonzero__(x):
+        return x.value == True
+    def __repr__(x):
+        return "Logical(%r)" % x.string
+    def __str__(x):
+        return x.string
+    __add__ = A
+    __and__ = K
+    __mul__ = K
+    __neg__ = N
+    __or__ = A
+    __radd__ = A
+    __rand__ = K
+    __rshift__ = None
+    __rmul__ = K
+    __ror__ = A
+    __rrshift__ = None
+    __rxor__ = J
+    __xor__ = J
+if hasattr(Logical, '_need_init'):
+    Logical.true = true = object.__new__(Logical)
+    true.value = True
+    true.string = 'T'
+    Logical.false = false = object.__new__(Logical)
+    false.value = False
+    false.string = 'F'
+    Logical.unknown = unknown = object.__new__(Logical)
+    unknown.value = None
+    unknown.string = '?'
+    Logical.set_implication('material')
+    del Logical._need_init
+
 # Internal classes
-class _DbfRecord(object):
+class _DbfRecord():
     """Provides routines to extract and save data within the fields of a dbf record."""
     __slots__ = ['_recnum', '_layout', '_data', '_dirty', '__weakref__']
     def _retrieveFieldValue(yo, record_data, fielddef):
@@ -385,7 +1121,7 @@ class _DbfRecord(object):
             yo._update_disk()
             return 1
         return 0
-class _DbfMemo(object):
+class _DbfMemo():
     """Provides access to memo fields as dictionaries
        must override _init, _get_memo, and _put_memo to
        store memo contents to disk"""
@@ -429,12 +1165,12 @@ class _Db3Memo(_DbfMemo):
         if yo.meta.ondisk and not yo.meta.ignorememos:
             if yo.meta.newmemofile:
                 yo.meta.mfd = open(yo.meta.memoname, 'w+b')
-                yo.meta.mfd.write(io.packLongInt(1) + '\x00' * 508)
+                yo.meta.mfd.write(packLongInt(1) + '\x00' * 508)
             else:
                 try:
                     yo.meta.mfd = open(yo.meta.memoname, 'r+b')
                     yo.meta.mfd.seek(0)
-                    yo.nextmemo = io.unpackLongInt(yo.meta.mfd.read(4))
+                    yo.nextmemo = unpackLongInt(yo.meta.mfd.read(4))
                 except:
                     raise DbfError("memo file appears to be corrupt")
     def _get_memo(yo, block):
@@ -458,7 +1194,7 @@ class _Db3Memo(_DbfMemo):
         thismemo = yo.nextmemo
         yo.nextmemo = thismemo + blocks
         yo.meta.mfd.seek(0)
-        yo.meta.mfd.write(io.packLongInt(yo.nextmemo))
+        yo.meta.mfd.write(packLongInt(yo.nextmemo))
         yo.meta.mfd.seek(thismemo * yo.meta.memo_size)
         yo.meta.mfd.write(data)
         yo.meta.mfd.write('\x1a\x1a')
@@ -489,44 +1225,318 @@ class _VfpMemo(_DbfMemo):
                 if nextmemo * yo.meta.memo_size < 512:
                     nextmemo += 1
                 yo.nextmemo = nextmemo
-                yo.meta.mfd.write(io.packLongInt(nextmemo, bigendian=True) + '\x00\x00' + \
-                        io.packShortInt(yo.meta.memo_size, bigendian=True) + '\x00' * 504)
+                yo.meta.mfd.write(packLongInt(nextmemo, bigendian=True) + '\x00\x00' + \
+                        packShortInt(yo.meta.memo_size, bigendian=True) + '\x00' * 504)
             else:
                 try:
                     yo.meta.mfd = open(yo.meta.memoname, 'r+b')
                     yo.meta.mfd.seek(0)
                     header = yo.meta.mfd.read(512)
-                    yo.nextmemo = io.unpackLongInt(header[:4], bigendian=True)
-                    yo.meta.memo_size = io.unpackShortInt(header[6:8], bigendian=True)
+                    yo.nextmemo = unpackLongInt(header[:4], bigendian=True)
+                    yo.meta.memo_size = unpackShortInt(header[6:8], bigendian=True)
                 except:
                     raise DbfError("memo file appears to be corrupt")
     def _get_memo(yo, block):
         yo.meta.mfd.seek(block * yo.meta.memo_size)
         header = yo.meta.mfd.read(8)
-        length = io.unpackLongInt(header[4:], bigendian=True)
+        length = unpackLongInt(header[4:], bigendian=True)
         return yo.meta.mfd.read(length)
     def _put_memo(yo, data):
         data = data.rstrip()     # no trailing whitespace
         yo.meta.mfd.seek(0)
-        thismemo = io.unpackLongInt(yo.meta.mfd.read(4), bigendian=True)
+        thismemo = unpackLongInt(yo.meta.mfd.read(4), bigendian=True)
         yo.meta.mfd.seek(0)
         length = len(data) + yo.record_header_length  # room for two ^Z at end of memo
         blocks = length // yo.meta.memo_size
         if length % yo.meta.memo_size:
             blocks += 1
-        yo.meta.mfd.write(io.packLongInt(thismemo+blocks, bigendian=True))
+        yo.meta.mfd.write(packLongInt(thismemo+blocks, bigendian=True))
         yo.meta.mfd.seek(thismemo*yo.meta.memo_size)
-        yo.meta.mfd.write('\x00\x00\x00\x01' + io.packLongInt(len(data), bigendian=True) + data)
+        yo.meta.mfd.write('\x00\x00\x00\x01' + packLongInt(len(data), bigendian=True) + data)
         return thismemo
+class DbfCsv(csv.Dialect):
+    "csv format for exporting tables"
+    delimiter = ','
+    doublequote = True
+    escapechar = None
+    lineterminator = '\n'
+    quotechar = '"'
+    skipinitialspace = True
+    quoting = csv.QUOTE_NONNUMERIC
+csv.register_dialect('dbf', DbfCsv)
+
+# Routines for saving, retrieving, and creating fields
+
+VFPTIME = 1721425
+
+def packShortInt(value, bigendian=False):
+        "Returns a two-bye integer from the value, or raises DbfError"
+        # 256 / 65,536
+        if value > 65535:
+            raise DateOverflow("Maximum Integer size exceeded.  Possible: 65535.  Attempted: %d" % value)
+        if bigendian:
+            return struct.pack('>H', value)
+        else:
+            return struct.pack('<H', value)
+def packLongInt(value, bigendian=False):
+        "Returns a four-bye integer from the value, or raises DbfError"
+        # 256 / 65,536 / 16,777,216
+        if value > 4294967295:
+            raise DateOverflow("Maximum Integer size exceeded.  Possible: 4294967295.  Attempted: %d" % value)
+        if bigendian:
+            return struct.pack('>L', value)
+        else:
+            return struct.pack('<L', value)
+def packDate(date):
+        "Returns a group of three bytes, in integer form, of the date"
+        return "%c%c%c" % (date.year-1900, date.month, date.day)
+def packStr(string):
+        "Returns an 11 byte, upper-cased, null padded string suitable for field names; raises DbfError if the string is bigger than 10 bytes"
+        if len(string) > 10:
+            raise DbfError("Maximum string size is ten characters -- %s has %d characters" % (string, len(string)))
+        return struct.pack('11s', string.upper())       
+def unpackShortInt(bytes, bigendian=False):
+        "Returns the value in the two-byte integer passed in"
+        if bigendian:
+            return struct.unpack('>H', bytes)[0]
+        else:
+            return struct.unpack('<H', bytes)[0]
+def unpackLongInt(bytes, bigendian=False):
+        "Returns the value in the four-byte integer passed in"
+        if bigendian:
+            return int(struct.unpack('>L', bytes)[0])
+        else:
+            return int(struct.unpack('<L', bytes)[0])
+def unpackDate(bytestr):
+        "Returns a Date() of the packed three-byte date passed in"
+        year, month, day = struct.unpack('<BBB', bytestr)
+        year += 1900
+        return Date(year, month, day)
+def unpackStr(chars):
+        "Returns a normal, lower-cased string from a null-padded byte string"
+        field = struct.unpack('%ds' % len(chars), chars)[0]
+        name = []
+        for ch in field:
+            if ch == '\x00':
+                break
+            name.append(ch.lower())
+        return ''.join(name)
+def convertToBool(value):
+    """Returns boolean true or false; normal rules apply to non-string values; string values
+    must be 'y','t', 'yes', or 'true' (case insensitive) to be True"""
+    if type(value) == str:
+        return bool(value.lower() in ['t', 'y', 'true', 'yes'])
+    else:
+        return bool(value)
+def unsupportedType(something, field, memo=None, typ=None):
+    "called if a data type is not supported for that style of table"
+    raise DbfError('field type is not supported.')
+def retrieveCharacter(bytes, fielddef={}, memo=None, typ=None):
+    "Returns the string in bytes with trailing white space removed"
+    return typ(bytes.tostring().rstrip())
+def updateCharacter(string, fielddef, memo=None):
+    "returns the string, truncating if string is longer than it's field"
+    string = str(string)
+    return string.rstrip()
+def retrieveCurrency(bytes, fielddef={}, memo=None, typ=None):
+    value = struct.unpack('<q', bytes)[0]
+    return typ(("%de-4" % value).strip())
+def updateCurrency(value, fielddef={}, memo=None):
+    currency = int(value * 10000)
+    if not -9223372036854775808 < currency < 9223372036854775808:
+        raise DataOverflow("value %s is out of bounds" % value)
+    return struct.pack('<q', currency)
+def retrieveDate(bytes, fielddef={}, memo=None):
+    "Returns the ascii coded date as a Date object"
+    return Date.fromymd(bytes.tostring())
+def updateDate(moment, fielddef={}, memo=None):
+    "returns the Date or datetime.date object ascii-encoded (yyyymmdd)"
+    if moment:
+        return "%04d%02d%02d" % moment.timetuple()[:3]
+    return '        '
+def retrieveDouble(bytes, fielddef={}, memo=None, typ=None):
+    return float(struct.unpack('<d', bytes)[0])
+def updateDouble(value, fielddef={}, memo=None):
+    return struct.pack('<d', float(value))
+def retrieveInteger(bytes, fielddef={}, memo=None, typ=None):
+    "Returns the binary number stored in bytes in little-endian format"
+    if typ is None or typ == 'default':
+        return struct.unpack('<i', bytes)[0]
+    else:
+        return typ(struct.unpack('<i', bytes)[0])
+def updateInteger(value, fielddef={}, memo=None):
+    "returns value in little-endian binary format"
+    try:
+        value = int(value)
+    except Exception:
+        raise DbfError("incompatible type: %s(%s)" % (type(value), value))
+    if not -2147483648 < value < 2147483647:
+        raise DataOverflow("Integer size exceeded.  Possible: -2,147,483,648..+2,147,483,647.  Attempted: %d" % value)
+    return struct.pack('<i', int(value))
+def retrieveLogical(bytes, fielddef={}, memo=None):
+    "Returns True if bytes is 't', 'T', 'y', or 'Y', None if '?', and False otherwise"
+    bytes = bytes.tostring()
+    if bytes == '?':
+        return None
+    return bytes in ['t','T','y','Y']
+def updateLogical(logical, fielddef={}, memo=None):
+    "Returns 'T' if logical is True, 'F' otherwise"
+    if type(logical) != bool:
+        logical = convertToBool(logical)
+    if type(logical) <> bool:
+        raise DbfError('Value %s is not logical.' % logical)
+    return logical and 'T' or 'F'
+def retrieveMemo(bytes, fielddef, memo, typ):
+    "Returns the block of data from a memo file"
+    stringval = bytes.tostring()
+    if stringval.strip():
+        block = int(stringval.strip())
+    else:
+        block = 0
+    return memo.get_memo(block, fielddef)
+def updateMemo(string, fielddef, memo):
+    "Writes string as a memo, returns the block number it was saved into"
+    block = memo.put_memo(string)
+    if block == 0:
+        block = ''
+    return "%*s" % (fielddef['length'], block)
+def retrieveNumeric(bytes, fielddef, memo=None, typ=None):
+    "Returns the number stored in bytes as integer if field spec for decimals is 0, float otherwise"
+    string = bytes.tostring()
+    if string[0:1] == '*':  # value too big to store (Visual FoxPro idiocy)
+        return None
+    if not string.strip():
+        string = '0'
+    if typ == 'default':
+        if fielddef['decimals'] == 0:
+            return int(string)
+        else:
+            return float(string)
+    else:
+        return typ(string.strip())
+def updateNumeric(value, fielddef, memo=None):
+    "returns value as ascii representation, rounding decimal portion as necessary"
+    try:
+        value = float(value)
+    except Exception:
+        raise DbfError("incompatible type: %s(%s)" % (type(value), value))
+    decimalsize = fielddef['decimals']
+    if decimalsize:
+        decimalsize += 1
+    maxintegersize = fielddef['length']-decimalsize
+    integersize = len("%.0f" % floor(value))
+    if integersize > maxintegersize:
+        raise DataOverflow('Integer portion too big')
+    return "%*.*f" % (fielddef['length'], fielddef['decimals'], value)
+def retrieveVfpDateTime(bytes, fielddef={}, memo=None):
+    """returns the date/time stored in bytes; dates <= 01/01/1981 00:00:00
+    may not be accurate;  BC dates are nulled."""
+    # two four-byte integers store the date and time.
+    # millesecords are discarded from time
+    time = retrieveInteger(bytes[4:])
+    microseconds = (time % 1000) * 1000
+    time = time // 1000                      # int(round(time, -3)) // 1000 discard milliseconds
+    hours = time // 3600
+    mins = time % 3600 // 60
+    secs = time % 3600 % 60
+    time = Time(hours, mins, secs, microseconds)
+    possible = retrieveInteger(bytes[:4])
+    possible -= VFPTIME
+    possible = max(0, possible)
+    date = Date.fromordinal(possible)
+    return DateTime.combine(date, time)
+def updateVfpDateTime(moment, fielddef={}, memo=None):
+    """sets the date/time stored in moment
+    moment must have fields year, month, day, hour, minute, second, microsecond"""
+    bytes = [0] * 8
+    hour = moment.hour
+    minute = moment.minute
+    second = moment.second
+    millisecond = moment.microsecond // 1000       # convert from millionths to thousandths
+    time = ((hour * 3600) + (minute * 60) + second) * 1000 + millisecond
+    bytes[4:] = updateInteger(time)
+    bytes[:4] = updateInteger(moment.toordinal() + VFPTIME)
+    return ''.join(bytes)
+def retrieveVfpMemo(bytes, fielddef, memo, typ=None):
+    "Returns the block of data from a memo file"
+    block = struct.unpack('<i', bytes)[0]
+    return memo.get_memo(block, fielddef)
+def updateVfpMemo(string, fielddef, memo):
+    "Writes string as a memo, returns the block number it was saved into"
+    block = memo.put_memo(string)
+    return struct.pack('<i', block)
+def addCharacter(format):
+    if format[1] != '(' or format[-1] != ')':
+        raise DbfError("Format for Character field creation is C(n), not %s" % format)
+    length = int(format[2:-1])
+    if not 0 < length < 255:
+        raise ValueError
+    decimals = 0
+    return length, decimals
+def addDate(format):
+    length = 8
+    decimals = 0
+    return length, decimals
+def addLogical(format):
+    length = 1
+    decimals = 0
+    return length, decimals
+def addMemo(format):
+    length = 10
+    decimals = 0
+    return length, decimals
+def addNumeric(format):
+    if format[1] != '(' or format[-1] != ')':
+        raise DbfError("Format for Numeric field creation is N(n,n), not %s" % format)
+    length, decimals = format[2:-1].split(',')
+    length = int(length)
+    decimals = int(decimals)
+    if not 0 < length < 18:
+        raise ValueError
+    if decimals and not 0 < decimals <= length - 2:
+        raise ValueError
+    return length, decimals
+def addVfpCurrency(format):
+    length = 8
+    decimals = 0
+    return length, decimals
+def addVfpDateTime(format):
+    length = 8
+    decimals = 8
+    return length, decimals
+def addVfpDouble(format):
+    length = 8
+    decimals = 0
+    return length, decimals
+def addVfpInteger(format):
+    length = 4
+    decimals = 0
+    return length, decimals
+def addVfpMemo(format):
+    length = 4
+    decimals = 0
+    return length, decimals
+def addVfpNumeric(format):
+    if format[1] != '(' or format[-1] != ')':
+        raise DbfError("Format for Numeric field creation is N(n,n), not %s" % format)
+    length, decimals = format[2:-1].split(',')
+    length = int(length)
+    decimals = int(decimals)
+    if not 0 < length < 21:
+        raise ValueError
+    if decimals and not 0 < decimals <= length - 2:
+        raise ValueError
+    return length, decimals
+
 # Public classes
-class DbfTable(object):
+class DbfTable():
     """Provides a framework for dbf style tables."""
     _version = 'basic memory table'
     _versionabbv = 'dbf'
     _fieldtypes = {
-            'D' : { 'Type':'Date',    'Init':io.addDate,    'Blank':Date.today, 'Retrieve':io.retrieveDate,    'Update':io.updateDate, 'Class':None},
-            'L' : { 'Type':'Logical', 'Init':io.addLogical, 'Blank':bool,       'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Class':None},
-            'M' : { 'Type':'Memo',    'Init':io.addMemo,    'Blank':str,        'Retrieve':io.retrieveMemo,    'Update':io.updateMemo, 'Class':None} }
+            'D' : { 'Type':'Date',    'Init':addDate,    'Blank':Date.today, 'Retrieve':retrieveDate,    'Update':updateDate, 'Class':None},
+            'L' : { 'Type':'Logical', 'Init':addLogical, 'Blank':bool,       'Retrieve':retrieveLogical, 'Update':updateLogical, 'Class':None},
+            'M' : { 'Type':'Memo',    'Init':addMemo,    'Blank':str,        'Retrieve':retrieveMemo,    'Update':updateMemo, 'Class':None} }
     _memoext = ''
     _memotypes = tuple('M', )
     _memoClass = _DbfMemo
@@ -540,7 +1550,7 @@ class DbfTable(object):
     _currency_fields = tuple()
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x00'             # table type - none
-    _dbfTableHeader[8:10] = array('c', io.packShortInt(33))
+    _dbfTableHeader[8:10] = array('c', packShortInt(33))
     _dbfTableHeader[10] = '\x01'            # record length -- one for delete flag
     _dbfTableHeader[29] = '\x00'            # code page -- none, using plain ascii
     _dbfTableHeader = _dbfTableHeader.tostring()
@@ -550,7 +1560,7 @@ class DbfTable(object):
     _meta_only = False
     _use_deleted = True
     backup = False
-    class _DbfLists(object):
+    class _DbfLists():
         "implements the weakref structure for DbfLists"
         def __init__(yo):
             yo._lists = set()
@@ -563,7 +1573,7 @@ class DbfTable(object):
         def add(yo, new_list):
             yo._lists.add(weakref.ref(new_list))
             yo._lists = set([s for s in yo._lists if s() is not None])
-    class _Indexen(object):
+    class _Indexen():
         "implements the weakref structure for seperate indexes"
         def __init__(yo):
             yo._indexen = set()
@@ -588,7 +1598,7 @@ class DbfTable(object):
         ignorememos = False
         memofields = None
         current = -1
-    class _TableHeader(object):
+    class _TableHeader():
         def __init__(yo, data):
             if len(data) != 32:
                 raise DbfError('table header should be 32 bytes, but is %d bytes' % len(data))
@@ -604,7 +1614,7 @@ class DbfTable(object):
         @property
         def data(yo):
             "main data structure"
-            date = io.packDate(Date.today())
+            date = packDate(Date.today())
             yo._data[1:4] = array('c', date)
             return yo._data.tostring()
         @data.setter
@@ -635,7 +1645,7 @@ class DbfTable(object):
                 raise DbfError("corrupt field structure")
             cr += 33    # skip past CR
             yo._data[cr:] = array('c', data)                             # extra
-            yo._data[8:10] = array('c', io.packShortInt(len(yo._data)))  # start
+            yo._data[8:10] = array('c', packShortInt(len(yo._data)))  # start
         @property
         def field_count(yo):
             "number of fields (read-only)"
@@ -672,34 +1682,34 @@ class DbfTable(object):
             if fieldlen % 32 != 0:
                 raise DbfError("fields structure corrupt: %d is not a multiple of 32" % fieldlen)
             yo._data[32:cr] = array('c', block)                           # fields
-            yo._data[8:10] = array('c', io.packShortInt(len(yo._data)))   # start
+            yo._data[8:10] = array('c', packShortInt(len(yo._data)))   # start
             fieldlen = fieldlen // 32
             recordlen = 1                                     # deleted flag
             for i in range(fieldlen):
                 recordlen += ord(block[i*32+16])
-            yo._data[10:12] = array('c', io.packShortInt(recordlen))
+            yo._data[10:12] = array('c', packShortInt(recordlen))
         @property
         def record_count(yo):
             "number of records (maximum 16,777,215)"
-            return io.unpackLongInt(yo._data[4:8].tostring())
+            return unpackLongInt(yo._data[4:8].tostring())
         @record_count.setter
         def record_count(yo, count):
-            yo._data[4:8] = array('c', io.packLongInt(count))
+            yo._data[4:8] = array('c', packLongInt(count))
         @property
         def record_length(yo):
             "length of a record (read_only) (max of 65,535)"
-            return io.unpackShortInt(yo._data[10:12].tostring())
+            return unpackShortInt(yo._data[10:12].tostring())
         @property
         def start(yo):
             "starting position of first record in file (must be within first 64K)"
-            return io.unpackShortInt(yo._data[8:10].tostring())
+            return unpackShortInt(yo._data[8:10].tostring())
         @start.setter
         def start(yo, pos):
-            yo._data[8:10] = array('c', io.packShortInt(pos))
+            yo._data[8:10] = array('c', packShortInt(pos))
         @property
         def update(yo):
             "date of last table modification (read-only)"
-            return io.unpackDate(yo._data[1:4].tostring())
+            return unpackDate(yo._data[1:4].tostring())
         @property
         def version(yo):
             "dbf version"
@@ -707,7 +1717,7 @@ class DbfTable(object):
         @version.setter
         def version(yo, ver):
             yo._data[0] = ver
-    class _Table(object):
+    class _Table():
         "implements the weakref table for records"
         def __init__(yo, count, meta):
             yo._meta = meta
@@ -734,7 +1744,7 @@ class DbfTable(object):
             yo._weakref_list[:] = []
         def pop(yo):
             return yo._weakref_list.pop()
-    class DbfIterator(object):
+    class DbfIterator():
         "returns records using current index"
         def __init__(yo, table):
             yo._table = table
@@ -763,9 +1773,9 @@ class DbfTable(object):
             if yo._meta.fields.count(field) > 1:
                 raise DbfError("corrupted field structure (noticed in _buildHeaderFields)")
             fielddef = array('c', '\x00' * 32)
-            fielddef[:11] = array('c', io.packStr(field))
+            fielddef[:11] = array('c', packStr(field))
             fielddef[11] = yo._meta[field]['type']
-            fielddef[12:16] = array('c', io.packLongInt(yo._meta[field]['start']))
+            fielddef[12:16] = array('c', packLongInt(yo._meta[field]['start']))
             fielddef[16] = chr(yo._meta[field]['length'])
             fielddef[17] = chr(yo._meta[field]['decimals'])
             fielddef[18] = chr(yo._meta[field]['flags'])
@@ -809,7 +1819,7 @@ class DbfTable(object):
             raise DbfError("Header shows %d fields, but field definition block has %d fields" % (yo.field_count, len(fieldsdef)//32))
         for i in range(yo.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = io.unpackStr(fieldblock[:11])
+            name = unpackStr(fieldblock[:11])
             type = fieldblock[11]
             if not type in yo._meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
@@ -1556,13 +2566,17 @@ class DbfTable(object):
                 raise DbfError("field %s not in table -- resize aborted" % victim)
         all_records = [record for record in yo]
         yo.create_backup()
+        #pprint(yo._meta['c_unit'])
+        #print repr(yo[0].c_unit)
         for victim in doomed:
+            delta = new_size - yo._meta[victim]['length']
             start = yo._meta[victim]['start']
             end = yo._meta[victim]['end']
             eff_end = min(yo._meta[victim]['length'], new_size)
             yo._meta[victim]['length'] = new_size
             yo._meta[victim]['end'] = start + new_size
             blank = array('c', ' ' * new_size)
+            #print "\nstart=%s\nend=%s\neff_end=%s\nnew_size=%s\n\n" % (start, end, eff_end, new_size)
             for record in yo:
                 new_data = blank[:]
                 new_data[:eff_end] = record._data[start:start+eff_end]
@@ -1570,9 +2584,12 @@ class DbfTable(object):
             for field in yo._meta.fields:
                 if yo._meta[field]['start'] == end:
                     end = yo._meta[field]['end']
-                    yo._meta[field]['start'] = start + new_size
-                    yo._meta[field]['end'] = start + new_size + yo._meta[field]['length']
+                    yo._meta[field]['start'] += delta
+                    yo._meta[field]['end'] += delta #+ yo._meta[field]['length']
                     start = yo._meta[field]['end']
+            #pprint(yo._meta['c_unit'])
+            #print repr(yo[0].c_unit)
+            #raw_input('...')
             yo._buildHeaderFields()
         yo._update_disk()
     def size(yo, field):
@@ -1628,11 +2645,11 @@ class Db3Table(DbfTable):
     _version = 'dBase III Plus'
     _versionabbv = 'db3'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical, 'Class':None},
-            'M' : {'Type':'Memo', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo, 'Class':None},
-            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addNumeric, 'Class':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical, 'Class':None},
+            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addNumeric, 'Class':None} }
     _memoext = '.dbt'
     _memotypes = ('M',)
     _memoClass = _Db3Memo
@@ -1646,7 +2663,7 @@ class Db3Table(DbfTable):
     _currency_fields = tuple()
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x03'         # version - dBase III w/o memo's
-    _dbfTableHeader[8:10] = array('c', io.packShortInt(33))
+    _dbfTableHeader[8:10] = array('c', packShortInt(33))
     _dbfTableHeader[10] = '\x01'        # record length -- one for delete flag
     _dbfTableHeader[29] = '\x03'        # code page -- 437 US-MS DOS
     _dbfTableHeader = _dbfTableHeader.tostring()
@@ -1687,7 +2704,7 @@ class Db3Table(DbfTable):
             raise DbfError("Header shows %d fields, but field definition block has %d fields" % (yo.field_count, len(fieldsdef)//32))
         for i in range(yo.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = io.unpackStr(fieldblock[:11])
+            name = unpackStr(fieldblock[:11])
             type = fieldblock[11]
             if not type in yo._meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
@@ -1704,15 +2721,15 @@ class FpTable(DbfTable):
     _version = 'Foxpro'
     _versionabbv = 'fp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter, 'Class':None},
-            'F' : {'Type':'Float', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':float, 'Init':io.addVfpNumeric, 'Class':None},
-            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addVfpNumeric, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate, 'Class':None},
-            'M' : {'Type':'Memo', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
-            'G' : {'Type':'General', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo, 'Class':None},
-            'P' : {'Type':'Picture', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo, 'Class':None},
-            '0' : {'Type':'_NullFlags', 'Retrieve':io.unsupportedType, 'Update':io.unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
+            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric, 'Class':None},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate, 'Class':None},
+            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
+            'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
+            'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
+            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -1727,7 +2744,7 @@ class FpTable(DbfTable):
     _supported_tables = ('\x03', '\xf5')
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
-    _dbfTableHeader[8:10] = array('c', io.packShortInt(33+263))
+    _dbfTableHeader[8:10] = array('c', packShortInt(33+263))
     _dbfTableHeader[10] = '\x01'        # record length -- one for delete flag
     _dbfTableHeader[29] = '\x03'        # code page -- 437 US-MS DOS
     _dbfTableHeader = _dbfTableHeader.tostring()
@@ -1760,7 +2777,7 @@ class FpTable(DbfTable):
             raise DbfError("Header shows %d fields, but field definition block has %d fields" % (yo.field_count, len(fieldsdef)//32))
         for i in range(yo.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = io.unpackStr(fieldblock[:11])
+            name = unpackStr(fieldblock[:11])
             type = fieldblock[11]
             if not type in yo._meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
@@ -1780,19 +2797,19 @@ class VfpTable(DbfTable):
     _version = 'Visual Foxpro v6'
     _versionabbv = 'vfp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter, 'Class':None},
-            'Y' : {'Type':'Currency', 'Retrieve':io.retrieveCurrency, 'Update':io.updateCurrency, 'Blank':Decimal(), 'Init':io.addVfpCurrency, 'Class':None},
-            'B' : {'Type':'Double', 'Retrieve':io.retrieveDouble, 'Update':io.updateDouble, 'Blank':float, 'Init':io.addVfpDouble, 'Class':None},
-            'F' : {'Type':'Float', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':float, 'Init':io.addVfpNumeric, 'Class':None},
-            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addVfpNumeric, 'Class':None},
-            'I' : {'Type':'Integer', 'Retrieve':io.retrieveInteger, 'Update':io.updateInteger, 'Blank':int, 'Init':io.addVfpInteger, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate, 'Class':None},
-            'T' : {'Type':'DateTime', 'Retrieve':io.retrieveVfpDateTime, 'Update':io.updateVfpDateTime, 'Blank':DateTime.now, 'Init':io.addVfpDateTime, 'Class':None},
-            'M' : {'Type':'Memo', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
-            'G' : {'Type':'General', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
-            'P' : {'Type':'Picture', 'Retrieve':io.retrieveVfpMemo, 'Update':io.updateVfpMemo, 'Blank':str, 'Init':io.addVfpMemo, 'Class':None},
-            '0' : {'Type':'_NullFlags', 'Retrieve':io.unsupportedType, 'Update':io.unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
+            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal(), 'Init':addVfpCurrency, 'Class':None},
+            'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble, 'Class':None},
+            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric, 'Class':None},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric, 'Class':None},
+            'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate, 'Class':None},
+            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime.now, 'Init':addVfpDateTime, 'Class':None},
+            'M' : {'Type':'Memo', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
+            'G' : {'Type':'General', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
+            'P' : {'Type':'Picture', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
+            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -1807,7 +2824,7 @@ class VfpTable(DbfTable):
     _supported_tables = ('\x30',)
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
-    _dbfTableHeader[8:10] = array('c', io.packShortInt(33+263))
+    _dbfTableHeader[8:10] = array('c', packShortInt(33+263))
     _dbfTableHeader[10] = '\x01'        # record length -- one for delete flag
     _dbfTableHeader[29] = '\x03'        # code page -- 437 US-MS DOS
     _dbfTableHeader = _dbfTableHeader.tostring()
@@ -1836,13 +2853,13 @@ class VfpTable(DbfTable):
         fieldsdef = yo._meta.header.fields
         for i in range(yo.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = io.unpackStr(fieldblock[:11])
+            name = unpackStr(fieldblock[:11])
             type = fieldblock[11]
             if not type in yo._meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
             elif type == '0':
                 return          # ignore nullflags
-            start = io.unpackLongInt(fieldblock[12:16])
+            start = unpackLongInt(fieldblock[12:16])
             length = ord(fieldblock[16])
             offset += length
             end = start + length
@@ -1850,7 +2867,7 @@ class VfpTable(DbfTable):
             flags = ord(fieldblock[18])
             yo._meta.fields.append(name)
             yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
-class List(object):
+class List():
     "list of Dbf records, with set-like behavior"
     _desc = ''
     def __init__(yo, new_records=None, desc=None, key=None, field_names=None):
@@ -2151,17 +3168,8 @@ class List(object):
             return yo._list.sort(reverse=reverse)
         return yo._list.sort(key=lambda item: key(item[0].get_record(item[1])), reverse=reverse)
 
-class DbfCsv(csv.Dialect):
-    "csv format for exporting tables"
-    delimiter = ','
-    doublequote = True
-    escapechar = None
-    lineterminator = '\n'
-    quotechar = '"'
-    skipinitialspace = True
-    quoting = csv.QUOTE_NONNUMERIC
-class Index(object):
-    class IndexIterator(object):
+class Index():
+    class IndexIterator():
         "returns records using this index"
         def __init__(yo, table, records):
             yo.table = table
@@ -2380,7 +3388,94 @@ class Index(object):
                 loc += 1
         return result
 
-csv.register_dialect('dbf', DbfCsv)
+# table meta
+table_types = {
+    'db3' : Db3Table,
+    'fp'  : FpTable,
+    'vfp' : VfpTable,
+    'dbf' : DbfTable,
+    }
+
+version_map = {
+        '\x02' : 'FoxBASE',
+        '\x03' : 'dBase III Plus',
+        '\x04' : 'dBase IV',
+        '\x05' : 'dBase V',
+        '\x30' : 'Visual FoxPro',
+        '\x31' : 'Visual FoxPro (auto increment field)',
+        '\x43' : 'dBase IV SQL',
+        '\x7b' : 'dBase IV w/memos',
+        '\x83' : 'dBase III Plus w/memos',
+        '\x8b' : 'dBase IV w/memos',
+        '\x8e' : 'dBase IV w/SQL table',
+        '\xf5' : 'FoxPro w/memos'}
+
+code_pages = {
+        '\x00' : ('ascii', "plain ol' ascii"),
+        '\x01' : ('cp437', 'U.S. MS-DOS'),
+        '\x02' : ('cp850', 'International MS-DOS'),
+        '\x03' : ('cp1252', 'Windows ANSI'),
+        '\x04' : ('mac_roman', 'Standard Macintosh'),
+        '\x08' : ('cp865', 'Danish OEM'),
+        '\x09' : ('cp437', 'Dutch OEM'),
+        '\x0A' : ('cp850', 'Dutch OEM (secondary)'),
+        '\x0B' : ('cp437', 'Finnish OEM'),
+        '\x0D' : ('cp437', 'French OEM'),
+        '\x0E' : ('cp850', 'French OEM (secondary)'),
+        '\x0F' : ('cp437', 'German OEM'),
+        '\x10' : ('cp850', 'German OEM (secondary)'),
+        '\x11' : ('cp437', 'Italian OEM'),
+        '\x12' : ('cp850', 'Italian OEM (secondary)'),
+        '\x13' : ('cp932', 'Japanese Shift-JIS'),
+        '\x14' : ('cp850', 'Spanish OEM (secondary)'),
+        '\x15' : ('cp437', 'Swedish OEM'),
+        '\x16' : ('cp850', 'Swedish OEM (secondary)'),
+        '\x17' : ('cp865', 'Norwegian OEM'),
+        '\x18' : ('cp437', 'Spanish OEM'),
+        '\x19' : ('cp437', 'English OEM (Britain)'),
+        '\x1A' : ('cp850', 'English OEM (Britain) (secondary)'),
+        '\x1B' : ('cp437', 'English OEM (U.S.)'),
+        '\x1C' : ('cp863', 'French OEM (Canada)'),
+        '\x1D' : ('cp850', 'French OEM (secondary)'),
+        '\x1F' : ('cp852', 'Czech OEM'),
+        '\x22' : ('cp852', 'Hungarian OEM'),
+        '\x23' : ('cp852', 'Polish OEM'),
+        '\x24' : ('cp860', 'Portugese OEM'),
+        '\x25' : ('cp850', 'Potugese OEM (secondary)'),
+        '\x26' : ('cp866', 'Russian OEM'),
+        '\x37' : ('cp850', 'English OEM (U.S.) (secondary)'),
+        '\x40' : ('cp852', 'Romanian OEM'),
+        '\x4D' : ('cp936', 'Chinese GBK (PRC)'),
+        '\x4E' : ('cp949', 'Korean (ANSI/OEM)'),
+        '\x4F' : ('cp950', 'Chinese Big 5 (Taiwan)'),
+        '\x50' : ('cp874', 'Thai (ANSI/OEM)'),
+        '\x57' : ('cp1252', 'ANSI'),
+        '\x58' : ('cp1252', 'Western European ANSI'),
+        '\x59' : ('cp1252', 'Spanish ANSI'),
+        '\x64' : ('cp852', 'Eastern European MS-DOS'),
+        '\x65' : ('cp866', 'Russian MS-DOS'),
+        '\x66' : ('cp865', 'Nordic MS-DOS'),
+        '\x67' : ('cp861', 'Icelandic MS-DOS'),
+        '\x68' : (None, 'Kamenicky (Czech) MS-DOS'),
+        '\x69' : (None, 'Mazovia (Polish) MS-DOS'),
+        '\x6a' : ('cp737', 'Greek MS-DOS (437G)'),
+        '\x6b' : ('cp857', 'Turkish MS-DOS'),
+        '\x78' : ('cp950', 'Traditional Chinese (Hong Kong SAR, Taiwan) Windows'),
+        '\x79' : ('cp949', 'Korean Windows'),
+        '\x7a' : ('cp936', 'Chinese Simplified (PRC, Singapore) Windows'),
+        '\x7b' : ('cp932', 'Japanese Windows'),
+        '\x7c' : ('cp874', 'Thai Windows'),
+        '\x7d' : ('cp1255', 'Hebrew Windows'),
+        '\x7e' : ('cp1256', 'Arabic Windows'),
+        '\xc8' : ('cp1250', 'Eastern European Windows'),
+        '\xc9' : ('cp1251', 'Russian Windows'),
+        '\xca' : ('cp1254', 'Turkish Windows'),
+        '\xcb' : ('cp1253', 'Greek Windows'),
+        '\x96' : ('mac_cyrillic', 'Russian Macintosh'),
+        '\x97' : ('mac_latin2', 'Macintosh EE'),
+        '\x98' : ('mac_greek', 'Greek Macintosh') }
+
+# SQL functions
 
 def sql_select(records, chosen_fields, condition, field_names):
     if chosen_fields != '*':
@@ -2479,20 +3574,6 @@ def sql_resize(records, fieldname_newsize, condition, field_names):
     possible.field_names = field_names
     return possible
 
-sql_functions = {
-        'select' : sql_select,
-        'update' : sql_update,
-        'replace': sql_update,
-        'insert' : None,
-        'delete' : sql_delete,
-        'recall' : sql_recall,
-        'add'    : sql_add,
-        'drop'   : sql_drop,
-        'count'  : None,
-        'pack'   : sql_pack,
-        'resize' : sql_resize,
-        }
-
 def sql_criteria(records, criteria):
     "creates a function matching the sql criteria"
     function = """def func(records):
@@ -2509,7 +3590,9 @@ def sql_criteria(records, criteria):
         if field in criteria:
             fields.append(field)
     fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
-    g = dbf.sql_user_functions.copy()
+    if 'record_number' in criteria:
+        fields += '\n        record_number = rec.record_number'
+    g = sql_user_functions.copy()
     g['List'] = List
     function %= (criteria, fields, criteria)
     #print function
@@ -2535,8 +3618,8 @@ def sql_cmd(command, field_names):
             fields.append(field)
     pre_fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
     post_fields = '\n        '.join(['rec.%s = %s' % (field, field) for field in fields])
-    g = dbf.sql_user_functions.copy()
-    if '=' not in command and ' with ' in command.lower():
+    g = sql_user_functions.copy()
+    if ' with ' in command.lower():
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset+6:]
     function %= (command, pre_fields, command, post_fields)
@@ -2546,26 +3629,50 @@ def sql_cmd(command, field_names):
 
 def sql(records, command):
     """recognized sql commands are SELECT, UPDATE | REPLACE, DELETE, RECALL, ADD, DROP"""
-    sql_command = command
-    if ' where ' in command:
-        command, condition = command.split(' where ', 1)
-        condition = sql_criteria(records, condition)
-    else:
-        def condition(records):
-            return records[:]
-    name, command = command.split(' ', 1)
-    command = command.strip()
-    name = name.lower()
-    field_names = records[0].field_names
-    if sql_functions.get(name) is None:
-        raise DbfError('unknown SQL command: %s' % name.upper())
-    result = sql_functions[name](records, command, condition, field_names)
-    tables = set()
-    for record in result:
-        tables.add(record.record_table)
-    for list_table in tables:
-        list_table._dbflists.add(result)
+    close_table = False
+    if isinstance(records, (str, unicode)):
+        records = Table(records)
+        close_table = True
+    try:
+        sql_command = command
+        if ' where ' in command:
+            command, condition = command.split(' where ', 1)
+            condition = sql_criteria(records, condition)
+        else:
+            def condition(records):
+                return records[:]
+        name, command = command.split(' ', 1)
+        command = command.strip()
+        name = name.lower()
+        field_names = records[0].field_names
+        if sql_functions.get(name) is None:
+            raise DbfError('unknown SQL command: %s' % name.upper())
+        result = sql_functions[name](records, command, condition, field_names)
+        tables = set()
+        for record in result:
+            tables.add(record.record_table)
+        for list_table in tables:
+            list_table._dbflists.add(result)
+    finally:
+        if close_table:
+            records.close()
     return result
+
+sql_functions = {
+        'select' : sql_select,
+        'update' : sql_update,
+        'replace': sql_update,
+        'insert' : None,
+        'delete' : sql_delete,
+        'recall' : sql_recall,
+        'add'    : sql_add,
+        'drop'   : sql_drop,
+        'count'  : None,
+        'pack'   : sql_pack,
+        'resize' : sql_resize,
+        }
+
+
 def _nop(value):
     "returns parameter unchanged"
     return value
@@ -2591,6 +3698,8 @@ def _codepage_lookup(cp):
             raise DbfError("Unsupported codepage: %s" % cp)
     sd, ld = code_pages[cp]
     return cp, sd, ld
+# miscellany
+
 def ascii(new_setting=None):
     "get/set return_ascii setting"
     global return_ascii
@@ -2614,19 +3723,19 @@ class _Db4Table(DbfTable):
     version = 'dBase IV w/memos (non-functional)'
     _versionabbv = 'db4'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':io.retrieveCharacter, 'Update':io.updateCharacter, 'Blank':str, 'Init':io.addCharacter},
-            'Y' : {'Type':'Currency', 'Retrieve':io.retrieveCurrency, 'Update':io.updateCurrency, 'Blank':Decimal(), 'Init':io.addVfpCurrency},
-            'B' : {'Type':'Double', 'Retrieve':io.retrieveDouble, 'Update':io.updateDouble, 'Blank':float, 'Init':io.addVfpDouble},
-            'F' : {'Type':'Float', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':float, 'Init':io.addVfpNumeric},
-            'N' : {'Type':'Numeric', 'Retrieve':io.retrieveNumeric, 'Update':io.updateNumeric, 'Blank':int, 'Init':io.addVfpNumeric},
-            'I' : {'Type':'Integer', 'Retrieve':io.retrieveInteger, 'Update':io.updateInteger, 'Blank':int, 'Init':io.addVfpInteger},
-            'L' : {'Type':'Logical', 'Retrieve':io.retrieveLogical, 'Update':io.updateLogical, 'Blank':bool, 'Init':io.addLogical},
-            'D' : {'Type':'Date', 'Retrieve':io.retrieveDate, 'Update':io.updateDate, 'Blank':Date.today, 'Init':io.addDate},
-            'T' : {'Type':'DateTime', 'Retrieve':io.retrieveVfpDateTime, 'Update':io.updateVfpDateTime, 'Blank':DateTime.now, 'Init':io.addVfpDateTime},
-            'M' : {'Type':'Memo', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo},
-            'G' : {'Type':'General', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo},
-            'P' : {'Type':'Picture', 'Retrieve':io.retrieveMemo, 'Update':io.updateMemo, 'Blank':str, 'Init':io.addMemo},
-            '0' : {'Type':'_NullFlags', 'Retrieve':io.unsupportedType, 'Update':io.unsupportedType, 'Blank':int, 'Init':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
+            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal(), 'Init':addVfpCurrency},
+            'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble},
+            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric},
+            'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate},
+            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime.now, 'Init':addVfpDateTime},
+            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
+            'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
+            'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
+            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None} }
     _memoext = '.dbt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -2667,4 +3776,178 @@ class _Db4Table(DbfTable):
                         yo._meta.dfd = None
                         raise DbfError("Table structure corrupt:  memo fields exist without memo file")
                     break
+
+# utility functions
+
+def Table(
+        filename, 
+        field_specs='', 
+        memo_size=128, 
+        ignore_memos=False,
+        read_only=False, 
+        keep_memos=False, 
+        meta_only=False, 
+        dbf_type=None, 
+        codepage=None,
+        numbers='default',
+        strings=str,
+        currency=Decimal,
+        ):
+    "returns an open table of the correct dbf_type, or creates it if field_specs is given"
+    if dbf_type is None and isinstance(filename, DbfTable):
+        return filename
+    if field_specs and dbf_type is None:
+        dbf_type = default_type
+    if dbf_type is not None:
+        dbf_type = dbf_type.lower()
+        table = table_types.get(dbf_type)
+        if table is None:
+            raise DbfError("Unknown table type: %s" % dbf_type)
+        return table(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
+    else:
+        possibles = guess_table_type(filename)
+        if len(possibles) == 1:
+            return possibles[0][2](filename, field_specs, memo_size, ignore_memos, \
+                                 read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
+        else:
+            for type, desc, cls in possibles:
+                if type == default_type:
+                    return cls(filename, field_specs, memo_size, ignore_memos, \
+                                 read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
+            else:
+                types = ', '.join(["%s" % item[1] for item in possibles])
+                abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'
+                raise DbfError("Table could be any of %s.  Please specify %s when opening" % (types, abbrs))
+def index(sequence):
+    "returns integers 0 - len(sequence)"
+    for i in xrange(len(sequence)):
+        yield i    
+def guess_table_type(filename):
+    reported = table_type(filename)
+    possibles = []
+    version = reported[0]
+    for tabletype in (Db3Table, FpTable, VfpTable):
+        if version in tabletype._supported_tables:
+            possibles.append((tabletype._versionabbv, tabletype._version, tabletype))
+    if not possibles:
+        raise DbfError("Tables of type %s not supported" % str(reported))
+    return possibles
+def table_type(filename):
+    "returns text representation of a table's dbf version"
+    base, ext = os.path.splitext(filename)
+    if ext == '':
+        filename = base + '.dbf'
+    if not os.path.exists(filename):
+        raise DbfError('File %s not found' % filename)
+    fd = open(filename)
+    version = fd.read(1)
+    fd.close()
+    fd = None
+    if not version in version_map:
+        raise DbfError("Unknown dbf type: %s (%x)" % (version, ord(version)))
+    return version, version_map[version]
+
+def add_fields(table_name, field_specs):
+    "adds fields to an existing table"
+    table = Table(table_name)
+    try:
+        table.add_fields(field_specs)
+    finally:
+        table.close()
+def delete_fields(table_name, field_names):
+    "deletes fields from an existing table"
+    table = Table(table_name)
+    try:
+        table.delete_fields(field_names)
+    finally:
+        table.close()
+def export(table_name, filename='', fields='', format='csv', header=True):
+    "creates a csv or tab-delimited file from an existing table"
+    if fields is None:
+        fields = []
+    table = Table(table_name)
+    try:
+        table.export(filename=filename, field_specs=fields, format=format, header=header)
+    finally:
+        table.close()
+def first_record(table_name):
+    "prints the first record of a table"
+    table = Table(table_name)
+    try:
+        print str(table[0])
+    finally:
+        table.close()
+def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fields=None, dbf_type='db3', memo_size=64, min_field_size=1):
+    """creates a Character table from a csv file
+    to_disk will create a table with the same name
+    filename will be used if provided
+    field_names default to f0, f1, f2, etc, unless specified (list)
+    extra_fields can be used to add additional fields -- should be normal field specifiers (list)"""
+    reader = csv.reader(open(csvfile))
+    if field_names:
+        field_names = ['%s M' % fn for fn in field_names]
+    else:
+        field_names = ['f0 M']
+    mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size)
+    fields_so_far = 1
+    for row in reader:
+        while fields_so_far < len(row):
+            if fields_so_far == len(field_names):
+                field_names.append('f%d M' % fields_so_far)
+            mtable.add_fields(field_names[fields_so_far])
+            fields_so_far += 1
+        mtable.append(tuple(row))
+    if filename:
+        to_disk = True
+    if not to_disk:
+        if extra_fields:
+            mtable.add_fields(extra_fields)
+    else:
+        if not filename:
+            filename = os.path.splitext(csvfile)[0]
+        length = [min_field_size] * len(field_names)
+        for record in mtable:
+            for i in index(record.field_names):
+                length[i] = max(length[i], len(record[i]))
+        fields = mtable.field_names
+        fielddef = []
+        for i in index(length):
+            if length[i] < 255:
+                fielddef.append('%s C(%d)' % (fields[i], length[i]))
+            else:
+                fielddef.append('%s M' % (fields[i]))
+        if extra_fields:
+            fielddef.extend(extra_fields)
+        csvtable = Table(filename, fielddef, dbf_type=dbf_type)
+        for record in mtable:
+            csvtable.append(record.scatter_fields())
+        return csvtable
+    return mtable
+def get_fields(table_name):
+    "returns the list of field names of a table"
+    table = Table(table_name)
+    return table.field_names
+def info(table_name):
+    "prints table info"
+    table = Table(table_name)
+    print str(table)
+def rename_field(table_name, oldfield, newfield):
+    "renames a field in a table"
+    table = Table(table_name)
+    try:
+        table.rename_field(oldfield, newfield)
+    finally:
+        table.close()
+def structure(table_name, field=None):
+    "returns the definition of a field (or all fields)"
+    table = Table(table_name)
+    return table.structure(field)
+def hex_dump(records):
+    "just what it says ;)"
+    for index,dummy in enumerate(records):
+        chars = dummy._data
+        print "%2d: " % index,
+        for char in chars[1:]:
+            print " %2x " % ord(char),
+        print
 

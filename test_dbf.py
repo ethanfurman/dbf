@@ -1,7 +1,16 @@
+import os
 import unittest
+import tempfile
+import shutil
 import dbf
 import datetime
 from decimal import Decimal
+
+if dbf.version != (0, 88, 22):
+    raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
+else:
+    print "\nTesting dbf version %d.%d.%d\n" % dbf.version
+
 
 # Walker in Leaves -- by Scot Noel -- http://www.scienceandfantasyfiction.com/sciencefiction/Walker-in-Leaves/walker-in-leaves.htm
 
@@ -67,17 +76,14 @@ Maya hopes to see what stones Walker has brought from the west this time, but th
 Around a table suited for the Queen of queens, a thousand and a thousand sit. Mother to daughter, side-by-side, generation after generation of lemurs share in the feast. Maya is there, hearing the excited voices and the stern warnings to prayer. To her left and her right, each daughter speaks freely. Then the rhythms change, rising along one side to the cadence of Shakespeare and falling along the other to howls the forest first knew.
 Unable to contain herself, Maya rises. She pushes on toward the head of a table she cannot see, beginning at last to run. What is the height her charges have reached? How far have they advanced? Lemur faces turn to laugh, their wide eyes joyous and amused. As the generations pass, she sees herself reflected in spectacles, hears the jangle of bracelets and burnished metal, watches matrons laugh behind scarves of silk. Then at last, someone with sculpted hands directs her outside, where the other children are at play in the leaves, now and forever.
 THE END""".split()
+
+# data
 numbers = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149,151,157,163,167,173,179,181,191,193,197,199,211,223,227,229,233,239,241,251,257,263,269,271,277,281,283,293,307,311,313,317,331,337,347,349,353,359,367,373,379,383,389,397,401,409,419,421,431,433,439,443,449,457,461,463,467,479,487,491,499,503,509,521,523,541]
 floats = []
 last = 1
 for number in numbers:
     floats.append(float(number ** 2 / last))
     last = number
-
-if dbf.version != (0, 88, 20):
-    raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
-else:
-    print "\nTesting dbf version %d.%d.%d\n" % dbf.version
 
 def permutate(Xs, N):
     if N <= 0:
@@ -91,6 +97,7 @@ def permutate(Xs, N):
                     break
             else:
                 yield result
+
 def combinate(Xs, N):
     """Generate combinations of N items from list Xs"""
     if N == 0:
@@ -99,10 +106,12 @@ def combinate(Xs, N):
     for i in xrange(len(Xs)-N+1):
         for r in combinate(Xs[i+1:], N-1):
             yield [Xs[i]] + r
+
 def index(sequence):
     "returns integers 0 - len(sequence)"
     for i in xrange(len(sequence)):
         yield i    
+
 class Test_Date(unittest.TestCase):
     "Testing Date"
     def test01(yo):
@@ -215,6 +224,323 @@ class Test_Date(unittest.TestCase):
         yo.assertEqual(uno != uno, False)
         yo.assertEqual(dos != dos, False)
         yo.assertEqual(tres != tres, False)
+class Test_Logical(unittest.TestCase):
+    "Testing Logical"
+    def test01(yo):
+        "Unknown"
+        huh = dbf.Logical()
+        yo.assertEqual(huh == None, True)
+        yo.assertEqual(None == huh, True)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertEqual((0, 1, 2)[huh], 2)
+        huh = dbf.Logical('?')
+        yo.assertEqual(huh == None, True)
+        yo.assertEqual(None == huh, True)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertEqual((0, 1, 2)[huh], 2)
+        huh = dbf.Logical(' ')
+        yo.assertEqual(huh == None, True)
+        yo.assertEqual(None == huh, True)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertEqual((0, 1, 2)[huh], 2)
+        huh = dbf.Logical(None)
+        yo.assertEqual(huh == None, True)
+        yo.assertEqual(None == huh, True)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertEqual((0, 1, 2)[huh], 2)
+    def test02(yo):
+        "true"
+        huh = dbf.Logical('True')
+        yo.assertEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertNotEqual(huh, None)
+        yo.assertEqual((0, 1, 2)[huh], 1)
+    def test03(yo):
+        "true"
+        huh = dbf.Logical('yes')
+        yo.assertEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertNotEqual(huh, None)
+    def test04(yo):
+        "true"
+        huh = dbf.Logical('t')
+        yo.assertEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertNotEqual(huh, None)
+    def test05(yo):
+        "true"
+        huh = dbf.Logical('Y')
+        yo.assertEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertNotEqual(huh, None)
+    def test06(yo):
+        "true"
+        huh = dbf.Logical(7)
+        yo.assertEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertNotEqual(huh, None)
+    def test07(yo):
+        "true"
+        huh = dbf.Logical(['blah'])
+        yo.assertEqual(huh, True)
+        yo.assertNotEqual(huh, False)
+        yo.assertNotEqual(huh, None)
+    def test08(yo):
+        "false"
+        huh = dbf.Logical('false')
+        yo.assertEqual(huh, False)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, None)
+        yo.assertEqual((0, 1, 2)[huh], 0)
+    def test09(yo):
+        "false"
+        huh = dbf.Logical('No')
+        yo.assertEqual(huh, False)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, None)
+    def test10(yo):
+        "false"
+        huh = dbf.Logical('F')
+        yo.assertEqual(huh, False)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, None)
+    def test11(yo):
+        "false"
+        huh = dbf.Logical('n')
+        yo.assertEqual(huh, False)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, None)
+    def test12(yo):
+        "false"
+        huh = dbf.Logical(0)
+        yo.assertEqual(huh, False)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, None)
+    def test13(yo):
+        "false"
+        huh = dbf.Logical([])
+        yo.assertEqual(huh, False)
+        yo.assertNotEqual(huh, True)
+        yo.assertNotEqual(huh, None)
+    def test14(yo):
+        "singletons"
+        heh = dbf.Logical(True)
+        hah = dbf.Logical('Yes')
+        ick = dbf.Logical(False)
+        ack = dbf.Logical([])
+        unk = dbf.Logical('?')
+        bla = dbf.Logical(None)
+        yo.assertEquals(heh is hah, True)
+        yo.assertEquals(ick is ack, True)
+        yo.assertEquals(unk is bla, True)
+    def test15(yo):
+        "errors"
+        yo.assertRaises(ValueError, dbf.Logical, 'wrong')
+    def test16(yo):
+        "or"
+        true = dbf.Logical(True)
+        false = dbf.Logical(False)
+        none = dbf.Logical(None)
+        yo.assertEquals(true + true, true)
+        yo.assertEquals(true + false, true)
+        yo.assertEquals(false + true, true)
+        yo.assertEquals(false + false, false)
+        yo.assertEquals(true + none, none)
+        yo.assertEquals(false + none, none)
+        yo.assertEquals(none + none, none)
+        yo.assertEquals(true | true, true)
+        yo.assertEquals(true | false, true)
+        yo.assertEquals(false | true, true)
+        yo.assertEquals(false | false, false)
+        yo.assertEquals(true | none, none)
+        yo.assertEquals(false | none, none)
+        yo.assertEquals(none | none, none)
+        yo.assertEquals(true + True, true)
+        yo.assertEquals(true + False, true)
+        yo.assertEquals(false + True, true)
+        yo.assertEquals(false + False, false)
+        yo.assertEquals(true + None, none)
+        yo.assertEquals(false + None, none)
+        yo.assertEquals(none + None, none)
+        yo.assertEquals(true | True, true)
+        yo.assertEquals(true | False, true)
+        yo.assertEquals(false | True, true)
+        yo.assertEquals(false | False, false)
+        yo.assertEquals(true | None, none)
+        yo.assertEquals(false | None, none)
+        yo.assertEquals(none | None, none)
+        yo.assertEquals(True + true, true)
+        yo.assertEquals(True + false, true)
+        yo.assertEquals(False + true, true)
+        yo.assertEquals(False + false, false)
+        yo.assertEquals(True + none, none)
+        yo.assertEquals(False + none, none)
+        yo.assertEquals(None + none, none)
+        yo.assertEquals(True | true, true)
+        yo.assertEquals(True | false, true)
+        yo.assertEquals(False | true, true)
+        yo.assertEquals(False | false, false)
+        yo.assertEquals(True | none, none)
+        yo.assertEquals(False | none, none)
+        yo.assertEquals(None | none, none)
+    def test17(yo):
+        "and"
+        true = dbf.Logical(True)
+        false = dbf.Logical(False)
+        none = dbf.Logical(None)
+        yo.assertEquals(true * true, true)
+        yo.assertEquals(true * false, false)
+        yo.assertEquals(false * true, false)
+        yo.assertEquals(false * false, false)
+        yo.assertEquals(true * none, none)
+        yo.assertEquals(false * none, none)
+        yo.assertEquals(none * none, none)
+        yo.assertEquals(true & true, true)
+        yo.assertEquals(true & false, false)
+        yo.assertEquals(false & true, false)
+        yo.assertEquals(false & false, false)
+        yo.assertEquals(true & none, none)
+        yo.assertEquals(false & none, none)
+        yo.assertEquals(none & none, none)
+        yo.assertEquals(true * True, true)
+        yo.assertEquals(true * False, false)
+        yo.assertEquals(false * True, false)
+        yo.assertEquals(false * False, false)
+        yo.assertEquals(true * None, none)
+        yo.assertEquals(false * None, none)
+        yo.assertEquals(none * None, none)
+        yo.assertEquals(true & True, true)
+        yo.assertEquals(true & False, false)
+        yo.assertEquals(false & True, false)
+        yo.assertEquals(false & False, false)
+        yo.assertEquals(true & None, none)
+        yo.assertEquals(false & None, none)
+        yo.assertEquals(none & None, none)
+        yo.assertEquals(True * true, true)
+        yo.assertEquals(True * false, false)
+        yo.assertEquals(False * true, false)
+        yo.assertEquals(False * false, false)
+        yo.assertEquals(True * none, none)
+        yo.assertEquals(False * none, none)
+        yo.assertEquals(None * none, none)
+        yo.assertEquals(True & true, true)
+        yo.assertEquals(True & false, false)
+        yo.assertEquals(False & true, false)
+        yo.assertEquals(False & false, false)
+        yo.assertEquals(True & none, none)
+        yo.assertEquals(False & none, none)
+        yo.assertEquals(None & none, none)
+    def test18(yo):
+        "xor"
+        true = dbf.Logical(True)
+        false = dbf.Logical(False)
+        none = dbf.Logical(None)
+        yo.assertEquals(true ^ true, false)
+        yo.assertEquals(true ^ false, true)
+        yo.assertEquals(false ^ true, true)
+        yo.assertEquals(false ^ false, false)
+        yo.assertEquals(true ^ none, none)
+        yo.assertEquals(false ^ none, none)
+        yo.assertEquals(none ^ none, none)
+        yo.assertEquals(true ^ True, false)
+        yo.assertEquals(true ^ False, true)
+        yo.assertEquals(false ^ True, true)
+        yo.assertEquals(false ^ False, false)
+        yo.assertEquals(true ^ None, none)
+        yo.assertEquals(false ^ None, none)
+        yo.assertEquals(none ^ None, none)
+        yo.assertEquals(True ^ true, false)
+        yo.assertEquals(True ^ false, true)
+        yo.assertEquals(False ^ true, true)
+        yo.assertEquals(False ^ false, false)
+        yo.assertEquals(True ^ none, none)
+        yo.assertEquals(False ^ none, none)
+        yo.assertEquals(None ^ none, none)
+    def test19(yo):
+        "implication, material"
+        true = dbf.Logical(True)
+        false = dbf.Logical(False)
+        none = dbf.Logical(None)
+        yo.assertEquals(true >> true, true)
+        yo.assertEquals(true >> false, false)
+        yo.assertEquals(false >> true, true)
+        yo.assertEquals(false >> false, true)
+        yo.assertEquals(true >> none, none)
+        yo.assertEquals(false >> none, none)
+        yo.assertEquals(none >> none, none)
+        yo.assertEquals(true >> True, true)
+        yo.assertEquals(true >> False, false)
+        yo.assertEquals(false >> True, true)
+        yo.assertEquals(false >> False, true)
+        yo.assertEquals(true >> None, none)
+        yo.assertEquals(false >> None, none)
+        yo.assertEquals(none >> None, none)
+        yo.assertEquals(True >> true, true)
+        yo.assertEquals(True >> false, false)
+        yo.assertEquals(False >> true, true)
+        yo.assertEquals(False >> false, true)
+        yo.assertEquals(True >> none, none)
+        yo.assertEquals(False >> none, none)
+        yo.assertEquals(None >> none, none)
+    def test20(yo):
+        "implication, relevant"
+        true = dbf.Logical(True)
+        false = dbf.Logical(False)
+        none = dbf.Logical(None)
+        dbf.Logical.set_implication('relevant')
+        yo.assertEquals(true >> true, true)
+        yo.assertEquals(true >> false, false)
+        yo.assertEquals(false >> true, none)
+        yo.assertEquals(false >> false, none)
+        yo.assertEquals(true >> none, none)
+        yo.assertEquals(false >> none, none)
+        yo.assertEquals(none >> none, none)
+        yo.assertEquals(true >> True, true)
+        yo.assertEquals(true >> False, false)
+        yo.assertEquals(false >> True, none)
+        yo.assertEquals(false >> False, none)
+        yo.assertEquals(true >> None, none)
+        yo.assertEquals(false >> None, none)
+        yo.assertEquals(none >> None, none)
+        yo.assertEquals(True >> true, true)
+        yo.assertEquals(True >> false, false)
+        yo.assertEquals(False >> true, none)
+        yo.assertEquals(False >> false, none)
+        yo.assertEquals(True >> none, none)
+        yo.assertEquals(False >> none, none)
+        yo.assertEquals(None >> none, none)
+    def test21(yo):
+        "negative and"
+        true = dbf.Logical(True)
+        false = dbf.Logical(False)
+        none = dbf.Logical(None)
+        yo.assertEquals(true.D(true), false)
+        yo.assertEquals(true.D(false), true)
+        yo.assertEquals(false.D(true), true)
+        yo.assertEquals(false.D(false), true)
+        yo.assertEquals(true.D(none), none)
+        yo.assertEquals(false.D(none), none)
+        yo.assertEquals(none.D(none), none)
+        yo.assertEquals(true.D(True), false)
+        yo.assertEquals(true.D(False), true)
+        yo.assertEquals(false.D(True), true)
+        yo.assertEquals(false.D(False), true)
+        yo.assertEquals(true.D(None), none)
+        yo.assertEquals(false.D(None), none)
+        yo.assertEquals(none.D(None), none)
+    def test22(yo):
+        "negation"
+        true = dbf.Logical(True)
+        false = dbf.Logical(False)
+        none = dbf.Logical(None)
+        yo.assertEquals(-true, false)
+        yo.assertEquals(-false, true)
+        yo.assertEquals(-none, none)
+
 class Test_Dbf_Functions(unittest.TestCase):
     "Testing table creation..."
     def test01(yo):
@@ -231,9 +557,9 @@ class Test_Dbf_Functions(unittest.TestCase):
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table('temptable', ';'.join(fieldlist), dbf_type='db3')
+                table = dbf.Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3')
                 table.close()
-                table = dbf.Table('temptable', dbf_type='db3')
+                table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
@@ -255,9 +581,9 @@ class Test_Dbf_Functions(unittest.TestCase):
                   'litres F(11,5)', 'blob G', 'graphic P']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table('tempfp', ';'.join(fieldlist), dbf_type='vfp')
+                table = dbf.Table(os.path.join(tempdir, 'tempfp'), ';'.join(fieldlist), dbf_type='vfp')
                 table.close()
-                table = dbf.Table('tempfp', dbf_type='vfp')
+                table = dbf.Table(os.path.join(tempdir, 'tempfp'), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
@@ -277,15 +603,15 @@ class Test_Dbf_Functions(unittest.TestCase):
                   'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table('tempvfp', ';'.join(fieldlist), dbf_type='vfp')
+                table = dbf.Table(os.path.join(tempdir, 'tempvfp'), ';'.join(fieldlist), dbf_type='vfp')
                 table.close()
-                table = dbf.Table('tempvfp', dbf_type='vfp')
+                table = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
     def test07(yo):
         "dbf table:  adding records; adding and deleting fields"
-        table = dbf.Table('temptable', 'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), 'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3')
         namelist = []
         paidlist = []
         qtylist = []
@@ -315,7 +641,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.close()
         last_byte = open(table.filename, 'rb').read()[-1]
         yo.assertEqual(last_byte, '\x1a')
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         yo.assertEqual(len(table), len(floats))
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
@@ -336,7 +662,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         yo.assertEqual(i, len(table))
         table.delete_fields('name')
         table.close()
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
         i = 0
@@ -399,7 +725,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.close()
     def test08(yo):
         "vfp table:  adding records; adding and deleting fields"
-        table = dbf.Table('tempvfp', 'name C(25); paid L; qty N(11,5); orderdate D; \
+        table = dbf.Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); paid L; qty N(11,5); orderdate D; \
                 desc M; mass B; weight F(18,3); age I; meeting T; misc G; photo P', dbf_type='vfp')
         namelist = []
         paidlist = []
@@ -450,7 +776,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             yo.assertEqual(record.misc, misc)
             yo.assertEqual(record.photo, photo)
         table.close()
-        table = dbf.Table('tempvfp', dbf_type='vfp')
+        table = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
         yo.assertEqual(len(table), len(floats))
         i = 0
         for record in table:
@@ -569,7 +895,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.close()
     def test09(yo):
         "basic function tests - len, contains & iterators"
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
         for field in table.field_names:
@@ -590,7 +916,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table = dbf.Table(':memory:', 'name C(10)', dbf_type='db3')
         table.append(multiple=10)
         yo.assertEqual(table.current(), table[0])
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         total = len(table)
         table.bottom()
         yo.assertEqual(table.record_number, total)
@@ -636,7 +962,7 @@ class Test_Dbf_Functions(unittest.TestCase):
 
         # check that deletes were saved to disk..
         table.close()
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         i = 0
         for record in table:
             yo.assertEqual(record.has_been_deleted, i%3==0)
@@ -716,7 +1042,7 @@ class Test_Dbf_Functions(unittest.TestCase):
 
     def test11(yo):
         "finding, ordering, searching"
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
 
         # find (brute force)
         unordered = []
@@ -784,8 +1110,8 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.close()
     def test12(yo):
         "scattering and gathering fields, and new()"
-        table1 = dbf.Table('temptable', dbf_type='db3')
-        table2 = table1.new('temptable2')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table2 = table1.new(os.path.join(tempdir, 'temptable2'))
         for record in table1:
             newrecord = table2.append()
             testdict = record.scatter_fields()
@@ -797,7 +1123,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             newrecord.write_record()
         table2.close()
         table2 = None
-        table2 = dbf.Table('temptable2', dbf_type='db3')
+        table2 = dbf.Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
         for i in range(len(table1)):
             dict1 = table1[i].scatter_fields()
             dict2 = table2[i].scatter_fields()
@@ -808,7 +1134,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table3 = table1.new(':memory:')
         for record in table1:
             newrecord = table3.append(record)
-        table4 = dbf.Table('tempvfp', dbf_type='vfp')
+        table4 = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
         table5 = table4.new(':memory:')
         for record in table4:
             newrecord = table5.append(record)
@@ -816,14 +1142,14 @@ class Test_Dbf_Functions(unittest.TestCase):
         table2.close()
     def test13(yo):
         "renaming fields, __contains__, has_key"
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         for field in table.field_names:
             oldfield = field
             table.rename_field(oldfield, 'newfield')
             yo.assertEqual(oldfield in table, False)
             yo.assertEqual('newfield' in table, True)
             table.close()
-            table = dbf.Table('temptable', dbf_type='db3')
+            table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
             yo.assertEqual(oldfield in table, False)
             yo.assertEqual('newfield' in table, True)
             table.rename_field('newfield', oldfield)
@@ -833,8 +1159,8 @@ class Test_Dbf_Functions(unittest.TestCase):
 
     def test14(yo):
         "kamikaze"
-        table1 = dbf.Table('temptable', dbf_type='db3')
-        table2 = table1.new('temptable2')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table2 = table1.new(os.path.join(tempdir, 'temptable2'))
         for record in table1:
             newrecord = table2.append(kamikaze=record)
             for key in table1.field_names:
@@ -844,7 +1170,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                 if not table2.is_memotype(field):
                     yo.assertEqual(newrecord[field], record[field])
         table2.close()
-        table2 = dbf.Table('temptable2', dbf_type='db3')
+        table2 = dbf.Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
         for i in range(len(table1)):
             dict1 = table1[i].scatter_fields()
             dict2 = table2[i].scatter_fields()
@@ -859,20 +1185,20 @@ class Test_Dbf_Functions(unittest.TestCase):
 
     def test15(yo):
         "multiple append"
-        table1 = dbf.Table('temptable', dbf_type='db3')
-        table2 = table1.new('temptable2')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table2 = table1.new(os.path.join(tempdir, 'temptable2'))
         record = table1.next()
         table2.append(record.scatter_fields(), multiple=100)
         for samerecord in table2:
             for field in record.field_names:
                 yo.assertEqual(record[field], samerecord[field])
         table2.close()
-        table2 = dbf.Table('temptable2', dbf_type='db3')
+        table2 = dbf.Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
         for samerecord in table2:
             for field in record.field_names:
                 yo.assertEqual(record[field], samerecord[field])
         table2.close
-        table3 = table1.new('temptable3')
+        table3 = table1.new(os.path.join(tempdir, 'temptable3'))
         record = table1.current()
         table3.append(kamikaze=record, multiple=100)
         for samerecord in table3:
@@ -882,7 +1208,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                 #else:
                     yo.assertEqual(record[field], samerecord[field])
         table3.close()
-        table3 = dbf.Table('temptable3', dbf_type='db3')
+        table3 = dbf.Table(os.path.join(tempdir, 'temptable3'), dbf_type='db3')
         for samerecord in table3:
             for field in record.field_names:
                 #if table3.is_memotype(field):
@@ -893,7 +1219,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table1.close()
     def test16(yo):
         "slices"
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         slice1 = [table[0], table[1], table[2]]
         yo.assertEqual(slice1, list(table[:3]))
         slice2 = [table[-3], table[-2], table[-1]]
@@ -910,7 +1236,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         yo.assertEqual(slice7, list(table[-1:-4:-1]))
     def test17(yo):
         "reset record"
-        table3 = dbf.Table('temptable3', dbf_type='db3')
+        table3 = dbf.Table(os.path.join(tempdir, 'temptable3'), dbf_type='db3')
         for record in table3:
             record.reset_record()
             record.write_record()
@@ -919,7 +1245,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         yo.assertNotEqual(table3[0].name, table3[1].name)
     def notest18(yo):
         "callable record"
-        table = dbf.Table('temptable', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         for record in table:
             yo.assertEqual(tuple([record.name]), record(('name',)))
             yo.assertEqual(tuple([record.name[5:]]), record(('name', lambda x: x[5:])))
@@ -934,7 +1260,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             yo.assertEqual(tuple([record.name, record.desc[4:6], record.paid]),
                     record(('name', ), ('desc', lambda x: x[4:6]), ('paid', )))
         table.close()
-        table = dbf.Table('tempvfp', dbf_type='vfp')
+        table = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
         for record in table:
             yo.assertEqual(tuple([record.name]), record(('name', )))
             yo.assertEqual(tuple([record.name[5:]]), record(('name', lambda x: x[5:])))
@@ -960,57 +1286,66 @@ class Test_Dbf_Functions(unittest.TestCase):
         table[0].write_record(motto='Are we there yet??')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
-        table = dbf.Table('temptable4', 'name C(50); age N(3,0)', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='db3')
         table.append(('user', 0))
         table.add_fields('motto M')
         table[0].write_record(motto='Are we there yet??')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
-        table = dbf.Table('temptable4', dbf_type='db3')
+        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
     def test20(yo):
         "from_csv"
-        table = dbf.Table('temptable')
+        table = dbf.Table(os.path.join(tempdir, 'temptable'))
         table.export(header=False)
-        csvtable = dbf.from_csv('temptable.csv')
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'))
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
-        csvtable = dbf.from_csv('temptable.csv', to_disk=True, filename='temptable5')
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
-        csvtable = dbf.from_csv('temptable.csv', field_names=['field1','field2'])
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'])
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
-        csvtable = dbf.from_csv('temptable.csv', field_names=['field1','field2'], to_disk=True, filename='temptable5')
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
-        csvtable = dbf.from_csv('temptable.csv', extra_fields=['count N(5,0)','id C(10)'])
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'])
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
-        csvtable = dbf.from_csv('temptable.csv', extra_fields=['count N(5,0)','id C(10)'], to_disk=True, filename='temptable5')
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
-        csvtable = dbf.from_csv('temptable.csv', field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'))
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'))
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
-        csvtable = dbf.from_csv('temptable.csv', field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'), to_disk=True, filename='temptable5')
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
                 yo.assertEqual(str(table[i][j]), csvtable[i][j])
+
+    def test21(yo):
+        "resize"
+        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        test_record = table[5].scatter_fields()
+        layout = table[5]._layout
+        table.resize_field('name', 40)
+        new_record = table[5].scatter_fields()
+        yo.assertEqual(test_record['orderdate'], new_record['orderdate'])
 
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"
     def test01(yo):
         "addition and subtraction"
-        table1 = dbf.Table('temptable', dbf_type='db3')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -1028,7 +1363,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         table1.close()
     def test02(yo):
         "appending and extending"
-        table1 = dbf.Table('temptable', dbf_type='db3')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -1043,7 +1378,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         table1.close()
     def test03(yo):
         "indexing"
-        table1 = dbf.Table('temptable', dbf_type='db3')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -1054,7 +1389,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         table1.close()
     def test04(yo):
         "sorting"
-        table1 = dbf.Table('temptable', dbf_type='db3')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -1066,9 +1401,12 @@ class Test_Dbf_Lists(unittest.TestCase):
         table1.close()
     def test05(yo):
         "keys"
-        table1 = dbf.Table('temptable', dbf_type='db3')
+        table1 = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         field = table1.field_names[0]
         list1 = dbf.List(table1, key=lambda rec: rec[field])
         for rec in table1:
             yo.assertEqual(rec[field], list1[rec][field])
-unittest.main()
+if __name__ == '__main__':
+    tempdir = tempfile.mkdtemp()
+    unittest.main()
+    shutil.rmtree(tempdir, True)

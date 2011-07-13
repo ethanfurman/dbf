@@ -6,7 +6,7 @@ import dbf
 import datetime
 from decimal import Decimal
 
-if dbf.version != (0, 88, 22):
+if dbf.version != (0, 88, 24):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%d.%d\n" % dbf.version
@@ -1340,6 +1340,31 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.resize_field('name', 40)
         new_record = table[5].scatter_fields()
         yo.assertEqual(test_record['orderdate'], new_record['orderdate'])
+    def test22(yo):
+        "automatically write records on object destruction"
+        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        old_data = table[0].scatter_fields()
+        new_name = table[0].name = '!BRAND NEW NAME!'
+        yo.assertEqual(new_name, table[0].name)
+    def test23(yo):
+        "automatically write records on table close"
+        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        record = table[0]
+        new_name = record.name = '?DIFFERENT NEW NAME?'
+        table.close()
+        del record
+        table.open()
+        yo.assertEqual(new_name, table[0].name)
+    def test24(yo):
+        "automatically write records on table destruction (no close() called)"
+        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        record = table[0]
+        new_name = record.name = '-YET ANOTHER NEW NAME-'
+        del table
+        del record
+        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        yo.assertEqual(new_name, table[0].name)
+
 
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"

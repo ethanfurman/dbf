@@ -1,11 +1,12 @@
 """
+=========
 Copyright
 =========
     - Copyright: 2008-2011 Ad-Mail, Inc -- All rights reserved.
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.88.019 as of 10 Mar 2011
+    - Version: 0.88.023 as of 12 Jul 2011
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -29,23 +30,105 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-B{I{Summary}}
+-------
+Summary
+-------
 
 Python package for reading/writing dBase III and VFP 6 tables and memos
 
-The entire table is read into memory, and all operations occur on the in-memory
-table, with data changes being written to disk as they occur.
-
 Goals:  programming style with databases
-    - C{table = dbf.table('table name' [, fielddesc[, fielddesc[, ....]]])}
-        - fielddesc examples:  C{name C(30); age N(3,0); wisdom M; marriage D}
-    - C{record = [ table.current() | table[int] | table.append() | table.[next|prev|top|bottom|goto]() ]}
-    - C{record.field | record['field']} accesses the field
+    - table = dbf.table('table name' [, fielddesc[, fielddesc[, ....]]])
+        - fielddesc examples:  name C(30); age N(3,0); wisdom M; marriage D
+    - record = [ table.current() | table[int] | table.append() | table.[next|prev|top|bottom|goto]() ]
+    - record.field | record['field'] accesses the field
 
 NOTE:  Of the VFP data types, auto-increment and null settings are not implemented.
+
+Examples:
+
+    Create a test table:
+    table = dbf.Table('temptable', 'name C(30); age N(3,0); birth D')
+
+    Populate it:
+    for datum in (
+            ('John Doe', 31, dbf.Date(1979, 9,13)),
+            ('Ethan Furman', 102, dbf.Date(1909, 4, 1)),
+            ('Jane Smith', 57, dbf.Date(1954, 7, 2)),
+            ('John Adams', 44, dbf.Date(1967, 1, 9)),
+            ):
+        table.append(datum)
+
+    Export to csv:
+    table.export(filename='filename', header=False)
+
+    Iterate over it:
+    for record in table:
+        print "%s was born on %s, so s/he is %d years of age" % (record.name, record.birth, record.age)
+
+    Create a new table from a csv file (all character fields now):
+    table = dbf.from_csv('filename.csv') # this has field names of f0, f1, f2, etc
+    or
+    table = dbf.from_csv('filename.csv', field_names="name age birth".split())
+
+    table = dbf.Table('temptable')  #reopen original file
+
+    Sort it:
+    name_index = table.create_index(lambda rec: rec.name)
+    for record in name_index:
+        print record.name
+
+    Search using the sort:
+    records = name_index.search(match=('John ',), partial=True)
+    for record in records:
+        print record, '\n'
+
+    Delete a record:
+    table[1].delete_record()
+
+    Check if a record has been marked as deleted:
+    record = table[1] # for example
+    if record.has_been_deleted:
+        print "table.pack() will physically remove this record! (and all other deleted records)"
+
+    Ignore deleted records:
+    table.use_deleted = False
+
+    Write records (instead of waiting for them to go out of scope):
+    record.write_record()  # returns 1 if the record was actually written, 0 otherwise
+
+    Specify data to write with write_record():
+    record.write_record(age=39)
+
+    Access record fields via attribute access:
+    for record in table:
+        print record.name
+        record.name = 'The Black Knight was here!'
+        print record.name
+
+    or dictionary-style access:
+    for record in table:
+        print record['age']
+        record['age'] = 29 # perpetual age of some ;)
+        print record['age']
+
+    and let's not forget index-style access:
+    for record in table:
+        print record[2]
+        record[2] = dbf.Date.today() # just born?
+        print record[2]
+
+    can even use slices if you like:
+    table = dbf.from_csv('filename.csv', field_names="name age birth".split())
+    table[0][:2] = table[1][:2] # first record's first two fields are now the same as the second record's
+    for record in table:
+        print record, '\n'
+
+    Primitive SQL (work in progress):
+    records = table.sql("select * where name[0] == 'J'")
+    for rec in records:
+        print rec, '\n'
 """
-version = (0, 88, 22)
-__docformat__ = 'epytext'
+version = (0, 88, 24)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -159,8 +242,7 @@ class Date():
     "adds null capable datetime.date constructs"
     __slots__ = ['_date']
     def __new__(cls, year=None, month=0, day=0):
-        """date should be either a datetime.date, a string in yyyymmdd format, 
-        or date/month/day should all be appropriate integers"""
+        """date should be either a datetime.date or date/month/day should all be appropriate integers"""
         nd = object.__new__(cls)
         nd._date = False
         if type(year) == datetime.date:
@@ -927,10 +1009,17 @@ class _DbfRecord():
             yo._layout.dfd.seek(location)
             yo._layout.dfd.write(data)
             yo._dirty = False
-        for index in yo.record_table._indexen:
-            index(yo)
+        if yo._layout.table() is not None:  # is None when table is being destroyed
+            for index in yo.record_table._indexen:
+                index(yo)
     def __contains__(yo, key):
         return key in yo._layout.fields or key in ['record_number','delete_flag']
+    def __del__(yo):
+        table = yo._layout.table()
+        if table is not None:
+            yo.write_record()
+        if not yo._layout.inmemory:
+            yo._layout.dfd.flush()
     def __iter__(yo):
         return (yo[field] for field in yo._layout.fields)
     def __getattr__(yo, name):
@@ -1889,6 +1978,15 @@ class DbfTable():
 
     def __contains__(yo, key):
         return key in yo.field_names
+    def __del__(yo):
+        if type(yo._table) == DbfTable._Table:
+            for record in yo._table._weakref_list:
+                record = record()
+                if record is not None:
+                    record.write_record()
+            if not yo._meta.inmemory:
+                yo._meta.dfd.flush()
+                    
     def __enter__(yo):
         return yo
     def __exit__(yo, *exc_info):
@@ -2236,9 +2334,11 @@ class DbfTable():
                 yo._meta.current = yo._meta.header.record_count
                 raise Eof()
     def close(yo, keep_table=False, keep_memos=False):
-        """closes disk files
+        """closes disk files, flushing record data to disk
         ensures table data is available if keep_table
         ensures memo data is available if keep_memos"""
+        for record in yo._table:
+            record.write_record()
         yo._meta.inmemory = True
         if keep_table:
             replacement_table = []

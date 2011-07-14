@@ -1616,4 +1616,4 @@ class Test_Dbf_Lists(unittest.TestCase):
 if __name__ == '__main__':
     tempdir = tempfile.mkdtemp()
     unittest.main()
-    #shutil.rmtree(tempdir, True)
+    shutil.rmtree(tempdir, True)

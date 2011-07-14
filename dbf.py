@@ -6,7 +6,7 @@ Copyright
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.88.023 as of 12 Jul 2011
+    - Version: 0.88.26 as of 12 Jul 2011
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -145,7 +145,7 @@ Field Types  -->  Python data types
     Integer         int, if Null none
     DateTime        dbf.DateTime (custom class that allows empty/null values)
 """
-version = (0, 88, 24)
+version = (0, 88, 26)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',

@@ -6,7 +6,7 @@ import dbf
 import datetime
 from decimal import Decimal
 
-if dbf.version != (0, 88, 24):
+if dbf.version != (0, 88, 26):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%d.%d\n" % dbf.version
@@ -1636,6 +1636,7 @@ class Test_Dbf_Lists(unittest.TestCase):
             unique.add(rec[field])
             yo.assertEqual(rec[field], list1[rec][field])
         yo.assertEqual(len(unique), len(list1))
+# main
 if __name__ == '__main__':
     tempdir = tempfile.mkdtemp()
     unittest.main()

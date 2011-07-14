@@ -127,6 +127,23 @@ Examples:
     records = table.sql("select * where name[0] == 'J'")
     for rec in records:
         print rec, '\n'
+
+Field Types  -->  Python data types
+  Dbf
+    Character       unicode  (or ascii if return_ascii is True)
+    Date            dbf.Date (custom class that allows empty/null values)
+    Logical         dbf.Logical (custom class that allows empty/null values)
+    Memo            unicode (same as character)
+    Numeric         if N(x, 0) int, if N(x, 1+) float, if null NaN
+  FP
+    Float           same as Numeric
+    General         binary data
+    Photo           binary data
+  VFP
+    Currency        Decimal, Decimal Nan if null
+    Double          float
+    Integer         int
+    DateTime        dbf.DateTime
 """
 version = (0, 88, 24)
 
@@ -168,8 +185,7 @@ sql_user_functions = {}      # user-defined sql functions
 if sys.version_info[:2] < (2, 6):
     # define our own property type
     class property():
-        "Emulate PyProperty_Type() in Objects/descrobject.c"
-    
+        "2.6 properties for 2.5-"    
         def __init__(self, fget=None, fset=None, fdel=None, doc=None):
             self.fget = fget
             self.fset = fset
@@ -243,8 +259,9 @@ class Date():
     __slots__ = ['_date']
     def __new__(cls, year=None, month=0, day=0):
         """date should be either a datetime.date or date/month/day should all be appropriate integers"""
+        if year is None:
+            return cls._null_date
         nd = object.__new__(cls)
-        nd._date = False
         if type(year) == datetime.date:
             nd._date = year
         elif type(year) == Date:
@@ -260,20 +277,12 @@ class Date():
         else:
             return NotImplemented
     def __eq__(yo, other):
-        if yo:
-            if type(other) == datetime.date:
-                return yo._date == other
-            elif type(other) == Date:
-                if other:
-                    return yo._date == other._date
-                return False
-        else:
-            if type(other) == datetime.date:
-                return False
-            elif type(other) == Date:
-                if other:
-                    return False
-                return True
+        if isinstance(other, yo.__class__):
+            return yo._date == other._date
+        if isinstance(other, datetime.date):
+            return yo._date == other
+        if isinstance(other, type(None)):
+            return yo._date is None
         return NotImplemented
     def __getattr__(yo, name):
         if yo:
@@ -364,9 +373,7 @@ class Date():
                 return False
         return NotImplemented
     def __nonzero__(yo):
-        if yo._date:
-            return True
-        return False
+        return bool(yo._date)
     __radd__ = __add__
     def __rsub__(yo, other):
         if yo and type(other) == datetime.date:
@@ -426,13 +433,18 @@ class Date():
             return '        '
 Date.max = Date(datetime.date.max)
 Date.min = Date(datetime.date.min)
+Date._null_date = object.__new__(Date)
+Date._null_date._date = None
+NullDate = Date()
+
 class DateTime():
     "adds null capable datetime.datetime constructs"
     __slots__ = ['_datetime']
     def __new__(cls, year=None, month=0, day=0, hour=0, minute=0, second=0, microsec=0):
         """year may be a datetime.datetime"""
+        if year is None:
+            return cls._null_datetime
         ndt = object.__new__(cls)
-        ndt._datetime = False
         if type(year) == datetime.datetime:
             ndt._datetime = year
         elif type(year) == DateTime:
@@ -446,20 +458,12 @@ class DateTime():
         else:
             return NotImplemented
     def __eq__(yo, other):
-        if yo:
-            if type(other) == datetime.datetime:
-                return yo._datetime == other
-            elif type(other) == DateTime:
-                if other:
-                    return yo._datetime == other._datetime
-                return False
-        else:
-            if type(other) == datetime.datetime:
-                return False
-            elif type(other) == DateTime:
-                if other:
-                    return False
-                return True
+        if isinstance(other, yo.__class__):
+            return yo._datetime == other._datetime
+        if isinstance(other, datetime.date):
+            return yo._datetime == other
+        if isinstance(other, type(None)):
+            return yo._datetime is None
         return NotImplemented
     def __getattr__(yo, name):
         if yo:
@@ -550,9 +554,7 @@ class DateTime():
                 return False
         return NotImplemented
     def __nonzero__(yo):
-        if yo._datetime is not False:
-            return True
-        return False
+        return bool(yo._datetime)
     __radd__ = __add__
     def __rsub__(yo, other):
         if yo and type(other) == datetime.datetime:
@@ -618,13 +620,18 @@ class DateTime():
         return cls(datetime.datetime.today())
 DateTime.max = DateTime(datetime.datetime.max)
 DateTime.min = DateTime(datetime.datetime.min)
+DateTime._null_datetime = object.__new__(DateTime)
+DateTime._null_datetime._datetime = None
+NullDateTime = DateTime()
+
 class Time():
     "adds null capable datetime.time constructs"
     __slots__ = ['_time']
     def __new__(cls, hour=None, minute=0, second=0, microsec=0):
         """hour may be a datetime.time"""
+        if hour is None:
+            return cls._null_time
         nt = object.__new__(cls)
-        nt._time = False
         if type(hour) == datetime.time:
             nt._time = hour
         elif type(hour) == Time:
@@ -638,20 +645,12 @@ class Time():
         else:
             return NotImplemented
     def __eq__(yo, other):
-        if yo:
-            if type(other) == datetime.time:
-                return yo._time == other
-            elif type(other) == Time:
-                if other:
-                    return yo._time == other._time
-                return False
-        else:
-            if type(other) == datetime.time:
-                return False
-            elif type(other) == Time:
-                if other:
-                    return False
-                return True
+        if isinstance(other, yo.__class__):
+            return yo._time == other._time
+        if isinstance(other, datetime.time):
+            return yo._time == other
+        if isinstance(other, type(None)):
+            return yo._time is None
         return NotImplemented
     def __getattr__(yo, name):
         if yo:
@@ -742,9 +741,7 @@ class Time():
                 return False
         return NotImplemented
     def __nonzero__(yo):
-        if yo._time is not False:
-            return True
-        return False
+        return bool(yo._time)
     __radd__ = __add__
     def __rsub__(yo, other):
         if yo and type(other) == datetime.time:
@@ -773,12 +770,18 @@ class Time():
             return Time(yo._time - other)
         else:
             return NotImplemented
+    @staticmethod
+    def now():
+        return DateTime.now().time()
 Time.max = Time(datetime.time.max)
 Time.min = Time(datetime.time.min)
+Time._null_time = object.__new__(Time)
+Time._null_time._time = None
+NullTime = Time()
 
 class Logical():
     "return type for Logical fields; implements boolean algebra"
-    _need_init = True
+    "can be equal to True, False, or None"
     def A(x, y):
         "OR (disjunction): x | y => True iff at least one of x, y is True"
         if not isinstance(y, (x.__class__, bool, type(None))):
@@ -938,18 +941,19 @@ class Logical():
     __rrshift__ = None
     __rxor__ = J
     __xor__ = J
-if hasattr(Logical, '_need_init'):
-    Logical.true = true = object.__new__(Logical)
-    true.value = True
-    true.string = 'T'
-    Logical.false = false = object.__new__(Logical)
-    false.value = False
-    false.string = 'F'
-    Logical.unknown = unknown = object.__new__(Logical)
-    unknown.value = None
-    unknown.string = '?'
-    Logical.set_implication('material')
-    del Logical._need_init
+Logical.true = object.__new__(Logical)
+Logical.true.value = True
+Logical.true.string = 'T'
+Logical.false = object.__new__(Logical)
+Logical.false.value = False
+Logical.false.string = 'F'
+Logical.unknown = object.__new__(Logical)
+Logical.unknown.value = None
+Logical.unknown.string = '?'
+Logical.set_implication('material')
+Truth = Logical(True)
+Falsth = Logical(False)
+Null = Logical()
 
 # Internal classes
 class _DbfRecord():
@@ -1465,16 +1469,11 @@ def updateInteger(value, fielddef={}, memo=None):
 def retrieveLogical(bytes, fielddef={}, memo=None):
     "Returns True if bytes is 't', 'T', 'y', or 'Y', None if '?', and False otherwise"
     bytes = bytes.tostring()
-    if bytes == '?':
-        return None
-    return bytes in ['t','T','y','Y']
-def updateLogical(logical, fielddef={}, memo=None):
-    "Returns 'T' if logical is True, 'F' otherwise"
-    if type(logical) != bool:
-        logical = convertToBool(logical)
-    if type(logical) <> bool:
-        raise DbfError('Value %s is not logical.' % logical)
-    return logical and 'T' or 'F'
+    return Logical(bytes)
+def updateLogical(data, fielddef={}, memo=None):
+    "Returns 'T' if logical is True, 'F' if False, '?' otherwise"
+    data = Logical(data)
+    return str(data)
 def retrieveMemo(bytes, fielddef, memo, typ):
     "Returns the block of data from a memo file"
     stringval = bytes.tostring()
@@ -1537,14 +1536,15 @@ def retrieveVfpDateTime(bytes, fielddef={}, memo=None):
 def updateVfpDateTime(moment, fielddef={}, memo=None):
     """sets the date/time stored in moment
     moment must have fields year, month, day, hour, minute, second, microsecond"""
-    bytes = [0] * 8
-    hour = moment.hour
-    minute = moment.minute
-    second = moment.second
-    millisecond = moment.microsecond // 1000       # convert from millionths to thousandths
-    time = ((hour * 3600) + (minute * 60) + second) * 1000 + millisecond
-    bytes[4:] = updateInteger(time)
-    bytes[:4] = updateInteger(moment.toordinal() + VFPTIME)
+    bytes = ['0'] * 8
+    if moment:
+        hour = moment.hour
+        minute = moment.minute
+        second = moment.second
+        millisecond = moment.microsecond // 1000       # convert from millionths to thousandths
+        time = ((hour * 3600) + (minute * 60) + second) * 1000 + millisecond
+        bytes[4:] = updateInteger(time)
+        bytes[:4] = updateInteger(moment.toordinal() + VFPTIME)
     return ''.join(bytes)
 def retrieveVfpMemo(bytes, fielddef, memo, typ=None):
     "Returns the block of data from a memo file"
@@ -1623,8 +1623,8 @@ class DbfTable():
     _version = 'basic memory table'
     _versionabbv = 'dbf'
     _fieldtypes = {
-            'D' : { 'Type':'Date',    'Init':addDate,    'Blank':Date.today, 'Retrieve':retrieveDate,    'Update':updateDate, 'Class':None},
-            'L' : { 'Type':'Logical', 'Init':addLogical, 'Blank':bool,       'Retrieve':retrieveLogical, 'Update':updateLogical, 'Class':None},
+            'D' : { 'Type':'Date',    'Init':addDate,    'Blank':Date      , 'Retrieve':retrieveDate,    'Update':updateDate, 'Class':None},
+            'L' : { 'Type':'Logical', 'Init':addLogical, 'Blank':Logical,    'Retrieve':retrieveLogical, 'Update':updateLogical, 'Class':None},
             'M' : { 'Type':'Memo',    'Init':addMemo,    'Blank':str,        'Retrieve':retrieveMemo,    'Update':updateMemo, 'Class':None} }
     _memoext = ''
     _memotypes = tuple('M', )
@@ -2746,8 +2746,8 @@ class Db3Table(DbfTable):
     _versionabbv = 'db3'
     _fieldtypes = {
             'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical, 'Class':None},
             'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
             'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addNumeric, 'Class':None} }
     _memoext = '.dbt'
@@ -2814,6 +2814,8 @@ class Db3Table(DbfTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
+            if name in yo._meta.fields:
+                raise DbfError('Duplicate field name found: %s' % name)
             yo._meta.fields.append(name)
             yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
 class FpTable(DbfTable):
@@ -2824,8 +2826,8 @@ class FpTable(DbfTable):
             'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
             'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric, 'Class':None},
             'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate, 'Class':None},
             'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
             'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
             'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
@@ -2889,23 +2891,25 @@ class FpTable(DbfTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
+            if name in yo._meta.fields:
+                raise DbfError('Duplicate field name found: %s' % name)
             yo._meta.fields.append(name)
             yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
             
 class VfpTable(DbfTable):
     'Provides an interface for working with Visual FoxPro 6 tables'
-    _version = 'Visual Foxpro v6'
+    _version = 'Visual Foxpro'
     _versionabbv = 'vfp'
     _fieldtypes = {
             'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
-            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal(), 'Init':addVfpCurrency, 'Class':None},
+            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency, 'Class':None},
             'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble, 'Class':None},
             'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric, 'Class':None},
             'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric, 'Class':None},
             'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate, 'Class':None},
-            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime.now, 'Init':addVfpDateTime, 'Class':None},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical, 'Class':None},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate, 'Class':None},
+            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime, 'Class':None},
             'M' : {'Type':'Memo', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
             'G' : {'Type':'General', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
             'P' : {'Type':'Picture', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
@@ -2921,7 +2925,7 @@ class VfpTable(DbfTable):
     _decimal_fields = ('F','N')
     _numeric_fields = ('B','F','I','N','Y')
     _currency_fields = ('Y',)
-    _supported_tables = ('\x30',)
+    _supported_tables = ('\x30','\x31')
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
     _dbfTableHeader[8:10] = array('c', packShortInt(33+263))
@@ -2965,6 +2969,8 @@ class VfpTable(DbfTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
+            if name in yo._meta.fields:
+                raise DbfError('Duplicate field name found: %s' % name)
             yo._meta.fields.append(name)
             yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
 class List():
@@ -3503,8 +3509,9 @@ version_map = {
         '\x05' : 'dBase V',
         '\x30' : 'Visual FoxPro',
         '\x31' : 'Visual FoxPro (auto increment field)',
-        '\x43' : 'dBase IV SQL',
-        '\x7b' : 'dBase IV w/memos',
+        '\x32' : 'Visual FoxPro (VarChar, VarBinary, or BLOB enabled)',
+        '\x43' : 'dBase IV SQL table files',
+        '\x63' : 'dBase IV SQL system files',
         '\x83' : 'dBase III Plus w/memos',
         '\x8b' : 'dBase IV w/memos',
         '\x8e' : 'dBase IV w/SQL table',
@@ -3824,14 +3831,14 @@ class _Db4Table(DbfTable):
     _versionabbv = 'db4'
     _fieldtypes = {
             'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
-            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal(), 'Init':addVfpCurrency},
+            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency},
             'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble},
             'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric},
             'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric},
             'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':bool, 'Init':addLogical},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date.today, 'Init':addDate},
-            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime.now, 'Init':addVfpDateTime},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
+            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime},
             'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
             'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
             'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},

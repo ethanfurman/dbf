@@ -134,16 +134,16 @@ Field Types  -->  Python data types
     Date            dbf.Date (custom class that allows empty/null values)
     Logical         dbf.Logical (custom class that allows empty/null values)
     Memo            unicode (same as character)
-    Numeric         if N(x, 0) int, if N(x, 1+) float, if null NaN
+    Numeric         if N(x, 0) int; if N(x, 1+) float; if null None
   FP
     Float           same as Numeric
-    General         binary data
-    Photo           binary data
+    General         binary data; if null None
+    Photo           binary data; if null None
   VFP
-    Currency        Decimal, Decimal Nan if null
-    Double          float
-    Integer         int
-    DateTime        dbf.DateTime
+    Currency        Decimal; if null None
+    Double          float; if null None
+    Integer         int, if Null none
+    DateTime        dbf.DateTime (custom class that allows empty/null values)
 """
 version = (0, 88, 24)
 
@@ -1536,7 +1536,7 @@ def retrieveVfpDateTime(bytes, fielddef={}, memo=None):
 def updateVfpDateTime(moment, fielddef={}, memo=None):
     """sets the date/time stored in moment
     moment must have fields year, month, day, hour, minute, second, microsecond"""
-    bytes = ['0'] * 8
+    bytes = ['\x00'] * 8
     if moment:
         hour = moment.hour
         minute = moment.minute

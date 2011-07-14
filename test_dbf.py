@@ -655,13 +655,20 @@ class Test_Dbf_Creation(unittest.TestCase):
             yo.assertEqual(record.qty, qty)
             yo.assertEqual(record.orderdate, orderdate)
             yo.assertEqual(record.desc, desc)
+        # plus a blank record
+        namelist.append('')
+        paidlist.append(dbf.Falsth)
+        qtylist.append(0.0)
+        orderlist.append(dbf.NullDate)
+        desclist.append('')
+        table.append()
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
         table.close()
         last_byte = open(table.filename, 'rb').read()[-1]
         yo.assertEqual(last_byte, '\x1a')
         table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
-        yo.assertEqual(len(table), len(floats))
+        yo.assertEqual(len(table), len(floats)+1)
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
         i = 0
@@ -682,7 +689,7 @@ class Test_Dbf_Creation(unittest.TestCase):
     def test08(yo):
         "vfp table:  adding records"
         table = dbf.Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); paid L; qty N(11,5); orderdate D;'
-                ' desc M; mass B; weight F(18,3); age I; meeting T; misc G; photo P', dbf_type='vfp')
+                ' desc M; mass B; weight F(18,3); age I; meeting T; misc G; photo P; price Y', dbf_type='vfp')
         namelist = []
         paidlist = []
         qtylist = []
@@ -694,6 +701,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         meetlist = []
         misclist = []
         photolist = []
+        pricelist = []
         for i in range(len(floats)):
             name = words[i]
             paid = len(words[i]) % 3 == 0
@@ -707,6 +715,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
             misc = ' '.join(words[i:i+50:3])
             photo = ' '.join(words[i:i+50:7])
+            price = Decimal(round(floats[i] * 2.182737, 4))
             namelist.append(name)
             paidlist.append(paid)
             qtylist.append(qty)
@@ -731,9 +740,23 @@ class Test_Dbf_Creation(unittest.TestCase):
             yo.assertEqual(record.meeting, meeting)
             yo.assertEqual(record.misc, misc)
             yo.assertEqual(record.photo, photo)
+        # plus a blank record
+        namelist.append('')
+        paidlist.append(dbf.Falsth)
+        qtylist.append(0.0)
+        orderlist.append(dbf.NullDate)
+        desclist.append('')
+        masslist.append(0.0)
+        weightlist.append(0.0)
+        agelist.append(0)
+        meetlist.append(dbf.NullDateTime)
+        misclist.append('')
+        photolist.append('')
+        pricelist.append(Decimal('0.0'))
+        table.append()
         table.close()
         table = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
-        yo.assertEqual(len(table), len(floats))
+        yo.assertEqual(len(table), len(floats)+1)
         i = 0
         for record in table:
             yo.assertEqual(record.record_number, i)

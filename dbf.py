@@ -42,7 +42,10 @@ Goals:  programming style with databases
     - record = [ table.current() | table[int] | table.append() | table.[next|prev|top|bottom|goto]() ]
     - record.field | record['field'] accesses the field
 
-NOTE:  Of the VFP data types, auto-increment and null settings are not implemented.
+NOTE:   Of the VFP data types, auto-increment and null settings are not implemented.
+        Record data is not written to disk until record.write_record() is called, or
+        the record or table goes out of scope (usual caveats about closing interpreter
+        without closing tables apply -- data loss can occur in that situation).
 
 Examples:
 
@@ -254,25 +257,67 @@ class DoNotIndex(DbfWarning):
         super(DoNotIndex, yo).__init__(yo.message)
 # wrappers around datetime and logical objects to allow null values
 
+class Char(str):
+    "adds null capable str constructs"
+    def __new__(cls, text):
+        if isinstance(text, type(None)):
+            return None
+        if not isinstance(text, (str, unicode, cls)):
+            raise ValueError("Unable to automatically coerce %r to Char" % text)
+        return str.__new__(cls, text)
+    def __eq__(yo, other):
+        "ignores trailing whitespace"
+        if not isinstance(other, (yo.__class__, str)):
+            return NotImplemented
+        return yo.rstrip() == other.rstrip()
+    def __ge__(yo, other):
+        "ignores trailing whitespace"
+        if not isinstance(other, (yo.__class__, str)):
+            return NotImplemented
+        return yo.rstrip() >= other.rstrip()
+    def __gt__(yo, other):
+        "ignores trailing whitespace"
+        if not isinstance(other, (yo.__class__, str)):
+            return NotImplemented
+        return yo.rstrip() > other.rstrip()
+    def __le__(yo, other):
+        "ignores trailing whitespace"
+        if not isinstance(other, (yo.__class__, str)):
+            return NotImplemented
+        return yo.rstrip() <= other.rstrip()
+    def __lt__(yo, other):
+        "ignores trailing whitespace"
+        if not isinstance(other, (yo.__class__, str)):
+            return NotImplemented
+        return yo.rstrip() < other.rstrip()
+    def __ne__(yo, other):
+        "ignores trailing whitespace"
+        if not isinstance(other, (yo.__class__, str)):
+            return NotImplemented
+        return yo.rstrip() != other.rstrip()
+    def __nonzero__(yo):
+        "ignores trailing whitespace"
+        return bool(yo.rstrip())
+    def __str__(yo):
+        return yo.rstrip()
+
 class Date():
     "adds null capable datetime.date constructs"
     __slots__ = ['_date']
     def __new__(cls, year=None, month=0, day=0):
         """date should be either a datetime.date or date/month/day should all be appropriate integers"""
-        if year is None:
+        if year is None or year == 'no date':
             return cls._null_date
         nd = object.__new__(cls)
-        if type(year) == datetime.date:
+        if isinstance(year, (datetime.date)):
             nd._date = year
-        elif type(year) == Date:
+        elif isinstance(year, (Date)):
             nd._date = year._date
-        elif year == 'no date':
-            pass    # date object is already False
-        elif year is not None:
+        else:
             nd._date = datetime.date(year, month, day)
         return nd
     def __add__(yo, other):
-        if yo and type(other) == datetime.timedelta:
+        if yo and isinstance(other, (datetime.timedelta)):
             return Date(yo._date + other)
         else:
             return NotImplemented
@@ -285,89 +330,70 @@ class Date():
             return yo._date is None
         return NotImplemented
     def __getattr__(yo, name):
-        if yo:
-            attribute = yo._date.__getattribute__(name)
-            return attribute
-        else:
-            raise AttributeError('null Date object has no attribute %s' % name)
+        attribute = yo._date.__getattribute__(name)
+        return attribute
     def __ge__(yo, other):
-        if yo:
-            if type(other) == datetime.date:
-                return yo._date >= other
-            elif type(other) == Date:
-                if other:
-                    return yo._date >= other._date
-                return False
-        else:
-            if type(other) == datetime.date:
-                return False
-            elif type(other) == Date:
-                if other:
-                    return False
-                return True
+        if isinstance(other, (datetime.date)):
+            return yo._date >= other
+        elif isinstance(other, (Date)):
+            if other:
+                return yo._date >= other._date
+            return False
         return NotImplemented
     def __gt__(yo, other):
-        if yo:
-            if type(other) == datetime.date:
-                return yo._date > other
-            elif type(other) == Date:
-                if other:
-                    return yo._date > other._date
-                return True
-        else:
-            if type(other) == datetime.date:
-                return False
-            elif type(other) == Date:
-                if other:
-                    return False
-                return False
+        if isinstance(other, (datetime.date)):
+            return yo._date > other
+        elif isinstance(other, (Date)):
+            if other:
+                return yo._date > other._date
+            return True
         return NotImplemented
     def __hash__(yo):
-        return yo._date.__hash__()
+        return hash(yo._date)
     def __le__(yo, other):
         if yo:
-            if type(other) == datetime.date:
+            if isinstance(other, (datetime.date)):
                 return yo._date <= other
-            elif type(other) == Date:
+            elif isinstance(other, (Date)):
                 if other:
                     return yo._date <= other._date
                 return False
         else:
-            if type(other) == datetime.date:
+            if isinstance(other, (datetime.date)):
                 return True
-            elif type(other) == Date:
+            elif isinstance(other, (Date)):
                 if other:
                     return True
                 return True
         return NotImplemented
     def __lt__(yo, other):
         if yo:
-            if type(other) == datetime.date:
+            if isinstance(other, (datetime.date)):
                 return yo._date < other
-            elif type(other) == Date:
+            elif isinstance(other, (Date)):
                 if other:
                     return yo._date < other._date
                 return False
         else:
-            if type(other) == datetime.date:
+            if isinstance(other, (datetime.date)):
                 return True
-            elif type(other) == Date:
+            elif isinstance(other, (Date)):
                 if other:
                     return True
                 return False
         return NotImplemented
     def __ne__(yo, other):
         if yo:
-            if type(other) == datetime.date:
+            if isinstance(other, (datetime.date)):
                 return yo._date != other
-            elif type(other) == Date:
+            elif isinstance(other, (Date)):
                 if other:
                     return yo._date != other._date
                 return True
         else:
-            if type(other) == datetime.date:
+            if isinstance(other, (datetime.date)):
                 return True
-            elif type(other) == Date:
+            elif isinstance(other, (Date)):
                 if other:
                     return True
                 return False
@@ -376,11 +402,11 @@ class Date():
         return bool(yo._date)
     __radd__ = __add__
     def __rsub__(yo, other):
-        if yo and type(other) == datetime.date:
+        if yo and isinstance(other, (datetime.date)):
             return other - yo._date
-        elif yo and type(other) == Date:
+        elif yo and isinstance(other, (Date)):
             return other._date - yo._date
-        elif yo and type(other) == datetime.timedelta:
+        elif yo and isinstance(other, (datetime.timedelta)):
             return Date(other - yo._date)
         else:
             return NotImplemented
@@ -394,11 +420,11 @@ class Date():
             return yo.isoformat()
         return "no date"
     def __sub__(yo, other):
-        if yo and type(other) == datetime.date:
+        if yo and isinstance(other, (datetime.date)):
             return yo._date - other
-        elif yo and type(other) == Date:
+        elif yo and isinstance(other, (Date)):
             return yo._date - other._date
-        elif yo and type(other) == datetime.timedelta:
+        elif yo and isinstance(other, (datetime.timedelta)):
             return Date(yo._date - other)
         else:
             return NotImplemented
@@ -445,15 +471,15 @@ class DateTime():
         if year is None:
             return cls._null_datetime
         ndt = object.__new__(cls)
-        if type(year) == datetime.datetime:
+        if isinstance(year, (datetime.datetime)):
             ndt._datetime = year
-        elif type(year) == DateTime:
+        elif isinstance(year, (DateTime)):
             ndt._datetime = year._datetime
         elif year is not None:
             ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsec)
         return ndt
     def __add__(yo, other):
-        if yo and type(other) == datetime.timedelta:
+        if yo and isinstance(other, (datetime.timedelta)):
             return DateTime(yo._datetime + other)
         else:
             return NotImplemented
@@ -473,32 +499,32 @@ class DateTime():
             raise AttributeError('null DateTime object has no attribute %s' % name)
     def __ge__(yo, other):
         if yo:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return yo._datetime >= other
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return yo._datetime >= other._datetime
                 return False
         else:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return False
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return False
                 return True
         return NotImplemented
     def __gt__(yo, other):
         if yo:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return yo._datetime > other
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return yo._datetime > other._datetime
                 return True
         else:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return False
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return False
                 return False
@@ -507,48 +533,48 @@ class DateTime():
         return yo._datetime.__hash__()
     def __le__(yo, other):
         if yo:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return yo._datetime <= other
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return yo._datetime <= other._datetime
                 return False
         else:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return True
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return True
                 return True
         return NotImplemented
     def __lt__(yo, other):
         if yo:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return yo._datetime < other
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return yo._datetime < other._datetime
                 return False
         else:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return True
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return True
                 return False
         return NotImplemented
     def __ne__(yo, other):
         if yo:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return yo._datetime != other
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return yo._datetime != other._datetime
                 return True
         else:
-            if type(other) == datetime.datetime:
+            if isinstance(other, (datetime.datetime)):
                 return True
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return True
                 return False
@@ -557,11 +583,11 @@ class DateTime():
         return bool(yo._datetime)
     __radd__ = __add__
     def __rsub__(yo, other):
-        if yo and type(other) == datetime.datetime:
+        if yo and isinstance(other, (datetime.datetime)):
             return other - yo._datetime
-        elif yo and type(other) == DateTime:
+        elif yo and isinstance(other, (DateTime)):
             return other._datetime - yo._datetime
-        elif yo and type(other) == datetime.timedelta:
+        elif yo and isinstance(other, (datetime.timedelta)):
             return DateTime(other - yo._datetime)
         else:
             return NotImplemented
@@ -575,11 +601,11 @@ class DateTime():
             return yo.isoformat()
         return "no datetime"
     def __sub__(yo, other):
-        if yo and type(other) == datetime.datetime:
+        if yo and isinstance(other, (datetime.datetime)):
             return yo._datetime - other
-        elif yo and type(other) == DateTime:
+        elif yo and isinstance(other, (DateTime)):
             return yo._datetime - other._datetime
-        elif yo and type(other) == datetime.timedelta:
+        elif yo and isinstance(other, (datetime.timedelta)):
             return DateTime(yo._datetime - other)
         else:
             return NotImplemented
@@ -632,15 +658,15 @@ class Time():
         if hour is None:
             return cls._null_time
         nt = object.__new__(cls)
-        if type(hour) == datetime.time:
+        if isinstance(hour, (datetime.time)):
             nt._time = hour
-        elif type(hour) == Time:
+        elif isinstance(hour, (Time)):
             nt._time = hour._time
         elif hour is not None:
             nt._time = datetime.time(hour, minute, second, microsec)
         return nt
     def __add__(yo, other):
-        if yo and type(other) == datetime.timedelta:
+        if yo and isinstance(other, (datetime.timedelta)):
             return Time(yo._time + other)
         else:
             return NotImplemented
@@ -660,32 +686,32 @@ class Time():
             raise AttributeError('null Time object has no attribute %s' % name)
     def __ge__(yo, other):
         if yo:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return yo._time >= other
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return yo._time >= other._time
                 return False
         else:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return False
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return False
                 return True
         return NotImplemented
     def __gt__(yo, other):
         if yo:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return yo._time > other
-            elif type(other) == DateTime:
+            elif isinstance(other, (DateTime)):
                 if other:
                     return yo._time > other._time
                 return True
         else:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return False
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return False
                 return False
@@ -694,48 +720,48 @@ class Time():
         return yo._datetime.__hash__()
     def __le__(yo, other):
         if yo:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return yo._time <= other
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return yo._time <= other._time
                 return False
         else:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return True
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return True
                 return True
         return NotImplemented
     def __lt__(yo, other):
         if yo:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return yo._time < other
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return yo._time < other._time
                 return False
         else:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return True
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return True
                 return False
         return NotImplemented
     def __ne__(yo, other):
         if yo:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return yo._time != other
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return yo._time != other._time
                 return True
         else:
-            if type(other) == datetime.time:
+            if isinstance(other, (datetime.time)):
                 return True
-            elif type(other) == Time:
+            elif isinstance(other, (Time)):
                 if other:
                     return True
                 return False
@@ -744,11 +770,11 @@ class Time():
         return bool(yo._time)
     __radd__ = __add__
     def __rsub__(yo, other):
-        if yo and type(other) == datetime.time:
+        if yo and isinstance(other, (datetime.time)):
             return other - yo._time
-        elif yo and type(other) == Time:
+        elif yo and isinstance(other, (Time)):
             return other._time - yo._time
-        elif yo and type(other) == datetime.timedelta:
+        elif yo and isinstance(other, (datetime.timedelta)):
             return Time(other - yo._datetime)
         else:
             return NotImplemented
@@ -762,11 +788,11 @@ class Time():
             return yo.isoformat()
         return "no time"
     def __sub__(yo, other):
-        if yo and type(other) == datetime.time:
+        if yo and isinstance(other, (datetime.time)):
             return yo._time - other
-        elif yo and type(other) == Time:
+        elif yo and isinstance(other, (Time)):
             return yo._time - other._time
-        elif yo and type(other) == datetime.timedelta:
+        elif yo and isinstance(other, (datetime.timedelta)):
             return Time(yo._time - other)
         else:
             return NotImplemented
@@ -960,7 +986,7 @@ class _DbfRecord():
     """Provides routines to extract and save data within the fields of a dbf record."""
     __slots__ = ['_recnum', '_layout', '_data', '_dirty', '__weakref__']
     def _retrieveFieldValue(yo, record_data, fielddef):
-        """calls appropriate routine to fetch value stored in field from array
+        """calls appropriate routine to convert value stored in field from array
         @param record_data: the data portion of the record
         @type record_data: array of characters
         @param fielddef: description of the field definition
@@ -981,6 +1007,8 @@ class _DbfRecord():
                     datum = yo._layout.output_encoder(datum)[0]
                 except UnicodeEncodeError:
                     datum = unicodedata.normalize('NFD', datum).encode('ascii','ignore')
+            if classtype is not None:
+                datum = classtype(datum)
         return datum
     def _updateFieldValue(yo, fielddef, value):
         "calls appropriate routine to convert value to ascii bytes, and save it in record"
@@ -1277,9 +1305,9 @@ class _Db3Memo(_DbfMemo):
                 return data
             data += newdata
             eom = data.find('\x1a\x1a')
-        return data[:eom].rstrip()
+        return data[:eom]
     def _put_memo(yo, data):
-        data = data.rstrip()
+        data = data
         length = len(data) + yo.record_header_length  # room for two ^Z at end of memo
         blocks = length // yo.meta.memo_size
         if length % yo.meta.memo_size:
@@ -1335,7 +1363,7 @@ class _VfpMemo(_DbfMemo):
         length = unpackLongInt(header[4:], bigendian=True)
         return yo.meta.mfd.read(length)
     def _put_memo(yo, data):
-        data = data.rstrip()     # no trailing whitespace
+        data = data
         yo.meta.mfd.seek(0)
         thismemo = unpackLongInt(yo.meta.mfd.read(4), bigendian=True)
         yo.meta.mfd.seek(0)
@@ -1425,12 +1453,12 @@ def unsupportedType(something, field, memo=None, typ=None):
     "called if a data type is not supported for that style of table"
     raise DbfError('field type is not supported.')
 def retrieveCharacter(bytes, fielddef={}, memo=None, typ=None):
-    "Returns the string in bytes with trailing white space removed"
-    return typ(bytes.tostring().rstrip())
+    "Returns the string in bytes"
+    return typ(bytes.tostring())
 def updateCharacter(string, fielddef, memo=None):
-    "returns the string, truncating if string is longer than it's field"
+    "returns the string"
     string = str(string)
-    return string.rstrip()
+    return string
 def retrieveCurrency(bytes, fielddef={}, memo=None, typ=None):
     value = struct.unpack('<q', bytes)[0]
     return typ(("%de-4" % value).strip())
@@ -1472,6 +1500,8 @@ def retrieveLogical(bytes, fielddef={}, memo=None):
     return Logical(bytes)
 def updateLogical(data, fielddef={}, memo=None):
     "Returns 'T' if logical is True, 'F' if False, '?' otherwise"
+    if not isinstance(data, (bool, Logical, type(None))):
+        raise ValueError("unable to automatically coerce %r to Logical" % data)
     data = Logical(data)
     return str(data)
 def retrieveMemo(bytes, fielddef, memo, typ):
@@ -2016,7 +2046,9 @@ class DbfTable():
             raise TypeError('type <%s> not valid for indexing' % type(value))
     def __init__(yo, filename=':memory:', field_specs=None, memo_size=128, ignore_memos=False, 
                  read_only=False, keep_memos=False, meta_only=False, codepage=None, 
-                 numbers='default', strings=str, currency=Decimal):
+                 default={ 'numbers':'default', 'strings':Char, 'currency':Decimal },
+                 field_types={},    # e.g. 'name':str, 'age':float
+                 ):
         """open/create dbf file
         filename should include path if needed
         field_specs can be either a ;-delimited string or a list of strings
@@ -2035,15 +2067,15 @@ class DbfTable():
         yo._indexen = yo._Indexen()
         yo._meta = meta = yo._MetaData()
         for datatypes, classtype in (
-                (yo._character_fields, strings),
-                (yo._numeric_fields, numbers),
-                (yo._currency_fields, currency),
+                (yo._character_fields, default['strings']),
+                (yo._numeric_fields, default['numbers']),
+                (yo._currency_fields, default['currency']),
                 ):
             for datatype in datatypes:
                 yo._fieldtypes[datatype]['Class'] = classtype
-        meta.numbers = numbers
-        meta.strings = strings
-        meta.currency = currency
+        meta.numbers = default['numbers']
+        meta.strings = default['strings']
+        meta.currency = default['currency']
         meta.table = weakref.ref(yo)
         meta.filename = filename
         meta.fields = []
@@ -3896,9 +3928,8 @@ def Table(
         meta_only=False, 
         dbf_type=None, 
         codepage=None,
-        numbers='default',
-        strings=str,
-        currency=Decimal,
+        default={'numbers':'default','strings':Char,'currency':Decimal,},
+        field_types={},
         ):
     "returns an open table of the correct dbf_type, or creates it if field_specs is given"
     if dbf_type is None and isinstance(filename, DbfTable):
@@ -3910,17 +3941,18 @@ def Table(
         table = table_types.get(dbf_type)
         if table is None:
             raise DbfError("Unknown table type: %s" % dbf_type)
-        return table(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
+        return table(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos,
+                meta_only, codepage, default, field_types)
     else:
         possibles = guess_table_type(filename)
         if len(possibles) == 1:
-            return possibles[0][2](filename, field_specs, memo_size, ignore_memos, \
-                                 read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
+            return possibles[0][2](filename, field_specs, memo_size, ignore_memos,
+                    read_only, keep_memos, meta_only, codepage, default, field_types)
         else:
             for type, desc, cls in possibles:
                 if type == default_type:
-                    return cls(filename, field_specs, memo_size, ignore_memos, \
-                                 read_only, keep_memos, meta_only, codepage, numbers, strings, currency)
+                    return cls(filename, field_specs, memo_size, ignore_memos,
+                            read_only, keep_memos, meta_only, codepage, default, field_types)
             else:
                 types = ', '.join(["%s" % item[1] for item in possibles])
                 abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'

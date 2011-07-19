@@ -112,6 +112,100 @@ def index(sequence):
     for i in xrange(len(sequence)):
         yield i    
 
+class Test_Char(unittest.TestCase):
+    def test_00(yo):
+        "exceptions"
+        yo.assertRaises(ValueError, dbf.Char, 7)
+        yo.assertRaises(ValueError, dbf.Char, ['nope'])
+        yo.assertRaises(ValueError, dbf.Char, True)
+        yo.assertRaises(ValueError, dbf.Char, False)
+        yo.assertRaises(ValueError, dbf.Char, type)
+        yo.assertRaises(ValueError, dbf.Char, str)
+    def test_01(yo):
+        "booleans and None"
+        one = dbf.Char(' ')
+        yo.assertFalse(bool(one))
+        actual = dbf.Char('1')
+        yo.assertTrue(bool(actual))
+        none = dbf.Char(None)
+        yo.assertTrue(none == None)
+    def test_02(yo):
+        "equality"
+        a1 = dbf.Char('a')
+        a2 = 'a '
+        yo.assertEqual(a1, a2)
+        yo.assertEqual(a2, a1)
+        a3 = 'a '
+        a4 = dbf.Char('a ')
+        yo.assertEqual(a3, a4)
+        yo.assertEqual(a4, a3)
+    def test_03(yo):
+        "inequality"
+        a1 = dbf.Char('ab ')
+        a2 = 'a b'
+        yo.assertNotEqual(a1, a2)
+        yo.assertNotEqual(a2, a1)
+        a3 = 'ab '
+        a4 = dbf.Char('a b')
+        yo.assertNotEqual(a3, a4)
+        yo.assertNotEqual(a4, a3)
+    def test_04(yo):
+        "less-than"
+        a1 = dbf.Char('a')
+        a2 = 'a '
+        yo.assertFalse(a1 < a2)
+        yo.assertFalse(a2 < a1)
+        a3 = 'a '
+        a4 = dbf.Char('a ')
+        yo.assertFalse(a3 < a4)
+        yo.assertFalse(a4 < a3)
+        a5 = 'abcd'
+        a6 = 'abce'
+        yo.assertTrue(a5 < a6)
+        yo.assertFalse(a6 < a5)
+    def test_05(yo):
+        "less-than or equal"
+        a1 = dbf.Char('a')
+        a2 = 'a '
+        yo.assertTrue(a1 <= a2)
+        yo.assertTrue(a2 <= a1)
+        a3 = 'a '
+        a4 = dbf.Char('a ')
+        yo.assertTrue(a3 <= a4)
+        yo.assertTrue(a4 <= a3)
+        a5 = 'abcd'
+        a6 = 'abce'
+        yo.assertTrue(a5 <= a6)
+        yo.assertFalse(a6 <= a5)
+    def test_06(yo):
+        "greater-than or equal"
+        a1 = dbf.Char('a')
+        a2 = 'a '
+        yo.assertTrue(a1 >= a2)
+        yo.assertTrue(a2 >= a1)
+        a3 = 'a '
+        a4 = dbf.Char('a ')
+        yo.assertTrue(a3 >= a4)
+        yo.assertTrue(a4 >= a3)
+        a5 = 'abcd'
+        a6 = 'abce'
+        yo.assertFalse(a5 >= a6)
+        yo.assertTrue(a6 >= a5)
+    def test_07(yo):
+        "greater-than"
+        a1 = dbf.Char('a')
+        a2 = 'a '
+        yo.assertFalse(a1 > a2)
+        yo.assertFalse(a2 > a1)
+        a3 = 'a '
+        a4 = dbf.Char('a ')
+        yo.assertFalse(a3 > a4)
+        yo.assertFalse(a4 > a3)
+        a5 = 'abcd'
+        a6 = 'abce'
+        yo.assertFalse(a5 > a6)
+        yo.assertTrue(a6 > a5)
+
 class Test_Date(unittest.TestCase):
     "Testing Date"
     def test01(yo):
@@ -1553,7 +1647,13 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.resize_field('name', 40)
         new_record = table[5].scatter_fields()
         yo.assertEqual(test_record['orderdate'], new_record['orderdate'])
-
+    def test15(yo):
+        table = dbf.Table(':memory:', 'name C(20); born L; married D; appt T', dbf_type='vfp')
+        record = table.append()
+        #record.name = None
+        record.born = None
+        record.married = None
+        record.appt = None
 
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"

@@ -6,7 +6,7 @@ Copyright
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.88.26 as of 12 Jul 2011
+    - Version: 0.88.28 as of 18 Oct 2011
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -133,22 +133,24 @@ Examples:
 
 Field Types  -->  Python data types
   Dbf
-    Character       unicode  (or ascii if return_ascii is True)
-    Date            dbf.Date (custom class that allows empty/null values)
-    Logical         dbf.Logical (custom class that allows empty/null values)
+    Character       unicode
+    Date            datetime.date
+    Logical         boolean
     Memo            unicode (same as character)
-    Numeric         if N(x, 0) int; if N(x, 1+) float; if null None
+    Numeric         if N(x, 0) int; if N(x, 1+) float
   FP
     Float           same as Numeric
-    General         binary data; if null None
-    Photo           binary data; if null None
+    General         binary data
+    Photo           binary data
   VFP
-    Currency        Decimal; if null None
-    Double          float; if null None
-    Integer         int, if Null none
-    DateTime        dbf.DateTime (custom class that allows empty/null values)
+    Currency        Decimal
+    Double          float
+    Integer         int
+    DateTime        datetime.datetime
+  Note: if any of the above are empty (nothing ever stored in that field) None is returned
+
 """
-version = (0, 88, 26)
+version = (0, 88, 28)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -170,21 +172,31 @@ import weakref
 
 from array import array
 from bisect import bisect_left, bisect_right
+from collections import defaultdict
+import decimal 
 from decimal import Decimal
 from math import floor
 from shutil import copyfileobj
 
 __metaclass__ = type
 
+LOGICAL_BAD_IS_FALSE = True # if bad data in logical fields, return False? (else raise error)
+
 input_decoding = locale.getdefaultlocale()[1]    # treat non-unicode data as ...
 default_codepage = input_decoding  # if no codepage specified on dbf creation, use this
-return_ascii = False         # if True -- convert back to icky ascii, losing chars if no mapping
 temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TEMP") or ""
 
 default_type = 'db3'    # default format if none specified
 sql_user_functions = {}      # user-defined sql functions
 
-# 2.6+ property for 2.5-
+# Decimal does not accept float inputs until 2.7
+if sys.version_info[:2] < (2, 7):
+    def Decimal(val=0):
+        if isinstance(val, float):
+            return decimal.Decimal(str(val))
+        return decimal.Decimal(val)
+
+# 2.6+ property for 2.5-, decimal.Decimal doesn't support float initialization
 if sys.version_info[:2] < (2, 6):
     # define our own property type
     class property():
@@ -223,12 +235,13 @@ if sys.version_info[:2] < (2, 6):
 
 class DbfError(Exception):
     "Fatal errors elicit this response."
-    pass
 class DataOverflow(DbfError):
     "Data too large for field"
     def __init__(yo, message, data=None):
         super(DataOverflow, yo).__init__(message)
         yo.data = data
+class BadData(DbfError):
+    "bad data in table"
 class FieldMissing(KeyError, DbfError):
     "Field does not exist in table"
     def __init__(yo, fieldname):
@@ -257,10 +270,33 @@ class DoNotIndex(DbfWarning):
         super(DoNotIndex, yo).__init__(yo.message)
 # wrappers around datetime and logical objects to allow null values
 
+class Null():
+    "Null object -- any interaction returns Null"
+    string = 'Null'
+    def _null(self, *args, **kwargs):
+        return self
+    def __getattr__(yo, name):
+        return self
+    def __hash__(yo):
+        return 42
+    def __nonzero__(yo):
+        return False
+    def __repr__(yo):
+        return 'Null()'
+    def __setattr__(yo, name, value):
+        return None
+        raise AttributeError('Null objects do not have %s' % name)
+    def __setitem___(yo, index, value):
+        return None
+        raise AttributeError('Null objects do not support assignment with [%r] access' % index)
+    def __str__(yo):
+        return yo.string
+Null = object.__new__(Null)
+
 class Char(str):
     "adds null capable str constructs"
-    def __new__(cls, text):
-        if isinstance(text, type(None)):
+    def __new__(cls, text=''):
+        if text == None:
             return None
         if not isinstance(text, (str, unicode, cls)):
             raise ValueError("Unable to automatically coerce %r to Char" % text)
@@ -306,7 +342,7 @@ class Date():
     __slots__ = ['_date']
     def __new__(cls, year=None, month=0, day=0):
         """date should be either a datetime.date or date/month/day should all be appropriate integers"""
-        if year is None or year == 'no date':
+        if year is None:
             return cls._null_date
         nd = object.__new__(cls)
         if isinstance(year, (datetime.date)):
@@ -330,8 +366,7 @@ class Date():
             return yo._date is None
         return NotImplemented
     def __getattr__(yo, name):
-        attribute = yo._date.__getattribute__(name)
-        return attribute
+        return yo._date.__getattribute__(name)
     def __ge__(yo, other):
         if isinstance(other, (datetime.date)):
             return yo._date >= other
@@ -418,7 +453,7 @@ class Date():
     def __str__(yo):
         if yo:
             return yo.isoformat()
-        return "no date"
+        return ""
     def __sub__(yo, other):
         if yo and isinstance(other, (datetime.date)):
             return yo._date - other
@@ -593,13 +628,15 @@ class DateTime():
             return NotImplemented
     def __repr__(yo):
         if yo:
-            return "DateTime(%d, %d, %d, %d, %d, %d, %d, %d, %d)" % yo._datetime.timetuple()[:]
+            return "DateTime(%d, %d, %d, %d, %d, %d, %d)" % (
+                yo._datetime.timetuple()[:6] + (yo._datetime.microsecond, )
+                )
         else:
             return "DateTime()"
     def __str__(yo):
         if yo:
             return yo.isoformat()
-        return "no datetime"
+        return ""
     def __sub__(yo, other):
         if yo and isinstance(other, (datetime.datetime)):
             return yo._datetime - other
@@ -786,7 +823,7 @@ class Time():
     def __str__(yo):
         if yo:
             return yo.isoformat()
-        return "no time"
+        return ""
     def __sub__(yo, other):
         if yo and isinstance(other, (datetime.time)):
             return yo._time - other
@@ -979,42 +1016,45 @@ Logical.unknown.string = '?'
 Logical.set_implication('material')
 Truth = Logical(True)
 Falsth = Logical(False)
-Null = Logical()
+Unknown = Logical()
 
 # Internal classes
 class _DbfRecord():
     """Provides routines to extract and save data within the fields of a dbf record."""
     __slots__ = ['_recnum', '_layout', '_data', '_dirty', '__weakref__']
-    def _retrieveFieldValue(yo, record_data, fielddef):
+    def _retrieveFieldValue(yo, index, name):
         """calls appropriate routine to convert value stored in field from array
         @param record_data: the data portion of the record
         @type record_data: array of characters
         @param fielddef: description of the field definition
         @type fielddef: dictionary with keys 'type', 'start', 'length', 'end', 'decimals', and 'flags'
         @returns: python data stored in field"""
-
+        fielddef = yo._layout[name]
+        #if fielddef['nullable'] and index & fielddef['flags']:
+        #    return fielddef['null']()
+        record_data = yo._data[fielddef['start']:fielddef['end']]
         field_type = fielddef['type']
-        classtype = yo._layout.fieldtypes[field_type]['Class']
+        classtype = fielddef['class']
         retrieve = yo._layout.fieldtypes[field_type]['Retrieve']
-        if classtype is not None:
-            datum = retrieve(record_data, fielddef, yo._layout.memo, classtype)
-        else:
-            datum = retrieve(record_data, fielddef, yo._layout.memo)
-        if field_type in yo._layout.character_fields:
-            datum = yo._layout.decoder(datum)[0]
-            if yo._layout.return_ascii:
-                try:
-                    datum = yo._layout.output_encoder(datum)[0]
-                except UnicodeEncodeError:
-                    datum = unicodedata.normalize('NFD', datum).encode('ascii','ignore')
+        datum = retrieve(record_data, fielddef, yo._layout.memo)
+        if field_type in yo._layout.character_fields and datum != None:
+            try:
+                datum = yo._layout.decoder(datum)[0]
+            except:
+                print '\n', repr(datum), '\n'
+                raise
             if classtype is not None:
                 datum = classtype(datum)
         return datum
-    def _updateFieldValue(yo, fielddef, value):
+    def _updateFieldValue(yo, index, name, value):
         "calls appropriate routine to convert value to ascii bytes, and save it in record"
+        fielddef = yo._layout[name]
         field_type = fielddef['type']
         update = yo._layout.fieldtypes[field_type]['Update']
+        # TODO: check if null field
         if field_type in yo._layout.character_fields:
+            if value is None:
+                value = u''
             if not isinstance(value, unicode):
                 if yo._layout.input_decoder is None:
                     raise NonUnicode("String not in unicode format, no default encoding specified")
@@ -1047,10 +1087,8 @@ class _DbfRecord():
     def __contains__(yo, key):
         return key in yo._layout.fields or key in ['record_number','delete_flag']
     def __del__(yo):
-        table = yo._layout.table()
-        if table is not None:
-            yo.write_record()
         if not yo._layout.inmemory:
+            yo._update_disk()
             yo._layout.dfd.flush()
     def __iter__(yo):
         return (yo[field] for field in yo._layout.fields)
@@ -1064,8 +1102,8 @@ class _DbfRecord():
         elif not name in yo._layout.fields:
             raise FieldMissing(name)
         try:
-            fielddef = yo._layout[name]
-            value = yo._retrieveFieldValue(yo._data[fielddef['start']:fielddef['end']], fielddef)
+            index = yo._layout.fields.index(name)
+            value = yo._retrieveFieldValue(index, name)
             return value
         except DbfError, error:
             error.message = "field --%s-- is %s -> %s" % (name, yo._layout.fieldtypes[fielddef['type']]['Type'], error.message)
@@ -1117,9 +1155,9 @@ class _DbfRecord():
             return
         elif not name in yo._layout.fields:
             raise FieldMissing(name)
-        fielddef = yo._layout[name]
+        index = yo._layout.fields.index(name)
         try:
-            yo._updateFieldValue(fielddef, value)
+            yo._updateFieldValue(index, name, value)
         except DbfError, error:
             error.message = "field --%s-- is %s -> %s" % (name, yo._layout.fieldtypes[fielddef['type']]['Type'], error.message)
             error.data = name
@@ -1153,10 +1191,10 @@ class _DbfRecord():
         layout.ondisk = False
         yo._data = array('c', ' ' * layout.header.record_length)
         layout.memofields = []
-        for field in layout.fields:
-            yo._updateFieldValue(layout[field], layout.fieldtypes[layout[field]['type']]['Blank']())
-            if layout[field]['type'] in layout.memotypes:
-                layout.memofields.append(field)
+        for index, name in enumerate(layout.fields):
+            yo._updateFieldValue(index, name, None)
+            if layout[name]['type'] in layout.memotypes:
+                layout.memofields.append(name)
         layout.blankrecord = yo._data[:]
         layout.ondisk = ondisk
     def delete_record(yo):
@@ -1225,7 +1263,7 @@ class _DbfRecord():
         "returns a dictionary of fieldnames and values which can be used with gather_fields().  if blank is True, values are empty."
         keys = yo._layout.fields
         if blank:
-            values = [yo._layout.fieldtypes[yo._layout[key]['type']]['Blank']() for key in keys]
+            values = [None] * len(keys)
         else:
             values = [yo[field] for field in keys]
         return dict(zip(keys, values))
@@ -1367,7 +1405,7 @@ class _VfpMemo(_DbfMemo):
         yo.meta.mfd.seek(0)
         thismemo = unpackLongInt(yo.meta.mfd.read(4), bigendian=True)
         yo.meta.mfd.seek(0)
-        length = len(data) + yo.record_header_length  # room for two ^Z at end of memo
+        length = len(data) + yo.record_header_length
         blocks = length // yo.meta.memo_size
         if length % yo.meta.memo_size:
             blocks += 1
@@ -1442,51 +1480,63 @@ def unpackStr(chars):
                 break
             name.append(ch.lower())
         return ''.join(name)
-def convertToBool(value):
-    """Returns boolean true or false; normal rules apply to non-string values; string values
-    must be 'y','t', 'yes', or 'true' (case insensitive) to be True"""
-    if type(value) == str:
-        return bool(value.lower() in ['t', 'y', 'true', 'yes'])
-    else:
-        return bool(value)
-def unsupportedType(something, field, memo=None, typ=None):
+def unsupportedType(something, field, memo=None):
     "called if a data type is not supported for that style of table"
     raise DbfError('field type is not supported.')
-def retrieveCharacter(bytes, fielddef={}, memo=None, typ=None):
+def retrieveCharacter(bytes, fielddef={}, memo=None):
     "Returns the string in bytes"
-    return typ(bytes.tostring())
+    return fielddef['class'](bytes.tostring())
 def updateCharacter(string, fielddef, memo=None):
     "returns the string"
+    if string == None:
+        return fielddef['length'] * ' '
+    if not isinstance(string, str):
+        raise ValueError("unable to coerce %r(%r) to string" % (type(string), string))
     string = str(string)
     return string
-def retrieveCurrency(bytes, fielddef={}, memo=None, typ=None):
+def retrieveCurrency(bytes, fielddef={}, memo=None):
     value = struct.unpack('<q', bytes)[0]
-    return typ(("%de-4" % value).strip())
+    return fielddef['class'](("%de-4" % value).strip())
 def updateCurrency(value, fielddef={}, memo=None):
+    if value == None:
+        value = 0
     currency = int(value * 10000)
     if not -9223372036854775808 < currency < 9223372036854775808:
         raise DataOverflow("value %s is out of bounds" % value)
     return struct.pack('<q', currency)
 def retrieveDate(bytes, fielddef={}, memo=None):
     "Returns the ascii coded date as a Date object"
-    return Date.fromymd(bytes.tostring())
+    text = bytes.tostring()
+    if text == '        ':
+        return fielddef['empty']()
+    year = int(text[0:4])
+    month = int(text[4:6])
+    day = int(text[6:8])
+    return fielddef['class'](year, month, day)
 def updateDate(moment, fielddef={}, memo=None):
     "returns the Date or datetime.date object ascii-encoded (yyyymmdd)"
-    if moment:
-        return "%04d%02d%02d" % moment.timetuple()[:3]
-    return '        '
-def retrieveDouble(bytes, fielddef={}, memo=None, typ=None):
-    return float(struct.unpack('<d', bytes)[0])
+    if moment == None:
+        return '        '
+    return "%04d%02d%02d" % moment.timetuple()[:3]
+def retrieveDouble(bytes, fielddef={}, memo=None):
+    typ = fielddef['class']
+    if typ == 'default':
+        typ = float
+    return typ(struct.unpack('<d', bytes)[0])
 def updateDouble(value, fielddef={}, memo=None):
+    if value == None:
+        value = 0
     return struct.pack('<d', float(value))
-def retrieveInteger(bytes, fielddef={}, memo=None, typ=None):
+def retrieveInteger(bytes, fielddef={}, memo=None):
     "Returns the binary number stored in bytes in little-endian format"
-    if typ is None or typ == 'default':
-        return struct.unpack('<i', bytes)[0]
-    else:
-        return typ(struct.unpack('<i', bytes)[0])
+    typ = fielddef['class']
+    if typ == 'default':
+        typ = int
+    return typ(struct.unpack('<i', bytes)[0])
 def updateInteger(value, fielddef={}, memo=None):
     "returns value in little-endian binary format"
+    if value == None:
+        value = 0
     try:
         value = int(value)
     except Exception:
@@ -1496,35 +1546,50 @@ def updateInteger(value, fielddef={}, memo=None):
     return struct.pack('<i', int(value))
 def retrieveLogical(bytes, fielddef={}, memo=None):
     "Returns True if bytes is 't', 'T', 'y', or 'Y', None if '?', and False otherwise"
+    typ = fielddef['class']
     bytes = bytes.tostring()
-    return Logical(bytes)
+    if typ is bool:
+        if bytes in 'tTyY':
+            return True
+        elif bytes in 'fFnN':
+            return False
+        elif bytes in '? ':
+            return fielddef['empty']()
+        elif LOGICAL_BAD_IS_FALSE:
+            return false
+        else:
+            raise BadData('Logical field contained %r' % bytes)
+    return typ(bytes)
 def updateLogical(data, fielddef={}, memo=None):
     "Returns 'T' if logical is True, 'F' if False, '?' otherwise"
-    if not isinstance(data, (bool, Logical, type(None))):
-        raise ValueError("unable to automatically coerce %r to Logical" % data)
-    data = Logical(data)
-    return str(data)
-def retrieveMemo(bytes, fielddef, memo, typ):
+    if data == None:
+        return '?'
+    elif data == True:
+        return 'T'
+    elif data == False:
+        return 'F'
+    raise ValueError("unable to automatically coerce %r to Logical" % data)
+def retrieveMemo(bytes, fielddef, memo):
     "Returns the block of data from a memo file"
-    stringval = bytes.tostring()
-    if stringval.strip():
-        block = int(stringval.strip())
-    else:
-        block = 0
-    return memo.get_memo(block, fielddef)
+    stringval = bytes.tostring().strip()
+    if not stringval:
+        return fielddef['empty']()
+    block = int(stringval)
+    return fielddef['class'](memo.get_memo(block, fielddef))
 def updateMemo(string, fielddef, memo):
     "Writes string as a memo, returns the block number it was saved into"
+    if string == None:
+        string = ''
     block = memo.put_memo(string)
     if block == 0:
         block = ''
     return "%*s" % (fielddef['length'], block)
-def retrieveNumeric(bytes, fielddef, memo=None, typ=None):
+def retrieveNumeric(bytes, fielddef, memo=None):
     "Returns the number stored in bytes as integer if field spec for decimals is 0, float otherwise"
-    string = bytes.tostring()
-    if string[0:1] == '*':  # value too big to store (Visual FoxPro idiocy)
-        return None
-    if not string.strip():
-        string = '0'
+    string = bytes.tostring().strip()
+    typ = fielddef['class']
+    if not string or string[0:1] == '*':  # value too big to store (Visual FoxPro idiocy)
+        return fielddef['empty']()
     if typ == 'default':
         if fielddef['decimals'] == 0:
             return int(string)
@@ -1534,6 +1599,8 @@ def retrieveNumeric(bytes, fielddef, memo=None, typ=None):
         return typ(string.strip())
 def updateNumeric(value, fielddef, memo=None):
     "returns value as ascii representation, rounding decimal portion as necessary"
+    if value == None:
+        return fielddef['length'] * ' '
     try:
         value = float(value)
     except Exception:
@@ -1551,18 +1618,26 @@ def retrieveVfpDateTime(bytes, fielddef={}, memo=None):
     may not be accurate;  BC dates are nulled."""
     # two four-byte integers store the date and time.
     # millesecords are discarded from time
-    time = retrieveInteger(bytes[4:])
+    if bytes == array('c','\x00' * 8):
+        return fielddef['empty']()
+    typ = fielddef['class']
+    time = unpackLongInt(bytes[4:])
     microseconds = (time % 1000) * 1000
     time = time // 1000                      # int(round(time, -3)) // 1000 discard milliseconds
     hours = time // 3600
     mins = time % 3600 // 60
     secs = time % 3600 % 60
-    time = Time(hours, mins, secs, microseconds)
-    possible = retrieveInteger(bytes[:4])
+    time = datetime.time(hours, mins, secs, microseconds)
+    possible = unpackLongInt(bytes[:4])
     possible -= VFPTIME
     possible = max(0, possible)
-    date = Date.fromordinal(possible)
-    return DateTime.combine(date, time)
+    try:
+        date = datetime.date.fromordinal(possible)
+    except:
+        print
+        print bytes
+        print possible
+    return typ(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond)
 def updateVfpDateTime(moment, fielddef={}, memo=None):
     """sets the date/time stored in moment
     moment must have fields year, month, day, hour, minute, second, microsecond"""
@@ -1576,12 +1651,17 @@ def updateVfpDateTime(moment, fielddef={}, memo=None):
         bytes[4:] = updateInteger(time)
         bytes[:4] = updateInteger(moment.toordinal() + VFPTIME)
     return ''.join(bytes)
-def retrieveVfpMemo(bytes, fielddef, memo, typ=None):
+def retrieveVfpMemo(bytes, fielddef, memo):
     "Returns the block of data from a memo file"
+    typ = fielddef['class']
     block = struct.unpack('<i', bytes)[0]
-    return memo.get_memo(block, fielddef)
+    if not block:
+        return fielddef['empty']()
+    return typ(memo.get_memo(block, fielddef))
 def updateVfpMemo(string, fielddef, memo):
     "Writes string as a memo, returns the block number it was saved into"
+    if string == None:
+        string = ''
     block = memo.put_memo(string)
     return struct.pack('<i', block)
 def addCharacter(format):
@@ -1611,9 +1691,9 @@ def addNumeric(format):
     length = int(length)
     decimals = int(decimals)
     if not 0 < length < 18:
-        raise ValueError
+        raise DbfError("Numeric fields must be between 1 and 17 digits, not %d" % length)
     if decimals and not 0 < decimals <= length - 2:
-        raise ValueError
+        raise DbfError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
     return length, decimals
 def addVfpCurrency(format):
     length = 8
@@ -1642,10 +1722,28 @@ def addVfpNumeric(format):
     length = int(length)
     decimals = int(decimals)
     if not 0 < length < 21:
-        raise ValueError
+        raise DbfError("Numeric fields must be between 1 and 20 digits, not %d" % length)
     if decimals and not 0 < decimals <= length - 2:
-        raise ValueError
+        raise DbfError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
     return length, decimals
+
+def ezip(*iters):
+    "extends all iters to longest one, using last value from each as necessary"
+    iters = [iter(x) for x in iters]
+    last = [None] * len(iters)
+    alive = len(iters)
+    while alive:
+        for i, iterator in enumerate(iters):
+            try:
+                value = next(iterator)
+                last[i] = value
+            except StopIteration:
+                alive -= 1
+        if alive:
+            yield tuple(last)
+            alive = len(iters)
+            continue
+        break
 
 # Public classes
 class DbfTable():
@@ -1653,9 +1751,9 @@ class DbfTable():
     _version = 'basic memory table'
     _versionabbv = 'dbf'
     _fieldtypes = {
-            'D' : { 'Type':'Date',    'Init':addDate,    'Blank':Date      , 'Retrieve':retrieveDate,    'Update':updateDate, 'Class':None},
-            'L' : { 'Type':'Logical', 'Init':addLogical, 'Blank':Logical,    'Retrieve':retrieveLogical, 'Update':updateLogical, 'Class':None},
-            'M' : { 'Type':'Memo',    'Init':addMemo,    'Blank':str,        'Retrieve':retrieveMemo,    'Update':updateMemo, 'Class':None} }
+            'D' : { 'Type':'Date',    'Init':addDate,    'Blank':Date,       'Retrieve':retrieveDate,    'Update':updateDate},
+            'L' : { 'Type':'Logical', 'Init':addLogical, 'Blank':Logical,    'Retrieve':retrieveLogical, 'Update':updateLogical},
+            'M' : { 'Type':'Memo',    'Init':addMemo,    'Blank':str,        'Retrieve':retrieveMemo,    'Update':updateMemo} }
     _memoext = ''
     _memotypes = tuple('M', )
     _memoClass = _DbfMemo
@@ -1663,10 +1761,14 @@ class DbfTable():
     _noMemoMask = ''
     _fixed_fields = ('M','D','L')           # always same length in table
     _variable_fields = tuple()              # variable length in table
+    _binary_fields = tuple()                # as in non-unicode character
     _character_fields = tuple('M', )        # field representing character data
     _decimal_fields = tuple()               # text-based numeric fields
     _numeric_fields = tuple()               # fields representing a number
     _currency_fields = tuple()
+    _date_fields = tuple()
+    _datetime_fields = tuple()
+    _logical_fields = tuple()
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x00'             # table type - none
     _dbfTableHeader[8:10] = array('c', packShortInt(33))
@@ -1679,6 +1781,17 @@ class DbfTable():
     _meta_only = False
     _use_deleted = True
     backup = False
+    defaults = {
+            'binary'    : str,
+            'character' : unicode,
+            'currency'  : Decimal,
+            'date'      : datetime.date,
+            'datetime'  : datetime.datetime,
+            'logical'   : bool,
+            'number'    : 'default',
+            'null'      : lambda:None,
+            'empty'     : lambda:None, 
+            }
     class _DbfLists():
         "implements the weakref structure for DbfLists"
         def __init__(yo):
@@ -1861,6 +1974,11 @@ class DbfTable():
             yo._weakref_list.append(weakref.ref(record))
         def clear(yo):
             yo._weakref_list[:] = []
+        def flush(yo):
+            for maybe in yo._weakref_list:
+                maybe = maybe()
+                if maybe is not None and maybe._dirty:
+                    maybe.write_record()            
         def pop(yo):
             return yo._weakref_list.pop()
     class DbfIterator():
@@ -1929,6 +2047,12 @@ class DbfTable():
                     break
     def _initializeFields(yo):
         "builds the FieldList of names, types, and descriptions from the disk file"
+        old_fields = defaultdict(dict)
+        for name in yo._meta.fields:
+            old_fields[name]['type'] = yo._meta[name]['type']
+            old_fields[name]['class'] = yo._meta[name]['class']
+            old_fields[name]['null'] = yo._meta[name]['null']
+            old_fields[name]['empty'] = yo._meta[name]['empty']
         yo._meta.fields[:] = []
         offset = 1
         fieldsdef = yo._meta.header.fields
@@ -1951,7 +2075,25 @@ class DbfTable():
             if name in yo._meta.fields:
                 raise DbfError('Duplicate field name found: %s' % name)
             yo._meta.fields.append(name)
-            yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
+            if name in old_fields and old_fields[name]['type'] == type:
+                cls = old_fields[name]['class']
+                null = old_fields[name]['null']
+                empty = old_fields[name]['empty']
+            else:
+                cls = yo._fieldtypes[type]['Class']
+                null = yo._fieldtypes[type]['Null']
+                empty = yo._fieldtypes[type]['Empty']
+            yo._meta[name] = {
+                    'type' : type,
+                    'start' : start,
+                    'length' : length,
+                    'end' : end,
+                    'decimals' : decimals,
+                    'flags' : flags,
+                    'class' : cls,
+                    'null' : null,
+                    'empty' : empty,
+                    }
     def _fieldLayout(yo, i):
         "Returns field information Name Type(Length[,Decimals])"
         name = yo._meta.fields[i]
@@ -2046,8 +2188,7 @@ class DbfTable():
             raise TypeError('type <%s> not valid for indexing' % type(value))
     def __init__(yo, filename=':memory:', field_specs=None, memo_size=128, ignore_memos=False, 
                  read_only=False, keep_memos=False, meta_only=False, codepage=None, 
-                 default={ 'numbers':'default', 'strings':Char, 'currency':Decimal },
-                 field_types={},    # e.g. 'name':str, 'age':float
+                 default={}, field_types={},    # e.g. 'name':str, 'age':float
                  ):
         """open/create dbf file
         filename should include path if needed
@@ -2063,23 +2204,15 @@ class DbfTable():
                 raise DbfError("field list must be specified for memory tables")
         elif type(yo) is DbfTable:
             raise DbfError("only memory tables supported")
+        yo.defaults = yo.defaults.copy()
+        yo.defaults.update(default)
         yo._dbflists = yo._DbfLists()
         yo._indexen = yo._Indexen()
         yo._meta = meta = yo._MetaData()
-        for datatypes, classtype in (
-                (yo._character_fields, default['strings']),
-                (yo._numeric_fields, default['numbers']),
-                (yo._currency_fields, default['currency']),
-                ):
-            for datatype in datatypes:
-                yo._fieldtypes[datatype]['Class'] = classtype
-        meta.numbers = default['numbers']
-        meta.strings = default['strings']
-        meta.currency = default['currency']
         meta.table = weakref.ref(yo)
         meta.filename = filename
         meta.fields = []
-        meta.fieldtypes = yo._fieldtypes
+        meta.fieldtypes = yo._fieldtypes.copy()
         meta.fixed_fields = yo._fixed_fields
         meta.variable_fields = yo._variable_fields
         meta.character_fields = yo._character_fields
@@ -2090,7 +2223,6 @@ class DbfTable():
         meta.memo_size = memo_size
         meta.input_decoder = codecs.getdecoder(input_decoding)      # from ascii to unicode
         meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
-        meta.return_ascii = return_ascii
         meta.header = header = yo._TableHeader(yo._dbfTableHeader)
         header.extra = yo._dbfTableHeaderExtra
         header.data        #force update of date
@@ -2106,6 +2238,20 @@ class DbfTable():
             meta.memoname = base + yo._memoext
             meta.ondisk = True
             meta.inmemory = False
+        # this must happen before .add_fields() is called
+        for datatypes, classtype in (
+                (yo._binary_fields, yo.defaults['binary']),
+                (yo._character_fields, yo.defaults['character']),
+                (yo._currency_fields, yo.defaults['currency']),
+                (yo._date_fields, yo.defaults['date']),
+                (yo._datetime_fields, yo.defaults['datetime']),
+                (yo._logical_fields, yo.defaults['logical']),
+                (yo._numeric_fields, yo.defaults['number']),
+                ):
+            for datatype in datatypes:
+                meta.fieldtypes[datatype]['Class'] = classtype
+                meta.fieldtypes[datatype]['Null'] = yo.defaults['null']
+                meta.fieldtypes[datatype]['Empty'] = yo.defaults['empty']
         if field_specs:
             if meta.ondisk:
                 meta.dfd = open(meta.filename, 'w+b')
@@ -2115,50 +2261,62 @@ class DbfTable():
             cp, sd, ld = _codepage_lookup(meta.header.codepage())
             meta.decoder = codecs.getdecoder(sd) 
             meta.encoder = codecs.getencoder(sd)
-            return
-        try:
-            dfd = meta.dfd = open(meta.filename, 'r+b')
-        except IOError, e:
-            raise DbfError(str(e))
-        dfd.seek(0)
-        meta.header = header = yo._TableHeader(dfd.read(32))
-        if not header.version in yo._supported_tables:
-            dfd.close()
-            dfd = None
-            raise DbfError(
-                "%s does not support %s [%x]" % 
-                (yo._version,
-                version_map.get(meta.header.version, 'Unknown: %s' % meta.header.version),
-                ord(meta.header.version)))
-        cp, sd, ld = _codepage_lookup(meta.header.codepage())
-        yo._meta.decoder = codecs.getdecoder(sd) 
-        yo._meta.encoder = codecs.getencoder(sd)
-        fieldblock = dfd.read(header.start - 32)
-        for i in range(len(fieldblock)//32+1):
-            fieldend = i * 32
-            if fieldblock[fieldend] == '\x0d':
-                break
+            #return
         else:
-            raise DbfError("corrupt field structure in header")
-        if len(fieldblock[:fieldend]) % 32 != 0:
-            raise DbfError("corrupt field structure in header")
-        header.fields = fieldblock[:fieldend]
-        header.extra = fieldblock[fieldend+1:]  # skip trailing \r
-        yo._initializeFields()
-        yo._checkMemoIntegrity()
-        meta.current = -1
-        if len(yo) > 0:
-            meta.current = 0
-        dfd.seek(0)
-        if meta_only:
-            yo.close(keep_table=False, keep_memos=False)
-        elif read_only:
-            yo.close(keep_table=True, keep_memos=keep_memos)
-        if codepage is not None:
-            cp, sd, ld = _codepage_lookup(codepage)
+            try:
+                dfd = meta.dfd = open(meta.filename, 'r+b')
+            except IOError, e:
+                raise DbfError(str(e))
+            dfd.seek(0)
+            meta.header = header = yo._TableHeader(dfd.read(32))
+            if not header.version in yo._supported_tables:
+                dfd.close()
+                dfd = None
+                raise DbfError(
+                    "%s does not support %s [%x]" % 
+                    (yo._version,
+                    version_map.get(meta.header.version, 'Unknown: %s' % meta.header.version),
+                    ord(meta.header.version)))
+            cp, sd, ld = _codepage_lookup(meta.header.codepage())
             yo._meta.decoder = codecs.getdecoder(sd) 
             yo._meta.encoder = codecs.getencoder(sd)
-
+            fieldblock = dfd.read(header.start - 32)
+            for i in range(len(fieldblock)//32+1):
+                fieldend = i * 32
+                if fieldblock[fieldend] == '\x0d':
+                    break
+            else:
+                raise DbfError("corrupt field structure in header")
+            if len(fieldblock[:fieldend]) % 32 != 0:
+                raise DbfError("corrupt field structure in header")
+            header.fields = fieldblock[:fieldend]
+            header.extra = fieldblock[fieldend+1:]  # skip trailing \r
+            yo._initializeFields()
+            yo._checkMemoIntegrity()
+            meta.current = -1
+            if len(yo) > 0:
+                meta.current = 0
+            dfd.seek(0)
+            if meta_only:
+                yo.close(keep_table=False, keep_memos=False)
+            elif read_only:
+                yo.close(keep_table=True, keep_memos=keep_memos)
+            if codepage is not None:
+                cp, sd, ld = _codepage_lookup(codepage)
+                yo._meta.decoder = codecs.getdecoder(sd) 
+                yo._meta.encoder = codecs.getencoder(sd)
+        for field in meta.fields:
+            field_type = meta[field]['type']
+            default_field_type = yo._fieldtypes[field_type]['Class']
+            specific_field_type = field_types.get(field)
+            if specific_field_type is not None and not isinstance(specific_field_type, tuple):
+                specific_field_type = (specific_field_type, )
+            if specific_field_type:
+                for result_name, result_type in ezip(('class','null','empty'), specific_field_type):
+                    meta[field][result_name] = result_type
+            else:
+                meta[field]['class'] = default_field_type
+        
     def __iter__(yo):
         return yo.DbfIterator(yo)           
     def __len__(yo):
@@ -2258,30 +2416,42 @@ class DbfTable():
         offset = meta.header.record_length
         fields = yo._list_fields(field_specs, sep=';')
         for field in fields:
-            try:
-                name, format = field.split()
-                if name[0] == '_' or name[0].isdigit() or not name.replace('_','').isalnum():
-                    raise DbfError("%s invalid:  field names must start with a letter, and can only contain letters, digits, and _" % name)
-                name = name.lower()
-                if name in meta.fields:
-                    raise DbfError("Field '%s' already exists" % name)
-                field_type = format[0].upper()
-                if len(name) > 10:
-                    raise DbfError("Maximum field name length is 10.  '%s' is %d characters long." % (name, len(name)))
-                if not field_type in meta.fieldtypes.keys():
-                    raise DbfError("Unknown field type:  %s" % field_type)
-                length, decimals = yo._meta.fieldtypes[field_type]['Init'](format)
-            except ValueError:
-                raise DbfError("invalid field specifier: %s (multiple fields should be separated with ';'" % field)
+            pieces = field.split()
+            name = pieces[0]
+            format = ''.join(pieces[1:])
+            if name[0] == '_' or name[0].isdigit() or not name.replace('_','').isalnum():
+                raise DbfError("%s invalid:  field names must start with a letter, and can only contain letters, digits, and _" % name)
+            name = name.lower()
+            if name in meta.fields:
+                raise DbfError("Field '%s' already exists" % name)
+            field_type = format[0].upper()
+            if len(name) > 10:
+                raise DbfError("Maximum field name length is 10.  '%s' is %d characters long." % (name, len(name)))
+            if not field_type in meta.fieldtypes.keys():
+                raise DbfError("Unknown field type:  %s" % field_type)
+            length, decimals = yo._meta.fieldtypes[field_type]['Init'](format)
             start = offset
             end = offset + length
             offset = end
             meta.fields.append(name)
-            meta[name] = {'type':field_type, 'start':start, 'length':length, 'end':end, 'decimals':decimals, 'flags':0}
+            cls = yo._fieldtypes[field_type]['Class']
+            empty = yo._fieldtypes[field_type]['Empty']
+            null = yo._fieldtypes[field_type]['Null']
+            meta[name] = {
+                    'type'      : field_type,
+                    'start'     : start,
+                    'length'    : length,
+                    'end'       : end,
+                    'decimals'  : decimals,
+                    'flags'     : 0,
+                    'class'     : cls,
+                    'empty'     : empty,
+                    'null'      : null,
+                    }
             if meta[name]['type'] in yo._memotypes and meta.memo is None:
                 meta.memo = yo._memoClass(meta)
             for record in yo:
-                record[name] = meta.fieldtypes[field_type]['Blank']()
+                record[name] = None
         yo._buildHeaderFields()
         yo._update_disk()
     def append(yo, kamikaze='', drop=False, multiple=1):
@@ -2369,8 +2539,8 @@ class DbfTable():
         """closes disk files, flushing record data to disk
         ensures table data is available if keep_table
         ensures memo data is available if keep_memos"""
-        for record in yo._table:
-            record.write_record()
+        if not yo._meta.inmemory:
+            yo._table.flush()
         yo._meta.inmemory = True
         if keep_table:
             replacement_table = []
@@ -2496,7 +2666,11 @@ class DbfTable():
                 for record in records:
                     fields = []
                     for fieldname in field_specs:
-                        fields.append(record[fieldname])
+                        data = record[fieldname]
+                        if isinstance(data, (str, unicode)):
+                            fields.append(yo._meta.encoder(data)[0])
+                        else:
+                            fields.append(data)
                     csvfile.writerow(fields)
             elif format == 'tab':
                 if header:
@@ -2504,7 +2678,11 @@ class DbfTable():
                 for record in records:
                     fields = []
                     for fieldname in field_specs:
-                        fields.append(str(record[fieldname]))
+                        data = record[fieldname]
+                        if isinstance(data, (str, unicode)):
+                            fields.append(yo._meta.encoder(data)[0])
+                        else:
+                            fields.append(str(data))
                     fd.write('\t'.join(fields) + '\n')
             else: # format == 'fixed'
                 header = open("%s_layout.txt" % os.path.splitext(filename)[0], 'w')
@@ -2519,8 +2697,12 @@ class DbfTable():
                 header.close()
                 for record in records:
                     fields = []
-                    for i, field_name in enumerate(field_specs):
-                        fields.append("%-*s" % (sizes[i], record[field_name]))
+                    for i, fieldname in enumerate(field_specs):
+                        data = record[fieldname]
+                        if isinstance(data, (str, unicode)):
+                            fields.append("%-*s" % (sizes[i], yo._meta.encoder(data)[0]))
+                        else:
+                            fields.append("%-*s" % (sizes[i], data))
                     fd.write(''.join(fields) + '\n')
         finally:
             fd.close()
@@ -2719,9 +2901,6 @@ class DbfTable():
                     yo._meta[field]['start'] += delta
                     yo._meta[field]['end'] += delta #+ yo._meta[field]['length']
                     start = yo._meta[field]['end']
-            #pprint(yo._meta['c_unit'])
-            #print repr(yo[0].c_unit)
-            #raw_input('...')
             yo._buildHeaderFields()
         yo._update_disk()
     def size(yo, field):
@@ -2777,11 +2956,11 @@ class Db3Table(DbfTable):
     _version = 'dBase III Plus'
     _versionabbv = 'db3'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical, 'Class':None},
-            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
-            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addNumeric, 'Class':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
+            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addNumeric} }
     _memoext = '.dbt'
     _memotypes = ('M',)
     _memoClass = _Db3Memo
@@ -2789,10 +2968,14 @@ class Db3Table(DbfTable):
     _noMemoMask = '\x7f'
     _fixed_fields = ('D','L','M')
     _variable_fields = ('C','N')
+    _binary_fields = ()
     _character_fields = ('C','M') 
     _decimal_fields = ('N',)
     _numeric_fields = ('N',)
     _currency_fields = tuple()
+    _date_fields = ('D',)
+    _datetime_fields = tuple()
+    _logical_fields = ('L',)
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x03'         # version - dBase III w/o memo's
     _dbfTableHeader[8:10] = array('c', packShortInt(33))
@@ -2827,6 +3010,12 @@ class Db3Table(DbfTable):
                     break
     def _initializeFields(yo):
         "builds the FieldList of names, types, and descriptions"
+        old_fields = defaultdict(dict)
+        for name in yo._meta.fields:
+            old_fields[name]['type'] = yo._meta[name]['type']
+            old_fields[name]['null'] = yo._meta[name]['null']
+            old_fields[name]['empty'] = yo._meta[name]['empty']
+            old_fields[name]['class'] = yo._meta[name]['class']
         yo._meta.fields[:] = []
         offset = 1
         fieldsdef = yo._meta.header.fields
@@ -2849,21 +3038,39 @@ class Db3Table(DbfTable):
             if name in yo._meta.fields:
                 raise DbfError('Duplicate field name found: %s' % name)
             yo._meta.fields.append(name)
-            yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
+            if name in old_fields and old_fields[name]['type'] == type:
+                cls = old_fields[name]['class']
+                null = old_fields[name]['null']
+                empty = old_fields[name]['empty']
+            else:
+                cls = yo._fieldtypes[type]['Class']
+                null = yo._fieldtypes[type]['Null']
+                empty = yo._fieldtypes[type]['Empty']
+            yo._meta[name] = {
+                    'type' : type,
+                    'start' : start,
+                    'length' : length,
+                    'end' : end,
+                    'decimals' : decimals,
+                    'flags' : flags,
+                    'class' : cls,
+                    'null' : null,
+                    'empty' : empty,
+                    }
 class FpTable(DbfTable):
     'Provides an interface for working with FoxPro 2 tables'
     _version = 'Foxpro'
     _versionabbv = 'fp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
-            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric, 'Class':None},
-            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate, 'Class':None},
-            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
-            'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
-            'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo, 'Class':None},
-            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
+            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
+            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addVfpMemo},
+            'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
+            'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
+            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None} }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -2871,10 +3078,14 @@ class FpTable(DbfTable):
     _noMemoMask = '\x03'                # 0000 0011
     _fixed_fields = ('B','D','G','I','L','M','P','T','Y')
     _variable_fields = ('C','F','N')
+    _binary_fields = ('G','P')
     _character_fields = ('C','M')       # field representing character data
     _decimal_fields = ('F','N')
     _numeric_fields = ('F','N')
     _currency_fields = tuple()
+    _date_fields = ('D',)
+    _datetime_fields = tuple()
+    _logical_fields = ('L',)
     _supported_tables = ('\x03', '\xf5')
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
@@ -2902,6 +3113,10 @@ class FpTable(DbfTable):
                     break
     def _initializeFields(yo):
         "builds the FieldList of names, types, and descriptions"
+        old_fields = defaultdict(dict)
+        for name in yo._meta.fields:
+            old_fields[name]['type'] = yo._meta[name]['type']
+            old_fields[name]['class'] = yo._meta[name]['class']
         yo._meta.fields[:] = []
         offset = 1
         fieldsdef = yo._meta.header.fields
@@ -2926,26 +3141,44 @@ class FpTable(DbfTable):
             if name in yo._meta.fields:
                 raise DbfError('Duplicate field name found: %s' % name)
             yo._meta.fields.append(name)
-            yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
+            if name in old_fields and old_fields[name]['type'] == type:
+                cls = old_fields[name]['class']
+                null = old_fields[name]['null']
+                empty = old_fields[name]['empty']
+            else:
+                cls = yo._fieldtypes[type]['Class']
+                null = yo._fieldtypes[type]['Null']
+                empty = yo._fieldtypes[type]['Empty']
+            yo._meta[name] = {
+                    'type' : type,
+                    'start' : start,
+                    'length' : length,
+                    'end' : end,
+                    'decimals' : decimals,
+                    'flags' : flags,
+                    'class' : cls,
+                    'null' : null,
+                    'empty' : empty,
+                    }
             
 class VfpTable(DbfTable):
     'Provides an interface for working with Visual FoxPro 6 tables'
     _version = 'Visual Foxpro'
     _versionabbv = 'vfp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter, 'Class':None},
-            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency, 'Class':None},
-            'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble, 'Class':None},
-            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric, 'Class':None},
-            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric, 'Class':None},
-            'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger, 'Class':None},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical, 'Class':None},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate, 'Class':None},
-            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime, 'Class':None},
-            'M' : {'Type':'Memo', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
-            'G' : {'Type':'General', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
-            'P' : {'Type':'Picture', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo, 'Class':None},
-            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None, 'Class':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
+            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency},
+            'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble},
+            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric},
+            'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger},
+            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
+            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
+            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime},
+            'M' : {'Type':'Memo', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo},
+            'G' : {'Type':'General', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo},
+            'P' : {'Type':'Picture', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo},
+            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':int} }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -2953,10 +3186,14 @@ class VfpTable(DbfTable):
     _noMemoMask = '\x30'                # 0011 0000
     _fixed_fields = ('B','D','G','I','L','M','P','T','Y')
     _variable_fields = ('C','F','N')
+    _binary_fields = ('G','P')
     _character_fields = ('C','M')       # field representing character data
+    _currency_fields = ('Y',)
     _decimal_fields = ('F','N')
     _numeric_fields = ('B','F','I','N','Y')
-    _currency_fields = ('Y',)
+    _date_fields = ('D',)
+    _datetime_fields = ('T',)
+    _logical_fields = ('L',)
     _supported_tables = ('\x30','\x31')
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
@@ -2984,6 +3221,10 @@ class VfpTable(DbfTable):
                     break
     def _initializeFields(yo):
         "builds the FieldList of names, types, and descriptions"
+        old_fields = defaultdict(dict)
+        for name in yo._meta.fields:
+            old_fields[name]['type'] = yo._meta[name]['type']
+            old_fields[name]['class'] = yo._meta[name]['class']
         yo._meta.fields[:] = []
         offset = 1
         fieldsdef = yo._meta.header.fields
@@ -3004,7 +3245,25 @@ class VfpTable(DbfTable):
             if name in yo._meta.fields:
                 raise DbfError('Duplicate field name found: %s' % name)
             yo._meta.fields.append(name)
-            yo._meta[name] = {'type':type,'start':start,'length':length,'end':end,'decimals':decimals,'flags':flags}
+            if name in old_fields and old_fields[name]['type'] == type:
+                cls = old_fields[name]['class']
+                null = old_fields[name]['null']
+                empty = old_fields[name]['empty']
+            else:
+                cls = yo._fieldtypes[type]['Class']
+                null = yo._fieldtypes[type]['Null']
+                empty = yo._fieldtypes[type]['Empty']
+            yo._meta[name] = {
+                    'type' : type,
+                    'start' : start,
+                    'length' : length,
+                    'end' : end,
+                    'decimals' : decimals,
+                    'flags' : flags,
+                    'class' : cls,
+                    'null' : null,
+                    'empty' : empty,
+                    }
 class List():
     "list of Dbf records, with set-like behavior"
     _desc = ''
@@ -3056,11 +3315,12 @@ class List():
             return result
         return NotImplemented
     def __contains__(yo, record):
-        if isinstance(record, tuple):
-            item = record
-        else:
-            item = yo.key(record)
-        return item in yo._set
+        if not isinstance(record, _DbfRecord):
+            raise ValueError("%r is not a record" % record)
+        item = yo.key(record)
+        if not isinstance(item, tuple):
+            item = (item, )
+        return item in yo._set and yo._get_record(*item) is record
     def __delitem__(yo, key):
         if isinstance(key, int):
             item = yo._list.pop[key]
@@ -3219,7 +3479,7 @@ class List():
                     value = key(rec)
                     yo._maybe_add((rec.record_table, rec.record_number, value))
         else:
-            for record in new_records:
+            for rec in new_records:
                 value = key(rec)
                 yo._maybe_add((rec.record_table, rec.record_number, value))
         if yo._current == -1 and yo._list:
@@ -3311,7 +3571,7 @@ class Index():
         "returns records using this index"
         def __init__(yo, table, records):
             yo.table = table
-            yo.records = records
+            yo.records = records[:]
             yo.index = 0
         def __iter__(yo):
             return yo
@@ -3346,28 +3606,35 @@ class Index():
         table._indexen.add(yo)
     def __call__(yo, record):
         rec_num = record.record_number
+        key = yo.key(record)
+        if not isinstance(key, tuple):
+            key = (key, )
         if rec_num in yo._records:
-            value = yo._records[rec_num]
-            vindex = bisect_left(yo._values, value)
+            if yo._records[rec_num] == key:
+                return
+            key = yo._records[rec_num]
+            vindex = bisect_left(yo._values, key)
             yo._values.pop(vindex)
             yo._rec_by_val.pop(vindex)
-        value = yo.key(record)
-        if value is DoNotIndex:
+        key = yo.key(record)
+        if key is DoNotIndex:
             return
-        if not isinstance(value, tuple):
-            value = (value, )
-        vindex = bisect_right(yo._values, value)
-        yo._values.insert(vindex, value)
+        if not isinstance(key, tuple):
+            key = (key, )
+        vindex = bisect_right(yo._values, key)
+        yo._values.insert(vindex, key)
         yo._rec_by_val.insert(vindex, rec_num)
-        yo._records[rec_num] = value
-    def __contains__(yo, match):
-        if isinstance(match, _DbfRecord):
-            if match.record_table is yo._table:
-                return match.record_number in yo._records
-            match = yo.key(match)
-        elif not isinstance(match, tuple):
-            match = (match, )
-        return yo.find(match) != -1
+        yo._records[rec_num] = key
+    def __contains__(yo, record):
+        if not isinstance(record, _DbfRecord):
+            raise ValueError("%r is not a record" % record)
+        if record.record_table is yo._table:
+            return record.record_number in yo._records
+        raise ValueError("record is from table %r, not %r" % (record.table, yo._table))
+        #record = yo.key(record)
+        #if not isinstance(record, tuple):
+        #    record = (record, )
+        #return yo.find(record) != -1
     def __getitem__(yo, key):
         if isinstance(key, int):
             count = len(yo._values)
@@ -3614,8 +3881,9 @@ code_pages = {
         '\x97' : ('mac_latin2', 'Macintosh EE'),
         '\x98' : ('mac_greek', 'Greek Macintosh') }
 
-# SQL functions
+default_codepage = code_pages.get(default_codepage, code_pages.get('ascii'))
 
+# SQL functions
 def sql_select(records, chosen_fields, condition, field_names):
     if chosen_fields != '*':
         field_names = chosen_fields.replace(' ','').split(',')
@@ -3716,9 +3984,11 @@ def sql_resize(records, fieldname_newsize, condition, field_names):
 def sql_criteria(records, criteria):
     "creates a function matching the sql criteria"
     function = """def func(records):
-    \"\"\"%s\"\"\"
+    \"\"\"%s
+    \"\"\"
     matched = List(field_names=records[0].field_names)
     for rec in records:
+        record_number = rec.record_number
         %s
 
         if %s:
@@ -3729,8 +3999,6 @@ def sql_criteria(records, criteria):
         if field in criteria:
             fields.append(field)
     fields = '\n        '.join(['%s = rec.%s' % (field, field) for field in fields])
-    if 'record_number' in criteria:
-        fields += '\n        record_number = rec.record_number'
     g = sql_user_functions.copy()
     g['List'] = List
     function %= (criteria, fields, criteria)
@@ -3741,9 +4009,11 @@ def sql_criteria(records, criteria):
 def sql_cmd(command, field_names):
     "creates a function matching to apply command to each record in records"
     function = """def func(records):
-    \"\"\"%s\"\"\"
+    \"\"\"%s
+    \"\"\"
     changed = 0
     for rec in records:
+        record_number = rec.record_number
         %s
 
         %s
@@ -3839,13 +4109,6 @@ def _codepage_lookup(cp):
     return cp, sd, ld
 # miscellany
 
-def ascii(new_setting=None):
-    "get/set return_ascii setting"
-    global return_ascii
-    if new_setting is None:
-        return return_ascii
-    else:
-        return_ascii = new_setting
 def codepage(cp=None):
     "get/set default codepage for any new tables"
     global default_codepage
@@ -3882,6 +4145,7 @@ class _Db4Table(DbfTable):
     _noMemoMask = '\x04'                # 0011 0000
     _fixed_fields = ('B','D','G','I','L','M','P','T','Y')
     _variable_fields = ('C','F','N')
+    _binary_fields = ('G','P')
     _character_fields = ('C','M')       # field representing character data
     _decimal_fields = ('F','N')
     _numeric_fields = ('B','F','I','N','Y')
@@ -3928,7 +4192,7 @@ def Table(
         meta_only=False, 
         dbf_type=None, 
         codepage=None,
-        default={'numbers':'default','strings':Char,'currency':Decimal,},
+        default={},
         field_types={},
         ):
     "returns an open table of the correct dbf_type, or creates it if field_specs is given"

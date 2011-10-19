@@ -1,15 +1,21 @@
 import os
+import sys
 import unittest
 import tempfile
 import shutil
 import dbf
 import datetime
 from decimal import Decimal
+from dbf import Decimal
 
-if dbf.version != (0, 88, 26):
+if dbf.version != (0, 88, 28):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
-    print "\nTesting dbf version %d.%d.%d\n" % dbf.version
+    print "\nTesting dbf version %s on %s with Python %s\n" % (
+        '.'.join([str(x) for x in dbf.version]),
+        sys.platform,
+        sys.version,
+        )
 
 
 # Walker in Leaves -- by Scot Noel -- http://www.scienceandfantasyfiction.com/sciencefiction/Walker-in-Leaves/walker-in-leaves.htm
@@ -123,6 +129,8 @@ class Test_Char(unittest.TestCase):
         yo.assertRaises(ValueError, dbf.Char, str)
     def test_01(yo):
         "booleans and None"
+        empty = dbf.Char()
+        yo.assertFalse(bool(empty))
         one = dbf.Char(' ')
         yo.assertFalse(bool(one))
         actual = dbf.Char('1')
@@ -279,9 +287,9 @@ class Test_Date(unittest.TestCase):
         empty_date = dbf.Date()
         empty_time = dbf.Time()
         empty_datetime = dbf.DateTime()
-        yo.assertEqual(empty_date is dbf.NullDate, True)
-        yo.assertEqual(empty_time is dbf.NullTime, True)
-        yo.assertEqual(empty_datetime is dbf.NullDateTime, True)
+        yo.assertTrue(empty_date is dbf.NullDate)
+        yo.assertTrue(empty_time is dbf.NullTime)
+        yo.assertTrue(empty_datetime is dbf.NullDateTime)
     def test10(yo):
         "boolean evaluation"
         empty_date = dbf.Date()
@@ -656,6 +664,8 @@ class Test_Logical(unittest.TestCase):
 
 class Test_Dbf_Creation(unittest.TestCase):
     "Testing table creation..."
+    def test00(yo):
+        "exceptions"
     def test01(yo):
         "dbf tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
@@ -665,6 +675,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
+                yo.assertTrue(all([type(x) is unicode for x in table.field_names]))
     def test02(yo):
         "dbf table on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
@@ -736,7 +747,7 @@ class Test_Dbf_Creation(unittest.TestCase):
             qty = floats[i]
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
-            namelist.append(name)
+            namelist.append(unicode(name))
             paidlist.append(paid)
             qtylist.append(qty)
             orderlist.append(orderdate)
@@ -744,17 +755,17 @@ class Test_Dbf_Creation(unittest.TestCase):
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
             last_byte = open(table.filename, 'rb').read()[-1]
             yo.assertEqual(last_byte, '\x1a')
-            yo.assertEqual(record.name, name)
+            yo.assertEqual(record.name.strip(), unicode(name))
             yo.assertEqual(record.paid, paid)
             yo.assertEqual(record.qty, qty)
             yo.assertEqual(record.orderdate, orderdate)
-            yo.assertEqual(record.desc, desc)
+            yo.assertEqual(record.desc.strip(), unicode(desc))
         # plus a blank record
         namelist.append('')
-        paidlist.append(dbf.Falsth)
-        qtylist.append(0.0)
-        orderlist.append(dbf.NullDate)
-        desclist.append('')
+        paidlist.append(None)
+        qtylist.append(None)
+        orderlist.append(None)
+        desclist.append(None)
         table.append()
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
@@ -766,19 +777,32 @@ class Test_Dbf_Creation(unittest.TestCase):
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
         i = 0
-        for record in table:
+        for record in table[:-1]:
             yo.assertEqual(record.record_number, i)
-            yo.assertEqual(table[i].name, namelist[i])
-            yo.assertEqual(record.name, namelist[i])
+            yo.assertEqual(table[i].name.strip(), namelist[i])
+            yo.assertEqual(record.name.strip(), namelist[i])
             yo.assertEqual(table[i].paid, paidlist[i])
             yo.assertEqual(record.paid, paidlist[i])
             yo.assertEqual(abs(table[i].qty - qtylist[i]) < .00001, True)
             yo.assertEqual(abs(record.qty - qtylist[i]) < .00001, True)
             yo.assertEqual(table[i].orderdate, orderlist[i])
             yo.assertEqual(record.orderdate, orderlist[i])
-            yo.assertEqual(table[i].desc, desclist[i])
-            yo.assertEqual(record.desc, desclist[i])
+            yo.assertEqual(table[i].desc.strip(), desclist[i])
+            yo.assertEqual(record.desc.strip(), desclist[i])
             i += 1
+        record = table[-1]
+        yo.assertEqual(record.record_number, i)
+        yo.assertEqual(table[i].name.strip(), namelist[i])
+        yo.assertEqual(record.name.strip(), namelist[i])
+        yo.assertEqual(table[i].paid, paidlist[i])
+        yo.assertEqual(record.paid, paidlist[i])
+        yo.assertEqual(table[i].qty, qtylist[i])
+        yo.assertEqual(record.qty, qtylist[i])
+        yo.assertEqual(table[i].orderdate, orderlist[i])
+        yo.assertEqual(record.orderdate, orderlist[i])
+        yo.assertEqual(table[i].desc, desclist[i])
+        yo.assertEqual(record.desc, desclist[i])
+        i += 1
         yo.assertEqual(i, len(table))
     def test08(yo):
         "vfp table:  adding records"
@@ -810,11 +834,11 @@ class Test_Dbf_Creation(unittest.TestCase):
             misc = ' '.join(words[i:i+50:3])
             photo = ' '.join(words[i:i+50:7])
             price = Decimal(round(floats[i] * 2.182737, 4))
-            namelist.append(name)
+            namelist.append(unicode(name))
             paidlist.append(paid)
             qtylist.append(qty)
             orderlist.append(orderdate)
-            desclist.append(desc)
+            desclist.append(unicode(desc))
             masslist.append(mass)
             weightlist.append(weight)
             agelist.append(age)
@@ -823,11 +847,11 @@ class Test_Dbf_Creation(unittest.TestCase):
             photolist.append(photo)
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc, \
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
-            yo.assertEqual(record.name, name)
+            yo.assertEqual(record.name.strip(), unicode(name))
             yo.assertEqual(record.paid, paid)
             yo.assertEqual(record.qty, qty)
             yo.assertEqual(record.orderdate, orderdate)
-            yo.assertEqual(record.desc, desc)
+            yo.assertEqual(record.desc.strip(), unicode(desc))
             yo.assertEqual(record.mass, mass)
             yo.assertEqual(record.weight, weight)
             yo.assertEqual(record.age, age)
@@ -835,35 +859,35 @@ class Test_Dbf_Creation(unittest.TestCase):
             yo.assertEqual(record.misc, misc)
             yo.assertEqual(record.photo, photo)
         # plus a blank record
-        namelist.append('')
-        paidlist.append(dbf.Falsth)
-        qtylist.append(0.0)
+        namelist.append(' ' * 25)
+        paidlist.append(dbf.Unknown)
+        qtylist.append(None)
         orderlist.append(dbf.NullDate)
-        desclist.append('')
+        desclist.append(None)
         masslist.append(0.0)
-        weightlist.append(0.0)
+        weightlist.append(None)
         agelist.append(0)
         meetlist.append(dbf.NullDateTime)
-        misclist.append('')
-        photolist.append('')
+        misclist.append(None)
+        photolist.append(None)
         pricelist.append(Decimal('0.0'))
         table.append()
         table.close()
         table = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
         yo.assertEqual(len(table), len(floats)+1)
         i = 0
-        for record in table:
+        for record in table[:-1]:
             yo.assertEqual(record.record_number, i)
-            yo.assertEqual(table[i].name, namelist[i])
-            yo.assertEqual(record.name, namelist[i])
+            yo.assertEqual(table[i].name.strip(), namelist[i])
+            yo.assertEqual(record.name.strip(), namelist[i])
             yo.assertEqual(table[i].paid, paidlist[i])
             yo.assertEqual(record.paid, paidlist[i])
             yo.assertEqual(abs(table[i].qty - qtylist[i]) < .00001, True)
             yo.assertEqual(abs(record.qty - qtylist[i]) < .00001, True)
             yo.assertEqual(table[i].orderdate, orderlist[i])
             yo.assertEqual(record.orderdate, orderlist[i])
-            yo.assertEqual(table[i].desc, desclist[i])
-            yo.assertEqual(record.desc, desclist[i])
+            yo.assertEqual(table[i].desc.strip(), desclist[i])
+            yo.assertEqual(record.desc.strip(), desclist[i])
             yo.assertEqual(record.mass, masslist[i])
             yo.assertEqual(table[i].mass, masslist[i])
             yo.assertEqual(record.weight, weightlist[i])
@@ -877,12 +901,37 @@ class Test_Dbf_Creation(unittest.TestCase):
             yo.assertEqual(record.photo, photolist[i])
             yo.assertEqual(table[i].photo, photolist[i])
             i += 1
+        record = table[-1]
+        yo.assertEqual(record.record_number, i)
+        yo.assertEqual(table[i].name, namelist[i])
+        yo.assertEqual(record.name, namelist[i])
+        yo.assertEqual(table[i].paid, paidlist[i])
+        yo.assertEqual(record.paid, paidlist[i])
+        yo.assertEqual(table[i].qty, None)
+        yo.assertEqual(record.qty, None)
+        yo.assertEqual(table[i].orderdate, orderlist[i])
+        yo.assertEqual(record.orderdate, orderlist[i])
+        yo.assertEqual(table[i].desc, desclist[i])
+        yo.assertEqual(record.desc, desclist[i])
+        yo.assertEqual(record.mass, masslist[i])
+        yo.assertEqual(table[i].mass, masslist[i])
+        yo.assertEqual(record.weight, weightlist[i])
+        yo.assertEqual(table[i].weight, weightlist[i])
+        yo.assertEqual(record.age, agelist[i])
+        yo.assertEqual(table[i].age, agelist[i])
+        yo.assertEqual(record.meeting, meetlist[i])
+        yo.assertEqual(table[i].meeting, meetlist[i])
+        yo.assertEqual(record.misc, misclist[i])
+        yo.assertEqual(table[i].misc, misclist[i])
+        yo.assertEqual(record.photo, photolist[i])
+        yo.assertEqual(table[i].photo, photolist[i])
+        i += 1
     def test09(yo):
         "automatically write records on object destruction"
         table = dbf.Table(os.path.join(tempdir, 'temptable'))
         old_data = table[0].scatter_fields()
         new_name = table[0].name = '!BRAND NEW NAME!'
-        yo.assertEqual(new_name, table[0].name)
+        yo.assertEqual(unicode(new_name), table[0].name.strip())
     def test10(yo):
         "automatically write records on table close"
         table = dbf.Table(os.path.join(tempdir, 'temptable'))
@@ -891,7 +940,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         table.close()
         del record
         table.open()
-        yo.assertEqual(new_name, table[0].name)
+        yo.assertEqual(unicode(new_name), table[0].name.strip())
     def test11(yo):
         "automatically write records on table destruction (no close() called)"
         table = dbf.Table(os.path.join(tempdir, 'temptable'))
@@ -900,7 +949,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         del table
         del record
         table = dbf.Table(os.path.join(tempdir, 'temptable'))
-        yo.assertEqual(new_name, table[0].name)
+        yo.assertEqual(unicode(new_name), table[0].name.strip())
 class Test_Dbf_Functions(unittest.TestCase):
     def setUp(yo):
         "create a dbf and vfp table"
@@ -914,7 +963,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         orderlist = yo.dbf_orderlist = []
         desclist = yo.dbf_desclist = []
         for i in range(len(floats)):
-            name = words[i]
+            name = '%-25s' % words[i]
             paid = len(words[i]) % 3 == 0
             qty = floats[i]
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
@@ -964,7 +1013,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
             misc = ' '.join(words[i:i+50:3])
             photo = ' '.join(words[i:i+50:7])
-            namelist.append(name)
+            namelist.append('%-25s' % name)
             paidlist.append(paid)
             qtylist.append(qty)
             orderlist.append(orderdate)
@@ -1023,9 +1072,9 @@ class Test_Dbf_Functions(unittest.TestCase):
             yo.assertEqual(1, table.field_names.count(field))
         yo.assertEqual(i, len(table))
         i = 0
-        for record in table:
-            yo.assertEqual(record.name, '')
-            yo.assertEqual(record.paid, False)
+        for i, record in enumerate(table):
+            yo.assertEqual(record.name, ' ' * 25)
+            yo.assertEqual(record.paid, None)
             yo.assertEqual(record.orderdate, None)
             i += 1
         yo.assertEqual(i, len(table))
@@ -1142,8 +1191,8 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.add_fields('desc M; paid L; mass B')
         i = 0
         for record in table:
-            yo.assertEqual(record.desc, '')
-            yo.assertEqual(record.paid, False)
+            yo.assertEqual(record.desc, None)
+            yo.assertEqual(record.paid, None)
             yo.assertEqual(record.mass, 0.0)
             i += 1
         yo.assertEqual(i, len(table))
@@ -1364,10 +1413,10 @@ class Test_Dbf_Functions(unittest.TestCase):
             i += 1
 
         # search (binary)
-        table.use_deleted = True
+        #table.use_deleted = True
         for word in unordered:
             records = name_index.search(match=word)
-            yo.assertEqual(len(records), unordered.count(word))
+            yo.assertEqual(len(records), unordered.count(word), "num records: %d\nnum words: %d\nfailure with %r" % (len(records), unordered.count(word), word))
             records = table.query(python="name == %r" % word)
             yo.assertEqual(len(records), unordered.count(word))
             records = table.query("select * where name == %r" % word)
@@ -1608,7 +1657,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
-                yo.assertEqual(str(table[i][j]), csvtable[i][j])
+                yo.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'])
         for i in index(table):
             for j in index(table.field_names):
@@ -1616,7 +1665,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
-                yo.assertEqual(str(table[i][j]), csvtable[i][j])
+                yo.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'])
         for i in index(table):
             for j in index(table.field_names):
@@ -1624,7 +1673,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
-                yo.assertEqual(str(table[i][j]), csvtable[i][j])
+                yo.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'))
         for i in index(table):
             for j in index(table.field_names):
@@ -1632,7 +1681,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
         for i in index(table):
             for j in index(table.field_names):
-                yo.assertEqual(str(table[i][j]), csvtable[i][j])
+                yo.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
 
     def test14(yo):
         "resize"
@@ -1648,12 +1697,72 @@ class Test_Dbf_Functions(unittest.TestCase):
         new_record = table[5].scatter_fields()
         yo.assertEqual(test_record['orderdate'], new_record['orderdate'])
     def test15(yo):
-        table = dbf.Table(':memory:', 'name C(20); born L; married D; appt T', dbf_type='vfp')
+        "empty and None values"
+        table = dbf.Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
         record = table.append()
-        #record.name = None
+        yo.assertTrue(record.born is None)
+        yo.assertTrue(record.married is None)
+        yo.assertTrue(record.appt is None)
+        yo.assertTrue(record.wisdom is None)
+        record.born = True
+        record.married = dbf.Date(1992, 6, 27)
+        record.appt = appt = dbf.DateTime.now()
+        record.wisdom = 'Choose Python'
+        yo.assertTrue(record.born)
+        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
+        yo.assertEqual(record.appt, appt)
+        yo.assertEqual(record.wisdom, 'Choose Python')
+        record.born = dbf.Unknown
+        record.married = dbf.NullDate
+        record.appt = dbf.NullDateTime
+        record.wisdom = ''
+        yo.assertTrue(record.born is None)
+        yo.assertTrue(record.married is None)
+        yo.assertTrue(record.appt is None)
+        yo.assertTrue(record.wisdom is None)
+    def test16(yo):
+        "custom data types"
+        table = dbf.Table(
+            filename=':memory:',
+            field_specs='name C(20); born L; married D; appt T; wisdom M',
+            field_types=dict(name=dbf.Char, born=dbf.Logical, married=dbf.Date, appt=dbf.DateTime, wisdom=dbf.Char,),
+            dbf_type='vfp'
+            )
+        record = table.append()
+        yo.assertTrue(type(record.name) is dbf.Char, "record.name is %r, not dbf.Char" % type(record.name))
+        yo.assertTrue(type(record.born) is dbf.Logical, "record.born is %r, not dbf.Logical" % type(record.born))
+        yo.assertTrue(type(record.married) is dbf.Date, "record.married is %r, not dbf.Date" % type(record.married))
+        yo.assertTrue(type(record.appt) is dbf.DateTime, "record.appt is %r, not dbf.DateTime" % type(record.appt))
+        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, not dbf.Char" % type(record.wisdom))
+        yo.assertEqual(record.name, ' ' * 20)
+        yo.assertTrue(record.born is dbf.Unknown, "record.born is %r, not dbf.Unknown" % record.born)
+        yo.assertEqual(record.born, None)
+        yo.assertTrue(record.married is dbf.NullDate, "record.married is %r, not dbf.NullDate" % record.married)
+        yo.assertEqual(record.married, None)
+        yo.assertTrue(record.appt is dbf.NullDateTime, "record.appt is %r, not dbf.NullDateTime" % record.appt)
+        yo.assertEqual(record.appt, None)
+        record.name = 'Ethan               '
+        record.born = True
+        record.married = dbf.Date(1992, 6, 27)
+        record.appt = appt = dbf.DateTime.now()
+        record.wisdom = 'Choose Python'
+        yo.assertEqual(type(record.name), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
+        yo.assertTrue(record.born is dbf.Truth)
+        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
+        yo.assertEqual(record.appt, appt)
+        yo.assertEqual(type(record.wisdom), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
+        yo.assertEqual(record.wisdom, 'Choose Python')
+        record.born = dbf.Falsth
+        yo.assertEqual(record.born, False)
         record.born = None
         record.married = None
         record.appt = None
+        record.wisdom = None
+        yo.assertTrue(record.born is dbf.Unknown)
+        yo.assertTrue(record.married is dbf.NullDate)
+        yo.assertTrue(record.appt is dbf.NullDateTime)
+        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, but should be dbf.Char" % type(record.wisdom))
+
 
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"

@@ -1109,19 +1109,19 @@ class _DbfRecord():
             error.message = "field --%s-- is %s -> %s" % (name, yo._layout.fieldtypes[fielddef['type']]['Type'], error.message)
             raise
     def __getitem__(yo, item):
-        if type(item) in (int, long):
+        if isinstance(item, (int, long)):
             if not -yo._layout.header.field_count <= item < yo._layout.header.field_count:
                 raise IndexError("Field offset %d is not in record" % item)
             return yo[yo._layout.fields[item]]
-        elif type(item) == slice:
+        elif isinstance(item, slice):
             sequence = []
             for index in yo._layout.fields[item]:
                 sequence.append(yo[index])
             return sequence
-        elif type(item) == str:
+        elif isinstance(item, (str, unicode)):
             return yo.__getattr__(item)
         else:
-            raise TypeError("%s is not a field name" % item)
+            raise TypeError("%r is not a field name" % item)
     def __len__(yo):
         return yo._layout.header.field_count
     def __new__(cls, recnum, layout, kamikaze='', _fromdisk=False):
@@ -1163,11 +1163,11 @@ class _DbfRecord():
             error.data = name
             raise
     def __setitem__(yo, name, value):
-        if type(name) == str:
+        if isinstance(name, (str, unicode)):
             yo.__setattr__(name, value)
-        elif type(name) in (int, long):
+        elif isinstance(name, (int, long)):
             yo.__setattr__(yo._layout.fields[name], value)
-        elif type(name) == slice:
+        elif isinstance(name, slice):
             sequence = []
             for field in yo._layout.fields[name]:
                 sequence.append(field)
@@ -1731,8 +1731,8 @@ def ezip(*iters):
     "extends all iters to longest one, using last value from each as necessary"
     iters = [iter(x) for x in iters]
     last = [None] * len(iters)
-    alive = len(iters)
-    while alive:
+    while "any iters have items left":
+        alive = len(iters)
         for i, iterator in enumerate(iters):
             try:
                 value = next(iterator)
@@ -2010,8 +2010,13 @@ class DbfTable():
             if yo._meta.fields.count(field) > 1:
                 raise DbfError("corrupted field structure (noticed in _buildHeaderFields)")
             fielddef = array('c', '\x00' * 32)
-            fielddef[:11] = array('c', packStr(field))
-            fielddef[11] = yo._meta[field]['type']
+            fielddef[:11] = array('c', packStr(yo._meta.encoder(field)[0]))
+            try:
+                fielddef[11] = yo._meta[field]['type']
+            except TypeError:
+                print
+                print repr(yo._meta[field])
+                print repr(yo._meta[field]['type'])
             fielddef[12:16] = array('c', packLongInt(yo._meta[field]['start']))
             fielddef[16] = chr(yo._meta[field]['length'])
             fielddef[17] = chr(yo._meta[field]['decimals'])
@@ -2061,7 +2066,7 @@ class DbfTable():
         if len(fieldsdef) // 32 != yo.field_count:
             raise DbfError("Header shows %d fields, but field definition block has %d fields" % (yo.field_count, len(fieldsdef)//32))
         for i in range(yo.field_count):
-            fieldblock = fieldsdef[i*32:(i+1)*32]
+            fieldblock = yo._meta.decoder(fieldsdef[i*32:(i+1)*32])
             name = unpackStr(fieldblock[:11])
             type = fieldblock[11]
             if not type in yo._meta.fieldtypes:
@@ -2252,15 +2257,20 @@ class DbfTable():
                 meta.fieldtypes[datatype]['Class'] = classtype
                 meta.fieldtypes[datatype]['Null'] = yo.defaults['null']
                 meta.fieldtypes[datatype]['Empty'] = yo.defaults['empty']
+        if codepage is not None:
+            cp, sd, ld = _codepage_lookup(codepage)
+            yo._meta.decoder = codecs.getdecoder(sd) 
+            yo._meta.encoder = codecs.getencoder(sd)
         if field_specs:
             if meta.ondisk:
                 meta.dfd = open(meta.filename, 'w+b')
                 meta.newmemofile = True
+            if codepage is None:
+                header.codepage(default_codepage)
+                cp, sd, ld = _codepage_lookup(meta.header.codepage())
+                meta.decoder = codecs.getdecoder(sd) 
+                meta.encoder = codecs.getencoder(sd)
             yo.add_fields(field_specs)
-            header.codepage(codepage or default_codepage)
-            cp, sd, ld = _codepage_lookup(meta.header.codepage())
-            meta.decoder = codecs.getdecoder(sd) 
-            meta.encoder = codecs.getencoder(sd)
             #return
         else:
             try:
@@ -2277,9 +2287,10 @@ class DbfTable():
                     (yo._version,
                     version_map.get(meta.header.version, 'Unknown: %s' % meta.header.version),
                     ord(meta.header.version)))
-            cp, sd, ld = _codepage_lookup(meta.header.codepage())
-            yo._meta.decoder = codecs.getdecoder(sd) 
-            yo._meta.encoder = codecs.getencoder(sd)
+            if codepage is None:
+                cp, sd, ld = _codepage_lookup(meta.header.codepage())
+                yo._meta.decoder = codecs.getdecoder(sd) 
+                yo._meta.encoder = codecs.getencoder(sd)
             fieldblock = dfd.read(header.start - 32)
             for i in range(len(fieldblock)//32+1):
                 fieldend = i * 32
@@ -2301,10 +2312,6 @@ class DbfTable():
                 yo.close(keep_table=False, keep_memos=False)
             elif read_only:
                 yo.close(keep_table=True, keep_memos=keep_memos)
-            if codepage is not None:
-                cp, sd, ld = _codepage_lookup(codepage)
-                yo._meta.decoder = codecs.getdecoder(sd) 
-                yo._meta.encoder = codecs.getencoder(sd)
         for field in meta.fields:
             field_type = meta[field]['type']
             default_field_type = yo._fieldtypes[field_type]['Class']
@@ -2421,10 +2428,10 @@ class DbfTable():
             format = ''.join(pieces[1:])
             if name[0] == '_' or name[0].isdigit() or not name.replace('_','').isalnum():
                 raise DbfError("%s invalid:  field names must start with a letter, and can only contain letters, digits, and _" % name)
-            name = name.lower()
+            name = unicode(name.lower())
             if name in meta.fields:
                 raise DbfError("Field '%s' already exists" % name)
-            field_type = format[0].upper()
+            field_type = format[0].upper().encode('ascii')
             if len(name) > 10:
                 raise DbfError("Maximum field name length is 10.  '%s' is %d characters long." % (name, len(name)))
             if not field_type in meta.fieldtypes.keys():

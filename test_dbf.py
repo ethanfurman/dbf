@@ -8,7 +8,7 @@ import datetime
 from decimal import Decimal
 from dbf import Decimal
 
-if dbf.version != (0, 88, 28):
+if dbf.version != (0, 88, 30):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %s on %s with Python %s\n" % (
@@ -118,6 +118,7 @@ def index(sequence):
     for i in xrange(len(sequence)):
         yield i    
 
+# tests
 class Test_Char(unittest.TestCase):
     def test_00(yo):
         "exceptions"
@@ -765,7 +766,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         paidlist.append(None)
         qtylist.append(None)
         orderlist.append(None)
-        desclist.append(None)
+        desclist.append('')
         table.append()
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
@@ -863,13 +864,13 @@ class Test_Dbf_Creation(unittest.TestCase):
         paidlist.append(dbf.Unknown)
         qtylist.append(None)
         orderlist.append(dbf.NullDate)
-        desclist.append(None)
+        desclist.append('')
         masslist.append(0.0)
         weightlist.append(None)
         agelist.append(0)
         meetlist.append(dbf.NullDateTime)
-        misclist.append(None)
-        photolist.append(None)
+        misclist.append('')
+        photolist.append('')
         pricelist.append(Decimal('0.0'))
         table.append()
         table.close()
@@ -950,6 +951,97 @@ class Test_Dbf_Creation(unittest.TestCase):
         del record
         table = dbf.Table(os.path.join(tempdir, 'temptable'))
         yo.assertEqual(unicode(new_name), table[0].name.strip())
+    def test12(yo):
+        "empty and None values"
+        table = dbf.Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
+        record = table.append()
+        yo.assertTrue(record.born is None)
+        yo.assertTrue(record.married is None)
+        yo.assertTrue(record.appt is None)
+        yo.assertEqual(record.wisdom, '')
+        record.born = True
+        record.married = dbf.Date(1992, 6, 27)
+        record.appt = appt = dbf.DateTime.now()
+        record.wisdom = 'Choose Python'
+        yo.assertTrue(record.born)
+        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
+        yo.assertEqual(record.appt, appt)
+        yo.assertEqual(record.wisdom, 'Choose Python')
+        record.born = dbf.Unknown
+        record.married = dbf.NullDate
+        record.appt = dbf.NullDateTime
+        record.wisdom = ''
+        yo.assertTrue(record.born is None)
+        yo.assertTrue(record.married is None)
+        yo.assertTrue(record.appt is None)
+        yo.assertEqual(record.wisdom, '')
+    def test13(yo):
+        "custom data types"
+        table = dbf.Table(
+            filename=':memory:',
+            field_specs='name C(20); born L; married D; appt T; wisdom M',
+            field_data_types=dict(name=dbf.Char, born=dbf.Logical, married=dbf.Date, appt=dbf.DateTime, wisdom=dbf.Char,),
+            dbf_type='vfp'
+            )
+        record = table.append()
+        yo.assertTrue(type(record.name) is dbf.Char, "record.name is %r, not dbf.Char" % type(record.name))
+        yo.assertTrue(type(record.born) is dbf.Logical, "record.born is %r, not dbf.Logical" % type(record.born))
+        yo.assertTrue(type(record.married) is dbf.Date, "record.married is %r, not dbf.Date" % type(record.married))
+        yo.assertTrue(type(record.appt) is dbf.DateTime, "record.appt is %r, not dbf.DateTime" % type(record.appt))
+        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, not dbf.Char" % type(record.wisdom))
+        yo.assertEqual(record.name, ' ' * 20)
+        yo.assertTrue(record.born is dbf.Unknown, "record.born is %r, not dbf.Unknown" % record.born)
+        yo.assertEqual(record.born, None)
+        yo.assertTrue(record.married is dbf.NullDate, "record.married is %r, not dbf.NullDate" % record.married)
+        yo.assertEqual(record.married, None)
+        yo.assertTrue(record.appt is dbf.NullDateTime, "record.appt is %r, not dbf.NullDateTime" % record.appt)
+        yo.assertEqual(record.appt, None)
+        record.name = 'Ethan               '
+        record.born = True
+        record.married = dbf.Date(1992, 6, 27)
+        record.appt = appt = dbf.DateTime.now()
+        record.wisdom = 'Choose Python'
+        yo.assertEqual(type(record.name), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
+        yo.assertTrue(record.born is dbf.Truth)
+        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
+        yo.assertEqual(record.appt, appt)
+        yo.assertEqual(type(record.wisdom), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
+        yo.assertEqual(record.wisdom, 'Choose Python')
+        record.born = dbf.Falsth
+        yo.assertEqual(record.born, False)
+        record.born = None
+        record.married = None
+        record.appt = None
+        record.wisdom = None
+        yo.assertTrue(record.born is dbf.Unknown)
+        yo.assertTrue(record.married is dbf.NullDate)
+        yo.assertTrue(record.appt is dbf.NullDateTime)
+        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, but should be dbf.Char" % type(record.wisdom))
+    def test14(yo):
+        "field_types with normal data type but None on empty"
+        table = dbf.Table(
+            filename=':memory:',
+            field_specs='name C(20); born L; married D; wisdom M',
+            field_data_types=dict(name=(str, dbf.NoneType), born=(bool, bool)),
+            dbf_type='db3'
+            )
+        record = table.append()
+        yo.assertTrue(type(record.name) is type(None), "record.name is %r, not None" % type(record.name))
+        yo.assertTrue(type(record.born) is bool, "record.born is %r, not False" % type(record.born))
+        yo.assertTrue(record.name is None)
+        yo.assertTrue(record.born is False, "record.born is %r, not dbf.Unknown" % record.born)
+        record.name = 'Ethan               '
+        record.born = True
+        yo.assertEqual(type(record.name), str, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
+        yo.assertTrue(record.born is True)
+        record.born = False
+        yo.assertEqual(record.born, False)
+        record.name = None
+        record.born = None
+        yo.assertTrue(record.name is None)
+        yo.assertTrue(record.born is False)
+
+
 class Test_Dbf_Functions(unittest.TestCase):
     def setUp(yo):
         "create a dbf and vfp table"
@@ -1191,7 +1283,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.add_fields('desc M; paid L; mass B')
         i = 0
         for record in table:
-            yo.assertEqual(record.desc, None)
+            yo.assertEqual(record.desc, u'')
             yo.assertEqual(record.paid, None)
             yo.assertEqual(record.mass, 0.0)
             i += 1
@@ -1634,11 +1726,28 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.close()
         table = dbf.Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='db3')
         table.append(('user', 0))
+        table.close()
+        table.open()
+        table.close()
+        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
         table.add_fields('motto M')
         table[0].write_record(motto='Are we there yet??')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
         table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
+        yo.assertEqual(table[0].motto, 'Are we there yet??')
+        table.close()
+        table = dbf.Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='vfp')
+        table.append(('user', 0))
+        table.close()
+        table.open()
+        table.close()
+        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
+        table.add_fields('motto M')
+        table[0].write_record(motto='Are we there yet??')
+        yo.assertEqual(table[0].motto, 'Are we there yet??')
+        table.close()
+        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
     def test13(yo):
@@ -1696,73 +1805,6 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.resize_field('name', 40)
         new_record = table[5].scatter_fields()
         yo.assertEqual(test_record['orderdate'], new_record['orderdate'])
-    def test15(yo):
-        "empty and None values"
-        table = dbf.Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
-        record = table.append()
-        yo.assertTrue(record.born is None)
-        yo.assertTrue(record.married is None)
-        yo.assertTrue(record.appt is None)
-        yo.assertTrue(record.wisdom is None)
-        record.born = True
-        record.married = dbf.Date(1992, 6, 27)
-        record.appt = appt = dbf.DateTime.now()
-        record.wisdom = 'Choose Python'
-        yo.assertTrue(record.born)
-        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
-        yo.assertEqual(record.appt, appt)
-        yo.assertEqual(record.wisdom, 'Choose Python')
-        record.born = dbf.Unknown
-        record.married = dbf.NullDate
-        record.appt = dbf.NullDateTime
-        record.wisdom = ''
-        yo.assertTrue(record.born is None)
-        yo.assertTrue(record.married is None)
-        yo.assertTrue(record.appt is None)
-        yo.assertTrue(record.wisdom is None)
-    def test16(yo):
-        "custom data types"
-        table = dbf.Table(
-            filename=':memory:',
-            field_specs='name C(20); born L; married D; appt T; wisdom M',
-            field_types=dict(name=dbf.Char, born=dbf.Logical, married=dbf.Date, appt=dbf.DateTime, wisdom=dbf.Char,),
-            dbf_type='vfp'
-            )
-        record = table.append()
-        yo.assertTrue(type(record.name) is dbf.Char, "record.name is %r, not dbf.Char" % type(record.name))
-        yo.assertTrue(type(record.born) is dbf.Logical, "record.born is %r, not dbf.Logical" % type(record.born))
-        yo.assertTrue(type(record.married) is dbf.Date, "record.married is %r, not dbf.Date" % type(record.married))
-        yo.assertTrue(type(record.appt) is dbf.DateTime, "record.appt is %r, not dbf.DateTime" % type(record.appt))
-        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, not dbf.Char" % type(record.wisdom))
-        yo.assertEqual(record.name, ' ' * 20)
-        yo.assertTrue(record.born is dbf.Unknown, "record.born is %r, not dbf.Unknown" % record.born)
-        yo.assertEqual(record.born, None)
-        yo.assertTrue(record.married is dbf.NullDate, "record.married is %r, not dbf.NullDate" % record.married)
-        yo.assertEqual(record.married, None)
-        yo.assertTrue(record.appt is dbf.NullDateTime, "record.appt is %r, not dbf.NullDateTime" % record.appt)
-        yo.assertEqual(record.appt, None)
-        record.name = 'Ethan               '
-        record.born = True
-        record.married = dbf.Date(1992, 6, 27)
-        record.appt = appt = dbf.DateTime.now()
-        record.wisdom = 'Choose Python'
-        yo.assertEqual(type(record.name), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
-        yo.assertTrue(record.born is dbf.Truth)
-        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
-        yo.assertEqual(record.appt, appt)
-        yo.assertEqual(type(record.wisdom), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
-        yo.assertEqual(record.wisdom, 'Choose Python')
-        record.born = dbf.Falsth
-        yo.assertEqual(record.born, False)
-        record.born = None
-        record.married = None
-        record.appt = None
-        record.wisdom = None
-        yo.assertTrue(record.born is dbf.Unknown)
-        yo.assertTrue(record.married is dbf.NullDate)
-        yo.assertTrue(record.appt is dbf.NullDateTime)
-        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, but should be dbf.Char" % type(record.wisdom))
-
 
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"

@@ -6,7 +6,7 @@ Copyright
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.88.28 as of 18 Oct 2011
+    - Version: 0.88.30 as of 25 Oct 2011
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -150,7 +150,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 88, 28)
+version = (0, 88, 30)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -177,6 +177,7 @@ import decimal
 from decimal import Decimal
 from math import floor
 from shutil import copyfileobj
+from types import NoneType
 
 __metaclass__ = type
 
@@ -196,8 +197,14 @@ if sys.version_info[:2] < (2, 7):
             return decimal.Decimal(str(val))
         return decimal.Decimal(val)
 
+    bytes = str
+
 # 2.6+ property for 2.5-, decimal.Decimal doesn't support float initialization
 if sys.version_info[:2] < (2, 6):
+    # define next()
+    def next(iterator):
+        return iterator.next()
+
     # define our own property type
     class property():
         "2.6 properties for 2.5-"    
@@ -230,6 +237,9 @@ if sys.version_info[:2] < (2, 6):
         def deleter(self, func):
             self.fdel = func
             return self
+
+def none(*args, **kwargs):
+    return None
 
 # warnings and errors
 
@@ -1446,9 +1456,6 @@ def packLongInt(value, bigendian=False):
             return struct.pack('>L', value)
         else:
             return struct.pack('<L', value)
-def packDate(date):
-        "Returns a group of three bytes, in integer form, of the date"
-        return "%c%c%c" % (date.year-1900, date.month, date.day)
 def packStr(string):
         "Returns an 11 byte, upper-cased, null padded string suitable for field names; raises DbfError if the string is bigger than 10 bytes"
         if len(string) > 10:
@@ -1466,11 +1473,6 @@ def unpackLongInt(bytes, bigendian=False):
             return int(struct.unpack('>L', bytes)[0])
         else:
             return int(struct.unpack('<L', bytes)[0])
-def unpackDate(bytestr):
-        "Returns a Date() of the packed three-byte date passed in"
-        year, month, day = struct.unpack('<BBB', bytestr)
-        year += 1900
-        return Date(year, month, day)
 def unpackStr(chars):
         "Returns a normal, lower-cased string from a null-padded byte string"
         field = struct.unpack('%ds' % len(chars), chars)[0]
@@ -1485,7 +1487,18 @@ def unsupportedType(something, field, memo=None):
     raise DbfError('field type is not supported.')
 def retrieveCharacter(bytes, fielddef={}, memo=None):
     "Returns the string in bytes"
-    return fielddef['class'](bytes.tostring())
+    data = (bytes.tostring())
+    if not data.strip():
+        cls = fielddef['empty']
+        if cls is NoneType:
+            return None
+        try:
+            return cls(data)
+        except:
+            print
+            print repr(cls)
+            raise
+    return fielddef['class'](data)
 def updateCharacter(string, fielddef, memo=None):
     "returns the string"
     if string == None:
@@ -1751,24 +1764,42 @@ class DbfTable():
     _version = 'basic memory table'
     _versionabbv = 'dbf'
     _fieldtypes = {
-            'D' : { 'Type':'Date',    'Init':addDate,    'Blank':Date,       'Retrieve':retrieveDate,    'Update':updateDate},
-            'L' : { 'Type':'Logical', 'Init':addLogical, 'Blank':Logical,    'Retrieve':retrieveLogical, 'Update':updateLogical},
-            'M' : { 'Type':'Memo',    'Init':addMemo,    'Blank':str,        'Retrieve':retrieveMemo,    'Update':updateMemo} }
+            'C' : {
+                    'Type':'Character', 'Init':addCharacter, 'Blank':str, 'Retrieve':retrieveCharacter, 'Update':updateCharacter,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'D' : { 
+                    'Type':'Date', 'Init':addDate, 'Blank':Date, 'Retrieve':retrieveDate, 'Update':updateDate,
+                    'Class':datetime.date, 'Empty':none, 'Null':none,
+                    },
+            'L' : { 
+                    'Type':'Logical', 'Init':addLogical, 'Blank':Logical, 'Retrieve':retrieveLogical, 'Update':updateLogical,
+                    'Class':bool, 'Empty':none, 'Null':none,
+                    },
+            'M' : { 
+                    'Type':'Memo', 'Init':addMemo, 'Blank':str, 'Retrieve':retrieveMemo, 'Update':updateMemo,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'N' : { 
+                    'Type':'Numeric', 'Init':addNumeric, 'Blank':int, 'Retrieve':retrieveNumeric, 'Update':updateNumeric,
+                    'Class':'default', 'Empty':none, 'Null':none,
+                    },
+            }
     _memoext = ''
     _memotypes = tuple('M', )
     _memoClass = _DbfMemo
     _yesMemoMask = ''
     _noMemoMask = ''
     _fixed_fields = ('M','D','L')           # always same length in table
-    _variable_fields = tuple()              # variable length in table
+    _variable_fields = ('C', 'N')           # variable length in table
     _binary_fields = tuple()                # as in non-unicode character
-    _character_fields = tuple('M', )        # field representing character data
-    _decimal_fields = tuple()               # text-based numeric fields
-    _numeric_fields = tuple()               # fields representing a number
+    _character_fields = ('C', 'M')          # field representing character data
+    _decimal_fields = ('N', )               # text-based numeric fields
+    _numeric_fields = ('N', )               # fields representing a number
     _currency_fields = tuple()
-    _date_fields = tuple()
+    _date_fields = ('D', )
     _datetime_fields = tuple()
-    _logical_fields = tuple()
+    _logical_fields = ('L', )
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x00'             # table type - none
     _dbfTableHeader[8:10] = array('c', packShortInt(33))
@@ -1781,17 +1812,7 @@ class DbfTable():
     _meta_only = False
     _use_deleted = True
     backup = False
-    defaults = {
-            'binary'    : str,
-            'character' : unicode,
-            'currency'  : Decimal,
-            'date'      : datetime.date,
-            'datetime'  : datetime.datetime,
-            'logical'   : bool,
-            'number'    : 'default',
-            'null'      : lambda:None,
-            'empty'     : lambda:None, 
-            }
+
     class _DbfLists():
         "implements the weakref structure for DbfLists"
         def __init__(yo):
@@ -1831,9 +1852,11 @@ class DbfTable():
         memofields = None
         current = -1
     class _TableHeader():
-        def __init__(yo, data):
+        def __init__(yo, data, pack_date, unpack_date):
             if len(data) != 32:
                 raise DbfError('table header should be 32 bytes, but is %d bytes' % len(data))
+            yo.packDate = pack_date
+            yo.unpackDate = unpack_date
             yo._data = array('c', data + '\x0d')
         def codepage(yo, cp=None):
             "get/set code page of table"
@@ -1846,7 +1869,7 @@ class DbfTable():
         @property
         def data(yo):
             "main data structure"
-            date = packDate(Date.today())
+            date = yo.packDate(Date.today())
             yo._data[1:4] = array('c', date)
             return yo._data.tostring()
         @data.setter
@@ -1941,7 +1964,7 @@ class DbfTable():
         @property
         def update(yo):
             "date of last table modification (read-only)"
-            return unpackDate(yo._data[1:4].tostring())
+            return yo.unpackDate(yo._data[1:4].tostring())
         @property
         def version(yo):
             "dbf version"
@@ -2053,11 +2076,12 @@ class DbfTable():
     def _initializeFields(yo):
         "builds the FieldList of names, types, and descriptions from the disk file"
         old_fields = defaultdict(dict)
+        missing = object()
         for name in yo._meta.fields:
             old_fields[name]['type'] = yo._meta[name]['type']
             old_fields[name]['class'] = yo._meta[name]['class']
-            old_fields[name]['null'] = yo._meta[name]['null']
             old_fields[name]['empty'] = yo._meta[name]['empty']
+            old_fields[name]['null'] = yo._meta[name]['null']
         yo._meta.fields[:] = []
         offset = 1
         fieldsdef = yo._meta.header.fields
@@ -2082,12 +2106,12 @@ class DbfTable():
             yo._meta.fields.append(name)
             if name in old_fields and old_fields[name]['type'] == type:
                 cls = old_fields[name]['class']
-                null = old_fields[name]['null']
                 empty = old_fields[name]['empty']
+                null = old_fields[name]['null']
             else:
                 cls = yo._fieldtypes[type]['Class']
-                null = yo._fieldtypes[type]['Null']
                 empty = yo._fieldtypes[type]['Empty']
+                null = yo._fieldtypes[type]['Null']
             yo._meta[name] = {
                     'type' : type,
                     'start' : start,
@@ -2096,9 +2120,10 @@ class DbfTable():
                     'decimals' : decimals,
                     'flags' : flags,
                     'class' : cls,
-                    'null' : null,
                     'empty' : empty,
+                    'null' : null,
                     }
+
     def _fieldLayout(yo, i):
         "Returns field information Name Type(Length[,Decimals])"
         name = yo._meta.fields[i]
@@ -2135,6 +2160,16 @@ class DbfTable():
             specs = list(specs)
         specs = [s.strip() for s in specs]
         return specs
+    @staticmethod
+    def _packDate(date):
+            "Returns a group of three bytes, in integer form, of the date"
+            return "%c%c%c" % (date.year-1900, date.month, date.day)
+    @staticmethod
+    def _unpackDate(bytestr):
+            "Returns a Date() of the packed three-byte date passed in"
+            year, month, day = struct.unpack('<BBB', bytestr)
+            year += 1900
+            return Date(year, month, day)
     def _update_disk(yo, headeronly=False):
         "synchronizes the disk file with current data"
         if yo._meta.inmemory:
@@ -2193,7 +2228,7 @@ class DbfTable():
             raise TypeError('type <%s> not valid for indexing' % type(value))
     def __init__(yo, filename=':memory:', field_specs=None, memo_size=128, ignore_memos=False, 
                  read_only=False, keep_memos=False, meta_only=False, codepage=None, 
-                 default={}, field_types={},    # e.g. 'name':str, 'age':float
+                 default_data_types={}, field_data_types={},    # e.g. 'name':str, 'age':float
                  ):
         """open/create dbf file
         filename should include path if needed
@@ -2209,8 +2244,6 @@ class DbfTable():
                 raise DbfError("field list must be specified for memory tables")
         elif type(yo) is DbfTable:
             raise DbfError("only memory tables supported")
-        yo.defaults = yo.defaults.copy()
-        yo.defaults.update(default)
         yo._dbflists = yo._DbfLists()
         yo._indexen = yo._Indexen()
         yo._meta = meta = yo._MetaData()
@@ -2228,9 +2261,15 @@ class DbfTable():
         meta.memo_size = memo_size
         meta.input_decoder = codecs.getdecoder(input_decoding)      # from ascii to unicode
         meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
-        meta.header = header = yo._TableHeader(yo._dbfTableHeader)
+        meta.header = header = yo._TableHeader(yo._dbfTableHeader, yo._packDate, yo._unpackDate)
         header.extra = yo._dbfTableHeaderExtra
         header.data        #force update of date
+        yo._fieldtypes = yo._fieldtypes.copy()
+        for field, types in default_data_types.items():
+            if not isinstance(types, tuple):
+                types = (types, )
+            for result_name, result_type in ezip(('Class','Empty','Null'), types):
+                _fieldtypes[field][result_name] = result_type
         if filename[0] == filename[-1] == ':':
             yo._table = []
             meta.ondisk = False
@@ -2243,20 +2282,6 @@ class DbfTable():
             meta.memoname = base + yo._memoext
             meta.ondisk = True
             meta.inmemory = False
-        # this must happen before .add_fields() is called
-        for datatypes, classtype in (
-                (yo._binary_fields, yo.defaults['binary']),
-                (yo._character_fields, yo.defaults['character']),
-                (yo._currency_fields, yo.defaults['currency']),
-                (yo._date_fields, yo.defaults['date']),
-                (yo._datetime_fields, yo.defaults['datetime']),
-                (yo._logical_fields, yo.defaults['logical']),
-                (yo._numeric_fields, yo.defaults['number']),
-                ):
-            for datatype in datatypes:
-                meta.fieldtypes[datatype]['Class'] = classtype
-                meta.fieldtypes[datatype]['Null'] = yo.defaults['null']
-                meta.fieldtypes[datatype]['Empty'] = yo.defaults['empty']
         if codepage is not None:
             cp, sd, ld = _codepage_lookup(codepage)
             yo._meta.decoder = codecs.getdecoder(sd) 
@@ -2278,7 +2303,7 @@ class DbfTable():
             except IOError, e:
                 raise DbfError(str(e))
             dfd.seek(0)
-            meta.header = header = yo._TableHeader(dfd.read(32))
+            meta.header = header = yo._TableHeader(dfd.read(32), yo._packDate, yo._unpackDate)
             if not header.version in yo._supported_tables:
                 dfd.close()
                 dfd = None
@@ -2312,17 +2337,19 @@ class DbfTable():
                 yo.close(keep_table=False, keep_memos=False)
             elif read_only:
                 yo.close(keep_table=True, keep_memos=keep_memos)
+
         for field in meta.fields:
             field_type = meta[field]['type']
-            default_field_type = yo._fieldtypes[field_type]['Class']
-            specific_field_type = field_types.get(field)
+            default_field_type = yo._fieldtypes[field_type]['Class'], yo._fieldtypes[field_type]['Empty'], yo._fieldtypes[field_type]['Null']
+            specific_field_type = field_data_types.get(field)
             if specific_field_type is not None and not isinstance(specific_field_type, tuple):
                 specific_field_type = (specific_field_type, )
-            if specific_field_type:
-                for result_name, result_type in ezip(('class','null','empty'), specific_field_type):
-                    meta[field][result_name] = result_type
-            else:
-                meta[field]['class'] = default_field_type
+            for result_name, result_type in ezip(
+                    ('class','empty','null'),
+                    specific_field_type or default_field_type,
+                    ):
+                meta[field][result_name] = result_type
+
         
     def __iter__(yo):
         return yo.DbfIterator(yo)           
@@ -2456,6 +2483,7 @@ class DbfTable():
                     'null'      : null,
                     }
             if meta[name]['type'] in yo._memotypes and meta.memo is None:
+                meta.newmemofile = True
                 meta.memo = yo._memoClass(meta)
             for record in yo:
                 record[name] = None
@@ -2790,7 +2818,7 @@ class DbfTable():
             del yo._table
         dfd = meta.dfd = open(meta.filename, 'r+b')
         dfd.seek(0)
-        meta.header = header = yo._TableHeader(dfd.read(32))
+        meta.header = header = yo._TableHeader(dfd.read(32), yo._packDate, yo._unpackDate)
         if not header.version in yo._supported_tables:
             dfd.close()
             dfd = None
@@ -2963,11 +2991,26 @@ class Db3Table(DbfTable):
     _version = 'dBase III Plus'
     _versionabbv = 'db3'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
-            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
-            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addNumeric} }
+            'C' : {
+                    'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'D' : {
+                    'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate,
+                    'Class':datetime.date, 'Empty':none, 'Null':none,
+                    },
+            'L' : {
+                    'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical,
+                    'Class':bool, 'Empty':none, 'Null':none,
+                    },
+            'M' : {
+                    'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'N' : {
+                    'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addNumeric,
+                    'Class':'default', 'Empty':none, 'Null':none,
+                    } }
     _memoext = '.dbt'
     _memotypes = ('M',)
     _memoClass = _Db3Memo
@@ -2994,6 +3037,7 @@ class Db3Table(DbfTable):
     _read_only = False
     _meta_only = False
     _use_deleted = True
+
     def _checkMemoIntegrity(yo):
         "dBase III specific"
         if yo._meta.header.version == '\x83':
@@ -3069,15 +3113,42 @@ class FpTable(DbfTable):
     _version = 'Foxpro'
     _versionabbv = 'fp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
-            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric},
-            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
-            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addVfpMemo},
-            'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
-            'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
-            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None} }
+            'C' : {
+                    'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'F' : {
+                    'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric,
+                    'Class':'default', 'Empty':none, 'Null':none,
+                    },
+            'N' : {
+                    'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric,
+                    'Class':'default', 'Empty':none, 'Null':none,
+                    },
+            'L' : {
+                    'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical,
+                    'Class':bool, 'Empty':none, 'Null':none,
+                    },
+            'D' : {
+                    'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate,
+                    'Class':datetime.date, 'Empty':none, 'Null':none,
+                    },
+            'M' : {
+                    'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'G' : {
+                    'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo,
+                    'Class':bytes, 'Empty':bytes, 'Null':none,
+                    },
+            'P' : {
+                    'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo,
+                    'Class':bytes, 'Empty':bytes, 'Null':none,
+                    },
+            '0' : {
+                    'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None,
+                    'Class':none, 'Empty':none, 'Null':none,
+                    } }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -3167,25 +3238,74 @@ class FpTable(DbfTable):
                     'null' : null,
                     'empty' : empty,
                     }
+    @staticmethod
+    def _packDate(date):
+            "Returns a group of three bytes, in integer form, of the date"
+            return "%c%c%c" % (date.year-2000, date.month, date.day)
+    @staticmethod
+    def _unpackDate(bytestr):
+            "Returns a Date() of the packed three-byte date passed in"
+            year, month, day = struct.unpack('<BBB', bytestr)
+            year += 2000
+            return Date(year, month, day)
             
 class VfpTable(DbfTable):
     'Provides an interface for working with Visual FoxPro 6 tables'
     _version = 'Visual Foxpro'
     _versionabbv = 'vfp'
     _fieldtypes = {
-            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
-            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency},
-            'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble},
-            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric},
-            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric},
-            'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
-            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime},
-            'M' : {'Type':'Memo', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo},
-            'G' : {'Type':'General', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo},
-            'P' : {'Type':'Picture', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo},
-            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':int} }
+            'C' : {
+                    'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'Y' : {
+                    'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency,
+                    'Class':Decimal, 'Empty':none, 'Null':none,
+                    },
+            'B' : {
+                    'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble,
+                    'Class':float, 'Empty':none, 'Null':none,
+                    },
+            'F' : {
+                    'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric,
+                    'Class':'default', 'Empty':none, 'Null':none,
+                    },
+            'N' : {
+                    'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric,
+                    'Class':'default', 'Empty':none, 'Null':none,
+                    },
+            'I' : {
+                    'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger,
+                    'Class':int, 'Empty':none, 'Null':none,
+                    },
+            'L' : {
+                    'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical,
+                    'Class':bool, 'Empty':none, 'Null':none,
+                    },
+            'D' : {
+                    'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate,
+                    'Class':datetime.date, 'Empty':none, 'Null':none,
+                    },
+            'T' : {
+                    'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime,
+                    'Class':datetime.datetime, 'Empty':none, 'Null':none,
+                    },
+            'M' : {
+                    'Type':'Memo', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Class':unicode, 'Empty':unicode, 'Null':none,
+                    },
+            'G' : {
+                    'Type':'General', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Class':bytes, 'Empty':bytes, 'Null':none,
+                    },
+            'P' : {
+                    'Type':'Picture', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Class':bytes, 'Empty':bytes, 'Null':none,
+                    },
+            '0' : {
+                    'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':int,
+                    'Class':none, 'Empty':none, 'Null':none,
+                    } }
     _memoext = '.fpt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -3232,6 +3352,8 @@ class VfpTable(DbfTable):
         for name in yo._meta.fields:
             old_fields[name]['type'] = yo._meta[name]['type']
             old_fields[name]['class'] = yo._meta[name]['class']
+            old_fields[name]['empty'] = yo._meta[name]['empty']
+            old_fields[name]['null'] = yo._meta[name]['null']
         yo._meta.fields[:] = []
         offset = 1
         fieldsdef = yo._meta.header.fields
@@ -3271,6 +3393,17 @@ class VfpTable(DbfTable):
                     'null' : null,
                     'empty' : empty,
                     }
+    @staticmethod
+    def _packDate(date):
+            "Returns a group of three bytes, in integer form, of the date"
+            return "%c%c%c" % (date.year-2000, date.month, date.day)
+    @staticmethod
+    def _unpackDate(bytestr):
+            "Returns a Date() of the packed three-byte date passed in"
+            year, month, day = struct.unpack('<BBB', bytestr)
+            year += 2000
+            return Date(year, month, day)
+                    
 class List():
     "list of Dbf records, with set-like behavior"
     _desc = ''
@@ -4199,8 +4332,8 @@ def Table(
         meta_only=False, 
         dbf_type=None, 
         codepage=None,
-        default={},
-        field_types={},
+        default_data_types={},
+        field_data_types={},
         ):
     "returns an open table of the correct dbf_type, or creates it if field_specs is given"
     if dbf_type is None and isinstance(filename, DbfTable):
@@ -4213,17 +4346,17 @@ def Table(
         if table is None:
             raise DbfError("Unknown table type: %s" % dbf_type)
         return table(filename, field_specs, memo_size, ignore_memos, read_only, keep_memos,
-                meta_only, codepage, default, field_types)
+                meta_only, codepage, default_data_types, field_data_types)
     else:
         possibles = guess_table_type(filename)
         if len(possibles) == 1:
             return possibles[0][2](filename, field_specs, memo_size, ignore_memos,
-                    read_only, keep_memos, meta_only, codepage, default, field_types)
+                    read_only, keep_memos, meta_only, codepage, default_data_types, field_data_types)
         else:
             for type, desc, cls in possibles:
                 if type == default_type:
                     return cls(filename, field_specs, memo_size, ignore_memos,
-                            read_only, keep_memos, meta_only, codepage, default, field_types)
+                            read_only, keep_memos, meta_only, codepage, default_data_types, field_data_types)
             else:
                 types = ', '.join(["%s" % item[1] for item in possibles])
                 abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'

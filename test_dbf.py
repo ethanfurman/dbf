@@ -5,10 +5,11 @@ import tempfile
 import shutil
 import dbf
 import datetime
-from decimal import Decimal
-from dbf import Decimal
+from dbf.api import *
 
-if dbf.version != (0, 88, 30):
+py_ver = sys.version_info[:2]
+
+if dbf.version != (0, 90, 1):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %s on %s with Python %s\n" % (
@@ -16,6 +17,18 @@ else:
         sys.platform,
         sys.version,
         )
+    # 2.5 constructs
+
+try:
+    all
+except NameError:
+    def all(iterable):
+        for element in iterable:
+            if not element:
+                return False
+        return True
+
+
 
 
 # Walker in Leaves -- by Scot Noel -- http://www.scienceandfantasyfiction.com/sciencefiction/Walker-in-Leaves/walker-in-leaves.htm
@@ -122,50 +135,50 @@ def index(sequence):
 class Test_Char(unittest.TestCase):
     def test_00(yo):
         "exceptions"
-        yo.assertRaises(ValueError, dbf.Char, 7)
-        yo.assertRaises(ValueError, dbf.Char, ['nope'])
-        yo.assertRaises(ValueError, dbf.Char, True)
-        yo.assertRaises(ValueError, dbf.Char, False)
-        yo.assertRaises(ValueError, dbf.Char, type)
-        yo.assertRaises(ValueError, dbf.Char, str)
+        yo.assertRaises(ValueError, Char, 7)
+        yo.assertRaises(ValueError, Char, ['nope'])
+        yo.assertRaises(ValueError, Char, True)
+        yo.assertRaises(ValueError, Char, False)
+        yo.assertRaises(ValueError, Char, type)
+        yo.assertRaises(ValueError, Char, str)
     def test_01(yo):
         "booleans and None"
-        empty = dbf.Char()
+        empty = Char()
         yo.assertFalse(bool(empty))
-        one = dbf.Char(' ')
+        one = Char(' ')
         yo.assertFalse(bool(one))
-        actual = dbf.Char('1')
+        actual = Char('1')
         yo.assertTrue(bool(actual))
-        none = dbf.Char(None)
+        none = Char(None)
         yo.assertTrue(none == None)
     def test_02(yo):
         "equality"
-        a1 = dbf.Char('a')
+        a1 = Char('a')
         a2 = 'a '
         yo.assertEqual(a1, a2)
         yo.assertEqual(a2, a1)
         a3 = 'a '
-        a4 = dbf.Char('a ')
+        a4 = Char('a ')
         yo.assertEqual(a3, a4)
         yo.assertEqual(a4, a3)
     def test_03(yo):
         "inequality"
-        a1 = dbf.Char('ab ')
+        a1 = Char('ab ')
         a2 = 'a b'
         yo.assertNotEqual(a1, a2)
         yo.assertNotEqual(a2, a1)
         a3 = 'ab '
-        a4 = dbf.Char('a b')
+        a4 = Char('a b')
         yo.assertNotEqual(a3, a4)
         yo.assertNotEqual(a4, a3)
     def test_04(yo):
         "less-than"
-        a1 = dbf.Char('a')
+        a1 = Char('a')
         a2 = 'a '
         yo.assertFalse(a1 < a2)
         yo.assertFalse(a2 < a1)
         a3 = 'a '
-        a4 = dbf.Char('a ')
+        a4 = Char('a ')
         yo.assertFalse(a3 < a4)
         yo.assertFalse(a4 < a3)
         a5 = 'abcd'
@@ -174,12 +187,12 @@ class Test_Char(unittest.TestCase):
         yo.assertFalse(a6 < a5)
     def test_05(yo):
         "less-than or equal"
-        a1 = dbf.Char('a')
+        a1 = Char('a')
         a2 = 'a '
         yo.assertTrue(a1 <= a2)
         yo.assertTrue(a2 <= a1)
         a3 = 'a '
-        a4 = dbf.Char('a ')
+        a4 = Char('a ')
         yo.assertTrue(a3 <= a4)
         yo.assertTrue(a4 <= a3)
         a5 = 'abcd'
@@ -188,12 +201,12 @@ class Test_Char(unittest.TestCase):
         yo.assertFalse(a6 <= a5)
     def test_06(yo):
         "greater-than or equal"
-        a1 = dbf.Char('a')
+        a1 = Char('a')
         a2 = 'a '
         yo.assertTrue(a1 >= a2)
         yo.assertTrue(a2 >= a1)
         a3 = 'a '
-        a4 = dbf.Char('a ')
+        a4 = Char('a ')
         yo.assertTrue(a3 >= a4)
         yo.assertTrue(a4 >= a3)
         a5 = 'abcd'
@@ -202,12 +215,12 @@ class Test_Char(unittest.TestCase):
         yo.assertTrue(a6 >= a5)
     def test_07(yo):
         "greater-than"
-        a1 = dbf.Char('a')
+        a1 = Char('a')
         a2 = 'a '
         yo.assertFalse(a1 > a2)
         yo.assertFalse(a2 > a1)
         a3 = 'a '
-        a4 = dbf.Char('a ')
+        a4 = Char('a ')
         yo.assertFalse(a3 > a4)
         yo.assertFalse(a4 > a3)
         a5 = 'abcd'
@@ -219,89 +232,89 @@ class Test_Date(unittest.TestCase):
     "Testing Date"
     def test01(yo):
         "Date creation"
-        date0 = dbf.Date()
-        date1 = dbf.Date()
-        date2 = dbf.Date.fromymd('        ')
-        date5 = dbf.Date.fromordinal(0)
-        date6 = dbf.Date.today()
-        date7 = dbf.Date.max
-        date8 = dbf.Date.min
-        yo.assertRaises(ValueError, dbf.Date.fromymd, '00000')
-        yo.assertRaises(ValueError, dbf.Date.fromymd, '00000000')
-        yo.assertRaises(ValueError, dbf.Date, 0, 0, 0)
+        date0 = Date()
+        date1 = Date()
+        date2 = Date.fromymd('        ')
+        date5 = Date.fromordinal(0)
+        date6 = Date.today()
+        date7 = Date.max
+        date8 = Date.min
+        yo.assertRaises(ValueError, Date.fromymd, '00000')
+        yo.assertRaises(ValueError, Date.fromymd, '00000000')
+        yo.assertRaises(ValueError, Date, 0, 0, 0)
     def test02(yo):
         "Date comparisons"
-        nodate1 = dbf.Date()
-        nodate2 = dbf.Date()
-        date1 = dbf.Date.fromordinal(1000)
-        date2 = dbf.Date.fromordinal(2000)
-        date3 = dbf.Date.fromordinal(3000)
+        nodate1 = Date()
+        nodate2 = Date()
+        date1 = Date.fromordinal(1000)
+        date2 = Date.fromordinal(2000)
+        date3 = Date.fromordinal(3000)
         yo.compareTimes(nodate1, nodate2, date1, date2, date3)
 
     def test03(yo):
         "DateTime creation"
-        datetime0 = dbf.DateTime()
-        datetime1 = dbf.DateTime()
-        datetime5 = dbf.DateTime.fromordinal(0)
-        datetime6 = dbf.DateTime.today()
-        datetime7 = dbf.DateTime.max
-        datetime8 = dbf.DateTime.min
+        datetime0 = DateTime()
+        datetime1 = DateTime()
+        datetime5 = DateTime.fromordinal(0)
+        datetime6 = DateTime.today()
+        datetime7 = DateTime.max
+        datetime8 = DateTime.min
     def test04(yo):
         "DateTime comparisons"
-        nodatetime1 = dbf.DateTime()
-        nodatetime2 = dbf.DateTime()
-        datetime1 = dbf.Date.fromordinal(1000)
-        datetime2 = dbf.Date.fromordinal(20000)
-        datetime3 = dbf.Date.fromordinal(300000)
+        nodatetime1 = DateTime()
+        nodatetime2 = DateTime()
+        datetime1 = Date.fromordinal(1000)
+        datetime2 = Date.fromordinal(20000)
+        datetime3 = Date.fromordinal(300000)
         yo.compareTimes(nodatetime1, nodatetime2, datetime1, datetime2, datetime3)
 
     def test05(yo):
         "Time creation"
-        time0 = dbf.Time()
-        time1 = dbf.Time()
-        time7 = dbf.Time.max
-        time8 = dbf.Time.min
+        time0 = Time()
+        time1 = Time()
+        time7 = Time.max
+        time8 = Time.min
     def test06(yo):
         "Time comparisons"
-        notime1 = dbf.Time()
-        notime2 = dbf.Time()
-        time1 = dbf.Date.fromordinal(1000)
-        time2 = dbf.Date.fromordinal(2000)
-        time3 = dbf.Date.fromordinal(3000)
+        notime1 = Time()
+        notime2 = Time()
+        time1 = Date.fromordinal(1000)
+        time2 = Date.fromordinal(2000)
+        time3 = Date.fromordinal(3000)
         yo.compareTimes(notime1, notime2, time1, time2, time3)
     def test07(yo):
         "Date, DateTime, & Time Arithmetic"
         one_day = datetime.timedelta(1)
-        today = dbf.Date.today()
+        today = Date.today()
         today + one_day
         today - one_day
     def test08(yo):
         "comparisons to None"
-        empty_date = dbf.Date()
-        empty_time = dbf.Time()
-        empty_datetime = dbf.DateTime()
+        empty_date = Date()
+        empty_time = Time()
+        empty_datetime = DateTime()
         yo.assertEqual(empty_date, None)
         yo.assertEqual(empty_time, None)
         yo.assertEqual(empty_datetime, None)
     def test09(yo):
         "singletons"
-        empty_date = dbf.Date()
-        empty_time = dbf.Time()
-        empty_datetime = dbf.DateTime()
-        yo.assertTrue(empty_date is dbf.NullDate)
-        yo.assertTrue(empty_time is dbf.NullTime)
-        yo.assertTrue(empty_datetime is dbf.NullDateTime)
+        empty_date = Date()
+        empty_time = Time()
+        empty_datetime = DateTime()
+        yo.assertTrue(empty_date is NullDate)
+        yo.assertTrue(empty_time is NullTime)
+        yo.assertTrue(empty_datetime is NullDateTime)
     def test10(yo):
         "boolean evaluation"
-        empty_date = dbf.Date()
-        empty_time = dbf.Time()
-        empty_datetime = dbf.DateTime()
+        empty_date = Date()
+        empty_time = Time()
+        empty_datetime = DateTime()
         yo.assertEqual(bool(empty_date), False)
         yo.assertEqual(bool(empty_time), False)
         yo.assertEqual(bool(empty_datetime), False)
-        actual_date = dbf.Date.today()
-        actual_time = dbf.Time.now()
-        actual_datetime = dbf.DateTime.now()
+        actual_date = Date.today()
+        actual_time = Time.now()
+        actual_datetime = DateTime.now()
         yo.assertEqual(bool(actual_date), True)
         yo.assertEqual(bool(actual_time), True)
         yo.assertEqual(bool(actual_datetime), True)
@@ -346,127 +359,246 @@ class Test_Date(unittest.TestCase):
         yo.assertEqual(uno != uno, False)
         yo.assertEqual(dos != dos, False)
         yo.assertEqual(tres != tres, False)
+class Test_Null(unittest.TestCase):
+    def test_01(yo):
+        null = Null = dbf.Null()
+        yo.assertTrue(null is dbf.Null())
+
+        yo.assertTrue(null + 1 is Null)
+        yo.assertTrue(1 + null is Null)
+        null += 4
+        yo.assertTrue(null is Null)
+        value = 5
+        value += null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null - 2 is Null)
+        yo.assertTrue(2 - null is Null)
+        null -= 5
+        yo.assertTrue(null is Null)
+        value = 6
+        value -= null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null / 0 is Null)
+        yo.assertTrue(3 / null is Null)
+        null /= 6
+        yo.assertTrue(null is Null)
+        value = 7
+        value /= null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null * -3 is Null)
+        yo.assertTrue(4 * null is Null)
+        null *= 7
+        yo.assertTrue(null is Null)
+        value = 8
+        value *= null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null % 1 is Null)
+        yo.assertTrue(7 % null is Null)
+        null %= 1
+        yo.assertTrue(null is Null)
+        value = 9
+        value %= null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null ** 2 is Null)
+        yo.assertTrue(4 ** null is Null)
+        null **= 3
+        yo.assertTrue(null is Null)
+        value = 9
+        value **= null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null & 1 is Null)
+        yo.assertTrue(1 & null is Null)
+        null &= 1
+        yo.assertTrue(null is Null)
+        value = 1
+        value &= null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null ^ 1 is Null)
+        yo.assertTrue(1 ^ null is Null)
+        null ^= 1
+        yo.assertTrue(null is Null)
+        value = 1
+        value ^= null
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null | 1 is Null)
+        yo.assertTrue(1 | null is Null)
+        null |= 1
+        yo.assertTrue(null is Null)
+        value = 1
+        value |= null 
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(str(divmod(null, 1)) == '(<null>, <null>)')
+        yo.assertTrue(str(divmod(1, null)) == '(<null>, <null>)')
+
+        yo.assertTrue(null << 1 is Null)
+        yo.assertTrue(2 << null is Null)
+        null <<=3
+        yo.assertTrue(null is Null)
+        value = 9
+        value <<= null 
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(null >> 1 is Null)
+        yo.assertTrue(2 >> null is Null)
+        null >>= 3
+        yo.assertTrue(null is Null)
+        value = 9
+        value >>= null 
+        yo.assertTrue(value is Null)
+
+        yo.assertTrue(-null is Null)
+        yo.assertTrue(+null is Null)
+        yo.assertTrue(abs(null) is Null)
+        yo.assertTrue(~null is Null)
+
+        yo.assertTrue(null.attr is Null)
+        yo.assertTrue(null() is Null)
+        yo.assertTrue(getattr(null, 'fake') is Null)
+
+        yo.assertRaises(TypeError, hash, null)
+
+        #yo.assertTrue( is Null)
+        #yo.assertTrue( is Null)
+        #yo.assertTrue( is Null)
+        #yo.assertTrue( is Null)
+        #yo.assertTrue( is Null)
+
 class Test_Logical(unittest.TestCase):
     "Testing Logical"
     def test01(yo):
         "Unknown"
-        huh = dbf.Logical()
+        huh = Logical()
         yo.assertEqual(huh == None, True)
         yo.assertEqual(None == huh, True)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, False)
-        yo.assertEqual((0, 1, 2)[huh], 2)
-        huh = dbf.Logical('?')
+        if py_ver >= (2, 5):
+            yo.assertEqual((0, 1, 2)[huh], 2)
+        huh = Logical('?')
         yo.assertEqual(huh == None, True)
         yo.assertEqual(None == huh, True)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, False)
-        yo.assertEqual((0, 1, 2)[huh], 2)
-        huh = dbf.Logical(' ')
+        if py_ver >= (2, 5):
+            yo.assertEqual((0, 1, 2)[huh], 2)
+        huh = Logical(' ')
         yo.assertEqual(huh == None, True)
         yo.assertEqual(None == huh, True)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, False)
-        yo.assertEqual((0, 1, 2)[huh], 2)
-        huh = dbf.Logical(None)
+        if py_ver >= (2, 5):
+            yo.assertEqual((0, 1, 2)[huh], 2)
+        huh = Logical(None)
         yo.assertEqual(huh == None, True)
         yo.assertEqual(None == huh, True)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, False)
-        yo.assertEqual((0, 1, 2)[huh], 2)
+        if py_ver >= (2, 5):
+            yo.assertEqual((0, 1, 2)[huh], 2)
     def test02(yo):
         "true"
-        huh = dbf.Logical('True')
+        huh = Logical('True')
         yo.assertEqual(huh, True)
         yo.assertNotEqual(huh, False)
         yo.assertNotEqual(huh, None)
-        yo.assertEqual((0, 1, 2)[huh], 1)
+        if py_ver >= (2, 5):
+            yo.assertEqual((0, 1, 2)[huh], 1)
     def test03(yo):
         "true"
-        huh = dbf.Logical('yes')
+        huh = Logical('yes')
         yo.assertEqual(huh, True)
         yo.assertNotEqual(huh, False)
         yo.assertNotEqual(huh, None)
     def test04(yo):
         "true"
-        huh = dbf.Logical('t')
+        huh = Logical('t')
         yo.assertEqual(huh, True)
         yo.assertNotEqual(huh, False)
         yo.assertNotEqual(huh, None)
     def test05(yo):
         "true"
-        huh = dbf.Logical('Y')
+        huh = Logical('Y')
         yo.assertEqual(huh, True)
         yo.assertNotEqual(huh, False)
         yo.assertNotEqual(huh, None)
     def test06(yo):
         "true"
-        huh = dbf.Logical(7)
+        huh = Logical(7)
         yo.assertEqual(huh, True)
         yo.assertNotEqual(huh, False)
         yo.assertNotEqual(huh, None)
     def test07(yo):
         "true"
-        huh = dbf.Logical(['blah'])
+        huh = Logical(['blah'])
         yo.assertEqual(huh, True)
         yo.assertNotEqual(huh, False)
         yo.assertNotEqual(huh, None)
     def test08(yo):
         "false"
-        huh = dbf.Logical('false')
+        huh = Logical('false')
         yo.assertEqual(huh, False)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, None)
-        yo.assertEqual((0, 1, 2)[huh], 0)
+        if py_ver >= (2, 5):
+            yo.assertEqual((0, 1, 2)[huh], 0)
     def test09(yo):
         "false"
-        huh = dbf.Logical('No')
+        huh = Logical('No')
         yo.assertEqual(huh, False)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, None)
     def test10(yo):
         "false"
-        huh = dbf.Logical('F')
+        huh = Logical('F')
         yo.assertEqual(huh, False)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, None)
     def test11(yo):
         "false"
-        huh = dbf.Logical('n')
+        huh = Logical('n')
         yo.assertEqual(huh, False)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, None)
     def test12(yo):
         "false"
-        huh = dbf.Logical(0)
+        huh = Logical(0)
         yo.assertEqual(huh, False)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, None)
     def test13(yo):
         "false"
-        huh = dbf.Logical([])
+        huh = Logical([])
         yo.assertEqual(huh, False)
         yo.assertNotEqual(huh, True)
         yo.assertNotEqual(huh, None)
     def test14(yo):
         "singletons"
-        heh = dbf.Logical(True)
-        hah = dbf.Logical('Yes')
-        ick = dbf.Logical(False)
-        ack = dbf.Logical([])
-        unk = dbf.Logical('?')
-        bla = dbf.Logical(None)
+        heh = Logical(True)
+        hah = Logical('Yes')
+        ick = Logical(False)
+        ack = Logical([])
+        unk = Logical('?')
+        bla = Logical(None)
         yo.assertEquals(heh is hah, True)
         yo.assertEquals(ick is ack, True)
         yo.assertEquals(unk is bla, True)
     def test15(yo):
         "errors"
-        yo.assertRaises(ValueError, dbf.Logical, 'wrong')
+        yo.assertRaises(ValueError, Logical, 'wrong')
     def test16(yo):
         "or"
-        true = dbf.Logical(True)
-        false = dbf.Logical(False)
-        none = dbf.Logical(None)
+        true = Logical(True)
+        false = Logical(False)
+        none = Logical(None)
         yo.assertEquals(true + true, true)
         yo.assertEquals(true + false, true)
         yo.assertEquals(false + true, true)
@@ -511,9 +643,9 @@ class Test_Logical(unittest.TestCase):
         yo.assertEquals(None | none, none)
     def test17(yo):
         "and"
-        true = dbf.Logical(True)
-        false = dbf.Logical(False)
-        none = dbf.Logical(None)
+        true = Logical(True)
+        false = Logical(False)
+        none = Logical(None)
         yo.assertEquals(true * true, true)
         yo.assertEquals(true * false, false)
         yo.assertEquals(false * true, false)
@@ -558,9 +690,9 @@ class Test_Logical(unittest.TestCase):
         yo.assertEquals(None & none, none)
     def test18(yo):
         "xor"
-        true = dbf.Logical(True)
-        false = dbf.Logical(False)
-        none = dbf.Logical(None)
+        true = Logical(True)
+        false = Logical(False)
+        none = Logical(None)
         yo.assertEquals(true ^ true, false)
         yo.assertEquals(true ^ false, true)
         yo.assertEquals(false ^ true, true)
@@ -584,9 +716,9 @@ class Test_Logical(unittest.TestCase):
         yo.assertEquals(None ^ none, none)
     def test19(yo):
         "implication, material"
-        true = dbf.Logical(True)
-        false = dbf.Logical(False)
-        none = dbf.Logical(None)
+        true = Logical(True)
+        false = Logical(False)
+        none = Logical(None)
         yo.assertEquals(true >> true, true)
         yo.assertEquals(true >> false, false)
         yo.assertEquals(false >> true, true)
@@ -610,10 +742,10 @@ class Test_Logical(unittest.TestCase):
         yo.assertEquals(None >> none, none)
     def test20(yo):
         "implication, relevant"
-        true = dbf.Logical(True)
-        false = dbf.Logical(False)
-        none = dbf.Logical(None)
-        dbf.Logical.set_implication('relevant')
+        true = Logical(True)
+        false = Logical(False)
+        none = Logical(None)
+        Logical.set_implication('relevant')
         yo.assertEquals(true >> true, true)
         yo.assertEquals(true >> false, false)
         yo.assertEquals(false >> true, none)
@@ -637,9 +769,9 @@ class Test_Logical(unittest.TestCase):
         yo.assertEquals(None >> none, none)
     def test21(yo):
         "negative and"
-        true = dbf.Logical(True)
-        false = dbf.Logical(False)
-        none = dbf.Logical(None)
+        true = Logical(True)
+        false = Logical(False)
+        none = Logical(None)
         yo.assertEquals(true.D(true), false)
         yo.assertEquals(true.D(false), true)
         yo.assertEquals(false.D(true), true)
@@ -656,9 +788,9 @@ class Test_Logical(unittest.TestCase):
         yo.assertEquals(none.D(None), none)
     def test22(yo):
         "negation"
-        true = dbf.Logical(True)
-        false = dbf.Logical(False)
-        none = dbf.Logical(None)
+        true = Logical(True)
+        false = Logical(False)
+        none = Logical(None)
         yo.assertEquals(-true, false)
         yo.assertEquals(-false, true)
         yo.assertEquals(-none, none)
@@ -672,7 +804,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table(':memory:', fieldlist, dbf_type='db3')
+                table = Table(':memory:', fieldlist, dbf_type='db3')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
@@ -682,9 +814,9 @@ class Test_Dbf_Creation(unittest.TestCase):
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3')
+                table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3')
                 table.close()
-                table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+                table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
@@ -696,7 +828,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                   'litres F(11,5)', 'blob G', 'graphic P']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
+                table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
@@ -706,9 +838,9 @@ class Test_Dbf_Creation(unittest.TestCase):
                   'litres F(11,5)', 'blob G', 'graphic P']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table(os.path.join(tempdir, 'tempfp'), ';'.join(fieldlist), dbf_type='vfp')
+                table = Table(os.path.join(tempdir, 'tempfp'), ';'.join(fieldlist), dbf_type='vfp')
                 table.close()
-                table = dbf.Table(os.path.join(tempdir, 'tempfp'), dbf_type='vfp')
+                table = Table(os.path.join(tempdir, 'tempfp'), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
@@ -718,7 +850,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                   'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
+                table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
@@ -728,15 +860,15 @@ class Test_Dbf_Creation(unittest.TestCase):
                   'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = dbf.Table(os.path.join(tempdir, 'tempvfp'), ';'.join(fieldlist), dbf_type='vfp')
+                table = Table(os.path.join(tempdir, 'tempvfp'), ';'.join(fieldlist), dbf_type='vfp')
                 table.close()
-                table = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
+                table = Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
                 yo.assertEqual(fieldlist, actualFields)
     def test07(yo):
         "dbf table:  adding records"
-        table = dbf.Table(os.path.join(tempdir, 'temptable'), 'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3')
+        table = Table(os.path.join(tempdir, 'temptable'), 'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3')
         namelist = []
         paidlist = []
         qtylist = []
@@ -773,7 +905,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         table.close()
         last_byte = open(table.filename, 'rb').read()[-1]
         yo.assertEqual(last_byte, '\x1a')
-        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         yo.assertEqual(len(table), len(floats)+1)
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
@@ -807,7 +939,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         yo.assertEqual(i, len(table))
     def test08(yo):
         "vfp table:  adding records"
-        table = dbf.Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); paid L; qty N(11,5); orderdate D;'
+        table = Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); paid L; qty N(11,5); orderdate D;'
                 ' desc M; mass B; weight F(18,3); age I; meeting T; misc G; photo P; price Y', dbf_type='vfp')
         namelist = []
         paidlist = []
@@ -861,20 +993,20 @@ class Test_Dbf_Creation(unittest.TestCase):
             yo.assertEqual(record.photo, photo)
         # plus a blank record
         namelist.append(' ' * 25)
-        paidlist.append(dbf.Unknown)
+        paidlist.append(Unknown)
         qtylist.append(None)
-        orderlist.append(dbf.NullDate)
+        orderlist.append(NullDate)
         desclist.append('')
         masslist.append(0.0)
         weightlist.append(None)
         agelist.append(0)
-        meetlist.append(dbf.NullDateTime)
+        meetlist.append(NullDateTime)
         misclist.append('')
         photolist.append('')
         pricelist.append(Decimal('0.0'))
         table.append()
         table.close()
-        table = dbf.Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
+        table = Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
         yo.assertEqual(len(table), len(floats)+1)
         i = 0
         for record in table[:-1]:
@@ -929,13 +1061,13 @@ class Test_Dbf_Creation(unittest.TestCase):
         i += 1
     def test09(yo):
         "automatically write records on object destruction"
-        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        table = Table(os.path.join(tempdir, 'temptable'))
         old_data = table[0].scatter_fields()
         new_name = table[0].name = '!BRAND NEW NAME!'
         yo.assertEqual(unicode(new_name), table[0].name.strip())
     def test10(yo):
         "automatically write records on table close"
-        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        table = Table(os.path.join(tempdir, 'temptable'))
         record = table[0]
         new_name = record.name = '?DIFFERENT NEW NAME?'
         table.close()
@@ -944,32 +1076,32 @@ class Test_Dbf_Creation(unittest.TestCase):
         yo.assertEqual(unicode(new_name), table[0].name.strip())
     def test11(yo):
         "automatically write records on table destruction (no close() called)"
-        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        table = Table(os.path.join(tempdir, 'temptable'))
         record = table[0]
         new_name = record.name = '-YET ANOTHER NEW NAME-'
         del table
         del record
-        table = dbf.Table(os.path.join(tempdir, 'temptable'))
+        table = Table(os.path.join(tempdir, 'temptable'))
         yo.assertEqual(unicode(new_name), table[0].name.strip())
     def test12(yo):
         "empty and None values"
-        table = dbf.Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
+        table = Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
         record = table.append()
         yo.assertTrue(record.born is None)
         yo.assertTrue(record.married is None)
         yo.assertTrue(record.appt is None)
         yo.assertEqual(record.wisdom, '')
         record.born = True
-        record.married = dbf.Date(1992, 6, 27)
-        record.appt = appt = dbf.DateTime.now()
+        record.married = Date(1992, 6, 27)
+        record.appt = appt = DateTime.now()
         record.wisdom = 'Choose Python'
         yo.assertTrue(record.born)
-        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
+        yo.assertEqual(record.married, Date(1992, 6, 27))
         yo.assertEqual(record.appt, appt)
         yo.assertEqual(record.wisdom, 'Choose Python')
-        record.born = dbf.Unknown
-        record.married = dbf.NullDate
-        record.appt = dbf.NullDateTime
+        record.born = Unknown
+        record.married = NullDate
+        record.appt = NullDateTime
         record.wisdom = ''
         yo.assertTrue(record.born is None)
         yo.assertTrue(record.married is None)
@@ -977,62 +1109,62 @@ class Test_Dbf_Creation(unittest.TestCase):
         yo.assertEqual(record.wisdom, '')
     def test13(yo):
         "custom data types"
-        table = dbf.Table(
+        table = Table(
             filename=':memory:',
             field_specs='name C(20); born L; married D; appt T; wisdom M',
-            field_data_types=dict(name=dbf.Char, born=dbf.Logical, married=dbf.Date, appt=dbf.DateTime, wisdom=dbf.Char,),
+            field_data_types=dict(name=Char, born=Logical, married=Date, appt=DateTime, wisdom=Char,),
             dbf_type='vfp'
             )
         record = table.append()
-        yo.assertTrue(type(record.name) is dbf.Char, "record.name is %r, not dbf.Char" % type(record.name))
-        yo.assertTrue(type(record.born) is dbf.Logical, "record.born is %r, not dbf.Logical" % type(record.born))
-        yo.assertTrue(type(record.married) is dbf.Date, "record.married is %r, not dbf.Date" % type(record.married))
-        yo.assertTrue(type(record.appt) is dbf.DateTime, "record.appt is %r, not dbf.DateTime" % type(record.appt))
-        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, not dbf.Char" % type(record.wisdom))
+        yo.assertTrue(type(record.name) is Char, "record.name is %r, not Char" % type(record.name))
+        yo.assertTrue(type(record.born) is Logical, "record.born is %r, not Logical" % type(record.born))
+        yo.assertTrue(type(record.married) is Date, "record.married is %r, not Date" % type(record.married))
+        yo.assertTrue(type(record.appt) is DateTime, "record.appt is %r, not DateTime" % type(record.appt))
+        yo.assertTrue(type(record.wisdom) is Char, "record.wisdom is %r, not Char" % type(record.wisdom))
         yo.assertEqual(record.name, ' ' * 20)
-        yo.assertTrue(record.born is dbf.Unknown, "record.born is %r, not dbf.Unknown" % record.born)
+        yo.assertTrue(record.born is Unknown, "record.born is %r, not Unknown" % record.born)
         yo.assertEqual(record.born, None)
-        yo.assertTrue(record.married is dbf.NullDate, "record.married is %r, not dbf.NullDate" % record.married)
+        yo.assertTrue(record.married is NullDate, "record.married is %r, not NullDate" % record.married)
         yo.assertEqual(record.married, None)
-        yo.assertTrue(record.appt is dbf.NullDateTime, "record.appt is %r, not dbf.NullDateTime" % record.appt)
+        yo.assertTrue(record.appt is NullDateTime, "record.appt is %r, not NullDateTime" % record.appt)
         yo.assertEqual(record.appt, None)
         record.name = 'Ethan               '
         record.born = True
-        record.married = dbf.Date(1992, 6, 27)
-        record.appt = appt = dbf.DateTime.now()
+        record.married = Date(1992, 6, 27)
+        record.appt = appt = DateTime.now()
         record.wisdom = 'Choose Python'
-        yo.assertEqual(type(record.name), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
-        yo.assertTrue(record.born is dbf.Truth)
-        yo.assertEqual(record.married, dbf.Date(1992, 6, 27))
+        yo.assertEqual(type(record.name), Char, "record.wisdom is %r, but should be Char" % record.wisdom)
+        yo.assertTrue(record.born is Truth)
+        yo.assertEqual(record.married, Date(1992, 6, 27))
         yo.assertEqual(record.appt, appt)
-        yo.assertEqual(type(record.wisdom), dbf.Char, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
+        yo.assertEqual(type(record.wisdom), Char, "record.wisdom is %r, but should be Char" % record.wisdom)
         yo.assertEqual(record.wisdom, 'Choose Python')
-        record.born = dbf.Falsth
+        record.born = Falsth
         yo.assertEqual(record.born, False)
         record.born = None
         record.married = None
         record.appt = None
         record.wisdom = None
-        yo.assertTrue(record.born is dbf.Unknown)
-        yo.assertTrue(record.married is dbf.NullDate)
-        yo.assertTrue(record.appt is dbf.NullDateTime)
-        yo.assertTrue(type(record.wisdom) is dbf.Char, "record.wisdom is %r, but should be dbf.Char" % type(record.wisdom))
+        yo.assertTrue(record.born is Unknown)
+        yo.assertTrue(record.married is NullDate)
+        yo.assertTrue(record.appt is NullDateTime)
+        yo.assertTrue(type(record.wisdom) is Char, "record.wisdom is %r, but should be Char" % type(record.wisdom))
     def test14(yo):
         "field_types with normal data type but None on empty"
-        table = dbf.Table(
+        table = Table(
             filename=':memory:',
             field_specs='name C(20); born L; married D; wisdom M',
-            field_data_types=dict(name=(str, dbf.NoneType), born=(bool, bool)),
+            field_data_types=dict(name=(str, NoneType), born=(bool, bool)),
             dbf_type='db3'
             )
         record = table.append()
         yo.assertTrue(type(record.name) is type(None), "record.name is %r, not None" % type(record.name))
         yo.assertTrue(type(record.born) is bool, "record.born is %r, not False" % type(record.born))
         yo.assertTrue(record.name is None)
-        yo.assertTrue(record.born is False, "record.born is %r, not dbf.Unknown" % record.born)
+        yo.assertTrue(record.born is False, "record.born is %r, not Unknown" % record.born)
         record.name = 'Ethan               '
         record.born = True
-        yo.assertEqual(type(record.name), str, "record.wisdom is %r, but should be dbf.Char" % record.wisdom)
+        yo.assertEqual(type(record.name), str, "record.name is %r, but should be Char" % record.wisdom)
         yo.assertTrue(record.born is True)
         record.born = False
         yo.assertEqual(record.born, False)
@@ -1040,12 +1172,69 @@ class Test_Dbf_Creation(unittest.TestCase):
         record.born = None
         yo.assertTrue(record.name is None)
         yo.assertTrue(record.born is False)
-
+    def test15(yo):
+        from pprint import pprint
+        table = Table(
+            filename=':memory:',
+            field_specs='name C(20); born L; married D; appt T; wisdom M',
+            default_data_types=dict(C=Char, L=Logical, D=Date, T=DateTime, M=Char),
+            dbf_type='vfp',
+            )
+        #print '\n\n', pprint(table._meta.fieldtypes), '\n'
+        #print '\n', pprint(table._meta)
+        #return
+        record = table.append()
+        yo.assertEqual(record.name, '')
+        yo.assertEqual(record.born, Unknown)
+        yo.assertEqual(record.married, NullDate)
+        yo.assertEqual(record.appt, NullDateTime)
+        yo.assertEqual(record.wisdom, '')
+        record.name = 'Ethan               '
+        record.born = True
+        record.married = datetime.date(2001, 6, 27)
+        record.appt = datetime.datetime(2012, 12, 15, 9, 37, 11)
+        record.wisdom = 'timing is everything'
+        yo.assertEqual(record.name, 'Ethan')
+        yo.assertEqual(type(record.name), Char)
+        yo.assertTrue(record.born)
+        yo.assertTrue(record.born is Truth)
+        yo.assertEqual(record.married, datetime.date(2001, 6, 27))
+        yo.assertEqual(type(record.married), Date)
+        yo.assertEqual(record.appt, datetime.datetime(2012, 12, 15, 9, 37, 11))
+        yo.assertEqual(type(record.appt), DateTime)
+        yo.assertEqual(record.wisdom, 'timing is everything')
+        yo.assertEqual(type(record.wisdom), Char)
+        record.name = Char()
+        record.born = Falsth
+        record.married = NullDate
+        record.appt = NullTime
+        record.wisdom = Char()
+        yo.assertEqual(record.name, '')
+        yo.assertEqual(type(record.name), Char)
+        yo.assertFalse(record.born)
+        yo.assertTrue(record.born is Falsth)
+        yo.assertTrue(record.married is NullDate)
+        yo.assertTrue(record.appt is NullDateTime)
+        yo.assertEqual(record.wisdom, '')
+        yo.assertEqual(type(record.wisdom), Char)
+        record.name = None
+        record.born = None
+        record.married = None
+        record.appt = None
+        record.wisdom = None
+        yo.assertEqual(record.name, '')
+        yo.assertEqual(type(record.name), Char)
+        yo.assertFalse(record.born)
+        yo.assertTrue(record.born is Unknown)
+        yo.assertTrue(record.married is NullDate)
+        yo.assertTrue(record.appt is NullDateTime)
+        yo.assertEqual(record.wisdom, '')
+        yo.assertEqual(type(record.wisdom), Char)
 
 class Test_Dbf_Functions(unittest.TestCase):
     def setUp(yo):
         "create a dbf and vfp table"
-        yo.dbf_table = table = dbf.Table(
+        yo.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
             'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
             )
@@ -1067,7 +1256,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             desclist.append(desc)
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
 
-        yo.vfp_table = table = dbf.Table(
+        yo.vfp_table = table = Table(
                 os.path.join(tempdir, 'tempvfp'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
                 ' weight F(18,3); age I; meeting T; misc G; photo P',
@@ -1132,7 +1321,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         desclist = yo.dbf_desclist
         table.delete_fields('name')
         table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         for field in table.field_names:
             yo.assertEqual(1, table.field_names.count(field))
         i = 0
@@ -1344,14 +1533,14 @@ class Test_Dbf_Functions(unittest.TestCase):
 
     def test04(yo):
         "basic function tests - top, bottom, next, prev, current, goto, delete, undelete"
-        table = dbf.Table(':memory:', 'name C(10)', dbf_type='db3')
-        yo.assertRaises(dbf.Bof, table.current)
+        table = Table(':memory:', 'name C(10)', dbf_type='db3')
+        yo.assertRaises(Bof, table.current)
         table.append()
         yo.assertEqual(table.current(), table[0])
-        table = dbf.Table(':memory:', 'name C(10)', dbf_type='db3')
+        table = Table(':memory:', 'name C(10)', dbf_type='db3')
         table.append(multiple=10)
         yo.assertEqual(table.current(), table[0])
-        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         total = len(table)
         table.bottom()
         yo.assertEqual(table.record_number, total)
@@ -1366,16 +1555,16 @@ class Test_Dbf_Functions(unittest.TestCase):
         yo.assertRaises(IndexError, table.goto, total)
         yo.assertRaises(IndexError, table.goto, -len(table)-1)
         table.top()
-        yo.assertRaises(dbf.Bof, table.prev)
+        yo.assertRaises(Bof, table.prev)
         table.bottom()
-        yo.assertRaises(dbf.Eof, table.next)
+        yo.assertRaises(Eof, table.next)
         for record in table:
             record.delete_record().write_record()
         table.use_deleted = False
         table.top()
-        yo.assertRaises(dbf.Eof, table.next)
+        yo.assertRaises(Eof, table.next)
         table.bottom()
-        yo.assertRaises(dbf.Bof, table.prev)
+        yo.assertRaises(Bof, table.prev)
         table.use_deleted = True
         for record in table:
             record.undelete_record().write_record()
@@ -1397,7 +1586,7 @@ class Test_Dbf_Functions(unittest.TestCase):
 
         # check that deletes were saved to disk..
         table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         i = 0
         for record in table:
             yo.assertEqual(record.has_been_deleted, i%3==0)
@@ -1431,10 +1620,10 @@ class Test_Dbf_Functions(unittest.TestCase):
         for record in table:
             record.delete_record().write_record()
         table.bottom()
-        yo.assertRaises(dbf.Eof, table.next)
+        yo.assertRaises(Eof, table.next)
         yo.assertEqual(table.eof(), True)
         table.top()
-        yo.assertRaises(dbf.Bof, table.prev)
+        yo.assertRaises(Bof, table.prev)
         yo.assertEqual(table.bof(), True)
 
         # verify deleted records are seen when .use_deleted is True
@@ -1568,7 +1757,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             newrecord.write_record()
         table2.close()
         table2 = None
-        table2 = dbf.Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
+        table2 = Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
         for i in range(len(table)):
             dict1 = table[i].scatter_fields()
             dict2 = table2[i].scatter_fields()
@@ -1602,7 +1791,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             yo.assertEqual(oldfield in table, False)
             yo.assertEqual('newfield' in table, True)
             table.close()
-            table = dbf.Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+            table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
             yo.assertEqual(oldfield in table, False)
             yo.assertEqual('newfield' in table, True)
             table.rename_field('newfield', oldfield)
@@ -1628,7 +1817,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                 if not table2.is_memotype(field):
                     yo.assertEqual(newrecord[field], record[field])
         table2.close()
-        table2 = dbf.Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
+        table2 = Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
         for i in range(len(table)):
             dict1 = table[i].scatter_fields()
             dict2 = table2[i].scatter_fields()
@@ -1656,7 +1845,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             for field in record.field_names:
                 yo.assertEqual(record[field], samerecord[field])
         table2.close()
-        table2 = dbf.Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
+        table2 = Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
         for samerecord in table2:
             for field in record.field_names:
                 yo.assertEqual(record[field], samerecord[field])
@@ -1671,7 +1860,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                 #else:
                     yo.assertEqual(record[field], samerecord[field])
         table3.close()
-        table3 = dbf.Table(os.path.join(tempdir, 'temptable3'), dbf_type='db3')
+        table3 = Table(os.path.join(tempdir, 'temptable3'), dbf_type='db3')
         for samerecord in table3:
             for field in record.field_names:
                 #if table3.is_memotype(field):
@@ -1718,36 +1907,36 @@ class Test_Dbf_Functions(unittest.TestCase):
         yo.assertNotEqual(table[0].name, table[1].name)
     def test12(yo):
         "adding memos to existing records"
-        table = dbf.Table(':memory:', 'name C(50); age N(3,0)', dbf_type='db3')
+        table = Table(':memory:', 'name C(50); age N(3,0)', dbf_type='db3')
         table.append(('user', 0))
         table.add_fields('motto M')
         table[0].write_record(motto='Are we there yet??')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='db3')
-        table.append(('user', 0))
-        table.close()
-        table.open()
-        table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
-        table.add_fields('motto M')
-        table[0].write_record(motto='Are we there yet??')
-        yo.assertEqual(table[0].motto, 'Are we there yet??')
-        table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
-        yo.assertEqual(table[0].motto, 'Are we there yet??')
-        table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='vfp')
+        table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='db3')
         table.append(('user', 0))
         table.close()
         table.open()
         table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
+        table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
         table.add_fields('motto M')
         table[0].write_record(motto='Are we there yet??')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
-        table = dbf.Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
+        table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
+        yo.assertEqual(table[0].motto, 'Are we there yet??')
+        table.close()
+        table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='vfp')
+        table.append(('user', 0))
+        table.close()
+        table.open()
+        table.close()
+        table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
+        table.add_fields('motto M')
+        table[0].write_record(motto='Are we there yet??')
+        yo.assertEqual(table[0].motto, 'Are we there yet??')
+        table.close()
+        table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
         yo.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
     def test13(yo):
@@ -1810,7 +1999,7 @@ class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"
     def setUp(yo):
         "create a dbf and vfp table"
-        yo.dbf_table = table = dbf.Table(
+        yo.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
             'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
             )
@@ -1881,7 +2070,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         "keys"
         table1 = yo.dbf_table
         field = table1.field_names[0]
-        list1 = dbf.List(table1, key=lambda rec: rec[field])
+        list1 = List(table1, key=lambda rec: rec[field])
         unique = set()
         for rec in table1:
             unique.add(rec[field])

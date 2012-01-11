@@ -352,7 +352,7 @@ class DoNotIndex(DbfWarning):
     def __init__(yo):
         DbfWarning.__init__(yo, yo.message)
 # wrappers around datetime and logical objects to allow null values
-class Null(object):
+class NullType(object):
     "Null object -- any interaction returns Null"
     def _null(self, *args, **kwargs):
         return self
@@ -384,6 +384,8 @@ class Null(object):
         def __hash__(yo):
             raise TypeError("unhashable type: 'Null'")
 
+    def __new__(cls):
+        return cls.null
     def __nonzero__(yo):
         return False
     def __repr__(yo):
@@ -394,7 +396,8 @@ class Null(object):
         return None
     def __str__(yo):
         return ''
-Null = object.__new__(Null)
+NullType.null = object.__new__(NullType)
+Null = NullType()
 
 class Char(str):
     "adds null capable str constructs"
@@ -947,37 +950,40 @@ NullTime = Time()
 
 class Logical(object):
     "return type for Logical fields; implements boolean algebra"
-    "can be equal to True, False, or None"
+    "can be equal take the values of True, False, or None/Null"
+    _debug = False
     def A(x, y):
         "OR (disjunction): x | y => True iff at least one of x, y is True"
-        if not isinstance(y, (x.__class__, bool, type(None))):
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is None or y == None:
-            return x.unknown
-        elif x.value is True or y == True:
+        if x.value is True or y == True:
             return x.true
-        return x.false
+        elif x.value is False and y == False:
+            return x.false
+        return x.unknown
     def _C_material(x, y):
         "IMP (material implication) x >> y => False iff x == True and y == False"
-        if not isinstance(y, (x.__class__, bool, type(None))):
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is None or y == None:
-            return x.unknown
-        elif y == False and x.value is True:
-            return x.false
-        return x.true
+        if (x.value is False
+        or (x.value is True and y == True)):
+            return x.true
+        elif x.value is True and y == False:
+            return False
+        return x.unknown
     def _C_material_reversed(y, x):
         "IMP (material implication) x >> y => False iff x = True and y = False"
-        if not isinstance(x, (y.__class__, bool, type(None))):
+        if not isinstance(x, (y.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x == None or y.value is None:
-            return y.unknown
+        if (x == False
+        or (x == True and y.value is True)):
+            return y.true
         elif x == True and y.value is False:
             return y.false
-        return y.true
+        return y.unknown
     def _C_relevant(x, y):
         "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if x is False"
-        if not isinstance(y, (x.__class__, bool, type(None))):
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if x.value is True and y == True:
             return x.true
@@ -986,53 +992,65 @@ class Logical(object):
         return x.unknown
     def _C_relevant_reversed(y, x):
         "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if y is False"
-        if not isinstance(x, (y.__class__, bool, type(None))):
+        if not isinstance(x, (y.__class__, bool, NullType, type(None))):
             return NotImplemented
         if x == True and y.value is True:
             return y.true
-        if  x == True and y.value is False:
+        if x == True and y.value is False:
             return y.false
         return y.unknown
     def D(x, y):
         "NAND (negative AND) x.D(y): False iff x and y are both True"
-        if not isinstance(y, (x.__class__, bool, type(None))):
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is None or y == None:
-            return x.unknown
+        if x.value is False or y == False:
+            return x.true
         elif x.value is True and y == True:
             return x.false
-        return x.true
+        return x.unknown
     def E(x, y):
         "EQV (equivalence) x.E(y): True iff x and y are the same"
-        if not isinstance(y, (x.__class__, bool, type(None))):
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is None or y == None:
-            return x.unknown
-        elif y == True:
-            return (x.false, x.true)[x]
-        elif y == False:
-            return (x.true, x.false)[x]
+        elif (
+            (x.value is True and y == True)
+            or
+            (x.value is False and y == False)
+            ):
+            return x.true
+        elif (
+            (x.value is True and y == False)
+            or
+            (x.value is False and y == True)
+            ):
+            return x.false
+        return x.unknown
     def J(x, y):
         "XOR (parity) x ^ y: True iff only one of x,y is True"
-        if not isinstance(y, (x.__class__, bool, type(None))):
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is None or y == None:
-            return x.unknown
-        elif (y == True and x == False
-            or y == False and x == True):
+        if (
+            (x.value is True and y == False)
+            or
+            (x.value is False and y == True)
+            ):
             return x.true
-        return x.false
+        if (
+            (x.value is False and y == False)
+            or
+            (x.value is True and y == True)
+            ):
+            return x.false
+        return x.unknown
     def K(x, y):
         "AND (conjunction) x & y: True iff both x, y are True"
-        if not isinstance(y, (x.__class__, bool, type(None))):
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is None or y == None:
-            return x.unknown
-        elif y == True and x == True:
+        if x.value is True and y == True:
             return x.true
-        return x.false
-
-
+        elif x.value is False or y == False:
+            return x.false
+        return x.unknown
     def N(x):
         "NEG (negation) -x: True iff x = False"
         if x is x.true:
@@ -1055,25 +1073,35 @@ class Logical(object):
             cls.__rshift__ = cls._C_relevant
             cls.__rrshift__ = cls._C_relevant_reversed
     def __new__(cls, value=None):
-        if value is None:
+        if value is None or value is Null:
             return cls.unknown
         elif isinstance(value, (str, unicode)):
             if value.lower() in ('t','true','y','yes','on'):
                 return cls.true
             elif value.lower() in ('f','false','n','no','off'):
                 return cls.false
-            elif value.lower() in ('?','unknown','null','none',' '):
+            elif value.lower() in ('?','unknown','null','none',' ',''):
                 return cls.unknown
             else:
                 raise ValueError('unknown value for Logical: %s' % value)
         else:
             return (cls.false, cls.true)[bool(value)]
     def __eq__(x, y):
-        if isinstance(y, (bool, type(None))):
-            return x.__class__(x.value == y)
-        if isinstance(y, x.__class__):
-            return x.__class__(x.value == y.value)
-        return NotImplemented
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
+            return NotImplemented
+        if (
+            (x.value is True and y == True)
+            or
+            (x.value is False and y == False)
+            ):
+            return x.true
+        elif (
+            (x.value is True and y == False)
+            or
+            (x.value is False and y == True)
+            ):
+            return x.false
+        return x.unknown
     def __hash__(x):
         return hash(x.value)
     def __index__(x):
@@ -1084,13 +1112,23 @@ class Logical(object):
         if x.value is None:
             return 2
     def __ne__(x, y):
-        if isinstance(y, (bool, type(None))):
-            return x.__class__(x.value != y)
-        if isinstance(y, x.__class__):
-            return x.__class__(x.value != y.value)
-        return NotImplemented
+        if not isinstance(y, (x.__class__, bool, NullType, type(None))):
+            return NotImplemented
+        if (
+            (x.value is True and y == False)
+            or
+            (x.value is False and y == True)
+            ):
+            return x.true
+        elif (
+            (x.value is True and y == True)
+            or
+            (x.value is False and y == False)
+            ):
+            return x.false
+        return x.unknown
     def __nonzero__(x):
-        return x.value == True
+        return x.value is True
     def __repr__(x):
         return "Logical(%r)" % x.string
     def __str__(x):
@@ -1679,12 +1717,12 @@ def retrieveLogical(bytes, fielddef={}, memo=None):
     return typ(bytes)
 def updateLogical(data, fielddef={}, memo=None):
     "Returns 'T' if logical is True, 'F' if False, '?' otherwise"
-    if data == None:
-        return '?'
-    elif data == True:
+    if data == True:
         return 'T'
     elif data == False:
         return 'F'
+    elif data is Unknown or data is None:
+        return '?'
     raise ValueError("unable to automatically coerce %r to Logical" % data)
 def retrieveMemo(bytes, fielddef, memo):
     "Returns the block of data from a memo file"

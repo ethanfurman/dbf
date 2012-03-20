@@ -150,7 +150,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 90, 1)
+version = (0, 90, 3)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -189,7 +189,7 @@ __metaclass__ = type
 LOGICAL_BAD_IS_FALSE = True # if bad data in logical fields, return False? (else raise error)
 
 input_decoding = locale.getdefaultlocale()[1]    # treat non-unicode data as ...
-default_codepage = input_decoding  # if no codepage specified on dbf creation, use this
+default_codepage = input_decoding or 'ascii'     # if no codepage specified on dbf creation, use this
 temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TEMP") or ""
 
 default_type = 'db3'    # default format if none specified
@@ -322,6 +322,9 @@ class DataOverflow(DbfError):
         yo.data = data
 class BadData(DbfError):
     "bad data in table"
+    def __init__(yo, message, data=None):
+        DbfError.__init__(yo, message)
+        yo.data = data
 class FieldMissing(KeyError, DbfError):
     "Field does not exist in table"
     def __init__(yo, fieldname):
@@ -949,116 +952,115 @@ Time._null_time._time = None
 NullTime = Time()
 
 class Logical(object):
-    "return type for Logical fields; implements boolean algebra"
-    "can be equal take the values of True, False, or None/Null"
+    """return type for Logical fields; implements boolean algebra
+    can take the values of True, False, or None/Null"""
     _debug = False
     def A(x, y):
         "OR (disjunction): x | y => True iff at least one of x, y is True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is True or y == True:
+        if x.value is True or y is not Unknown and y == True:
             return x.true
-        elif x.value is False and y == False:
+        elif x.value is False and y is not Unknown and y == False:
             return x.false
-        return x.unknown
+        return Unknown
     def _C_material(x, y):
         "IMP (material implication) x >> y => False iff x == True and y == False"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (x.value is False
-        or (x.value is True and y == True)):
+            or (x.value is True and y is not Unknown and y == True)):
             return x.true
-        elif x.value is True and y == False:
+        elif x.value is True and y is not Unknown and y == False:
             return False
-        return x.unknown
+        return Unknown
     def _C_material_reversed(y, x):
         "IMP (material implication) x >> y => False iff x = True and y = False"
         if not isinstance(x, (y.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if (x == False
-        or (x == True and y.value is True)):
+        if (x is not Unknown and x == False
+            or (x is not Unknown and x == True and y.value is True)):
             return y.true
-        elif x == True and y.value is False:
+        elif x is not Unknown and x == True and y.value is False:
             return y.false
-        return y.unknown
+        return Unknown
     def _C_relevant(x, y):
         "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if x is False"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is True and y == True:
+        if x.value is True and y is not Unknown and y == True:
             return x.true
-        if x.value is True and y == False:
+        if x.value is True and y is not Unknown and y == False:
             return x.false
-        return x.unknown
+        return Unknown
     def _C_relevant_reversed(y, x):
         "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if y is False"
         if not isinstance(x, (y.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x == True and y.value is True:
+        if x is not Unknown and x == True and y.value is True:
             return y.true
-        if x == True and y.value is False:
+        if x is not Unknown and x == True and y.value is False:
             return y.false
-        return y.unknown
+        return Unknown
     def D(x, y):
         "NAND (negative AND) x.D(y): False iff x and y are both True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is False or y == False:
+        if x.value is False or y is not Unknown and y == False:
             return x.true
-        elif x.value is True and y == True:
+        elif x.value is True and y is not Unknown and y == True:
             return x.false
-        return x.unknown
+        return Unknown
     def E(x, y):
         "EQV (equivalence) x.E(y): True iff x and y are the same"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         elif (
-            (x.value is True and y == True)
+            (x.value is True and y is not Unknown and y == True)
             or
-            (x.value is False and y == False)
+            (x.value is False and y is not Unknown and y == False)
             ):
             return x.true
         elif (
-            (x.value is True and y == False)
+            (x.value is True and y is not Unknown and y == False)
             or
-            (x.value is False and y == True)
+            (x.value is False and y is not Unknown and y == True)
             ):
             return x.false
-        return x.unknown
+        return Unknown
     def J(x, y):
         "XOR (parity) x ^ y: True iff only one of x,y is True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (
-            (x.value is True and y == False)
+            (x.value is True and y is not Unknown and y == False)
             or
-            (x.value is False and y == True)
+            (x.value is False and y is not Unknown and y == True)
             ):
             return x.true
         if (
-            (x.value is False and y == False)
+            (x.value is False and y is not Unknown and y == False)
             or
-            (x.value is True and y == True)
+            (x.value is True and y is not Unknown and y == True)
             ):
             return x.false
-        return x.unknown
+        return Unknown
     def K(x, y):
         "AND (conjunction) x & y: True iff both x, y are True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is True and y == True:
+        if x.value is True and y is not Unknown and y == True:
             return x.true
-        elif x.value is False or y == False:
+        elif x.value is False or y is not Unknown and y == False:
             return x.false
-        return x.unknown
+        return Unknown
     def N(x):
         "NEG (negation) -x: True iff x = False"
         if x is x.true:
             return x.false
         elif x is x.false:
             return x.true
-        else:
-            return x.unknown
+        return Unknown
     @classmethod
     def set_implication(cls, method):
         "sets IMP to material or relevant"
@@ -1090,18 +1092,18 @@ class Logical(object):
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (
-            (x.value is True and y == True)
+            (x.value is True and y is not Unknown and y == True)
             or
-            (x.value is False and y == False)
+            (x.value is False and y is not Unknown and y == False)
             ):
             return x.true
         elif (
-            (x.value is True and y == False)
+            (x.value is True and y is not Unknown and y == False)
             or
-            (x.value is False and y == True)
+            (x.value is False and y is not Unknown and y == True)
             ):
             return x.false
-        return x.unknown
+        return Unknown
     def __hash__(x):
         return hash(x.value)
     def __index__(x):
@@ -1115,19 +1117,21 @@ class Logical(object):
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (
-            (x.value is True and y == False)
+            (x.value is True and y is not Unknown and y == False)
             or
-            (x.value is False and y == True)
+            (x.value is False and y is not Unknown and y == True)
             ):
             return x.true
         elif (
-            (x.value is True and y == True)
+            (x.value is True and y is not Unknown and y == True)
             or
-            (x.value is False and y == False)
+            (x.value is False and y is not Unknown and y == False)
             ):
             return x.false
-        return x.unknown
+        return Unknown
     def __nonzero__(x):
+        if x is Unknown:
+            raise TypeError('True/False value of %r is unknown' % x)
         return x.value is True
     def __repr__(x):
         return "Logical(%r)" % x.string
@@ -1207,7 +1211,10 @@ class _DbfRecord(object):
             if not isinstance(value, unicode):
                 if yo._layout.input_decoder is None:
                     raise NonUnicode("String not in unicode format, no default encoding specified")
-                value = yo._layout.input_decoder(value)[0]     # input ascii => unicode
+                try:
+                    value = yo._layout.input_decoder(value)[0]     # input ascii => unicode
+                except Exception, exc:
+                    raise BadData(exc.message)
             value = yo._layout.encoder(value)[0]           # unicode => table ascii
         bytes = array('c', update(value, fielddef, yo._layout.memo))
         size = fielddef['length']
@@ -1308,9 +1315,11 @@ class _DbfRecord(object):
         try:
             yo._updateFieldValue(index, name, value)
         except DbfError, error:
-            error.message = "field --%s-- is %s -> %s" % (name, yo._layout.fieldtypes[fielddef['type']]['Type'], error.message)
-            error.data = name
-            raise
+            fielddef = yo._layout[name]
+            message = "%s (%s) = %r --> %s" % (name, yo._layout.fieldtypes[fielddef['type']]['Type'], value, error.message)
+            data = name
+            err_cls = error.__class__
+            raise err_cls(message, data)
     def __setitem__(yo, name, value):
         if isinstance(name, (str, unicode)):
             yo.__setattr__(name, value)
@@ -1640,7 +1649,7 @@ def retrieveCharacter(bytes, fielddef={}, memo=None):
             print
             print repr(cls)
             raise
-    return fielddef['class'](data)
+    return data
 def updateCharacter(string, fielddef, memo=None):
     "returns the string"
     if string == None:
@@ -1717,12 +1726,12 @@ def retrieveLogical(bytes, fielddef={}, memo=None):
     return typ(bytes)
 def updateLogical(data, fielddef={}, memo=None):
     "Returns 'T' if logical is True, 'F' if False, '?' otherwise"
+    if data is Unknown or data is None or data is Null:
+        return '?'
     if data == True:
         return 'T'
-    elif data == False:
+    if data == False:
         return 'F'
-    elif data is Unknown or data is None:
-        return '?'
     raise ValueError("unable to automatically coerce %r to Logical" % data)
 def retrieveMemo(bytes, fielddef, memo):
     "Returns the block of data from a memo file"
@@ -1730,7 +1739,7 @@ def retrieveMemo(bytes, fielddef, memo):
     if not stringval:
         return fielddef['empty']()
     block = int(stringval)
-    return fielddef['class'](memo.get_memo(block, fielddef))
+    return memo.get_memo(block, fielddef)
 def updateMemo(string, fielddef, memo):
     "Writes string as a memo, returns the block number it was saved into"
     if string == None:
@@ -2668,7 +2677,11 @@ class DbfTable(object):
                 newrecord.gather_fields(dictdata, drop=drop)
             elif tupledata:
                 for index, item in enumerate(tupledata):
-                    newrecord[index] = item
+                    try:
+                        newrecord[index] = item
+                    except IndexError, exc:
+                        raise DbfError("table %s has %d fields, incoming data has %d fields" %
+                            (yo.filename, len(newrecord), len(tupledata)))
             elif kamikaze == str:
                 for field in yo._meta.memofields:
                     newrecord[field] = ''
@@ -3947,6 +3960,8 @@ class Index(object):
             if start is None: start = 0
             if stop is None: stop = len(yo._rec_by_val)
             if step is None: step = 1
+            if step < 0:
+                start, stop = stop - 1, -(stop - start + 1)
             for loc in range(start, stop, step):
                 record = yo._table.get_record(yo._rec_by_val[loc])
                 result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))

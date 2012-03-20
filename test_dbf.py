@@ -9,14 +9,11 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 90, 1):
+if dbf.version != (0, 90, 3):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
-    print "\nTesting dbf version %s on %s with Python %s\n" % (
-        '.'.join([str(x) for x in dbf.version]),
-        sys.platform,
-        sys.version,
-        )
+    print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
+        dbf.version + (sys.platform, sys.version) )
     # 2.5 constructs
 
 try:
@@ -1201,6 +1198,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         yo.assertTrue(record.name is None)
         yo.assertTrue(record.born is False)
     def test15(yo):
+        "NullType"
         from pprint import pprint
         table = Table(
             filename=':memory:',
@@ -1252,12 +1250,19 @@ class Test_Dbf_Creation(unittest.TestCase):
         record.wisdom = None
         yo.assertEqual(record.name, '')
         yo.assertEqual(type(record.name), Char)
-        yo.assertFalse(record.born)
+        yo.assertRaises(TypeError, bool, record.born)
         yo.assertTrue(record.born is Unknown)
         yo.assertTrue(record.married is NullDate)
         yo.assertTrue(record.appt is NullDateTime)
         yo.assertEqual(record.wisdom, '')
         yo.assertEqual(type(record.wisdom), Char)
+
+    def test16(self):
+        "check non-ascii text"
+        table = Table('main')
+        for record in table:
+            record.scatter_fields()
+
 
 class Test_Dbf_Functions(unittest.TestCase):
     def setUp(yo):
@@ -1715,6 +1720,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         ordered = unordered[:]
         ordered.sort()
         name_index = table.create_index(lambda rec: rec.name)
+        yo.assertEqual(list(name_index[::-1]), list(reversed(name_index)))
         #table.index(sort=(('name', ), ))
         i = 0
         for record in name_index:
@@ -1735,6 +1741,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         ordered = unordered[:]
         ordered.sort()
         nd_index = table.create_index(lambda rec: (rec.name, rec.desc))
+        yo.assertEqual(list(nd_index[::-1]), list(reversed(nd_index)))
         #table.index(sort=(('name', ), ('desc', lambda x: x[10:20])))
         i = 0
         for record in nd_index:
@@ -1755,6 +1762,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         ordered = unordered[:]
         ordered.sort()
         qty_index = table.create_index(lambda rec: rec.qty)
+        yo.assertEqual(list(qty_index[::-1]), list(reversed(qty_index)))
         #table.index(sort=(('qty', ), ))
         i = 0
         for record in qty_index:

@@ -1,0 +1,41 @@
+dbf.py is a pure Python library that provides access to dBase III, Foxpro, and
+Visual Foxpro database tables.
+
+It does not currently support index files, auto-incrementing fields, and
+Varchar fields.
+
+Unicode is always returned.
+
+Helper classes include
+  - Logical: a tri-state boolean
+  - Char: auto-trims trailing-whitespace, and trailing-whitespace insenstive
+          compares
+  - Index: in-memory index of table
+  - List: list-like structure that leaves records on disk until needed
+
+
+sample table & data:
+
+  sample = dbf.table('/temp/sample'; "name C(30), age N(3,0); wisdom M")
+
+  record = sample.append()
+  record['name'] = 'Ethan'
+  record['age'] = 37
+  record['wisdom'] = 'Python rules!'
+
+  record = {'name':'Allen', 'age':51, 'wisdom':'code smarter, not harder'}
+  sample.append(record)
+
+  sample.append()
+  record = sample[-1]
+  record.name = 'Alexis'
+  record.age = 29
+  record.wisdom = 'take a break!  refresh the little grey cells!'
+
+retrieving data to store it somewhere else:
+  source = dbf.table('/some/path/to/file.dbf')
+  for record in source:
+    data = record.scatterFields()   # creates dictionary {fieldname:value, fieldname:value, ...}
+    data = list(record)             # creates list of values in field order
+    # do something with the data
+

@@ -150,7 +150,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 90, 3)
+version = (0, 90, 5)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -2208,26 +2208,8 @@ class DbfTable(object):
             if yo._meta.memo is None:
                 yo._meta.memo = yo._memoClass(yo._meta)
     def _checkMemoIntegrity(yo):
-        "dBase III specific"
-        if yo._meta.header.version == '\x83':
-            try:
-                yo._meta.memo = yo._memoClass(yo._meta)
-            except:
-                yo._meta.dfd.close()
-                yo._meta.dfd = None
-                raise
-        if not yo._meta.ignorememos:
-            for field in yo._meta.fields:
-                if yo._meta[field]['type'] in yo._memotypes:
-                    if yo._meta.header.version != '\x83':
-                        yo._meta.dfd.close()
-                        yo._meta.dfd = None
-                        raise DbfError("Table structure corrupt:  memo fields exist, header declares no memos")
-                    elif not os.path.exists(yo._meta.memoname):
-                        yo._meta.dfd.close()
-                        yo._meta.dfd = None
-                        raise DbfError("Table structure corrupt:  memo fields exist without memo file")
-                    break
+        "memory memos are simple dicts"
+        pass
     def _initializeFields(yo):
         "builds the FieldList of names, types, and descriptions from the disk file"
         old_fields = defaultdict(dict)
@@ -2414,7 +2396,7 @@ class DbfTable(object):
         meta.decimal_fields = yo._decimal_fields
         meta.numeric_fields = yo._numeric_fields
         meta.memotypes = yo._memotypes
-        meta.ignorememos = ignore_memos
+        meta.ignorememos = meta.original_ignorememos = ignore_memos
         meta.memo_size = memo_size
         meta.input_decoder = codecs.getdecoder(input_decoding)      # from ascii to unicode
         meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
@@ -2757,6 +2739,7 @@ class DbfTable(object):
                 yo._meta_only = True
         if yo._meta.mfd is not None:
             if not keep_memos:
+                yo._meta.original_ignorememos = yo._meta.ignorememos
                 yo._meta.ignorememos = True
             else:
                 memo_fields = []
@@ -3007,6 +2990,7 @@ class DbfTable(object):
             raise DbfError("corrupt field structure in header")
         header.fields = fieldblock[:fieldend]
         header.extra = fieldblock[fieldend+1:]  # skip trailing \r
+        yo._meta.ignorememos = yo._meta.original_ignorememos
         yo._initializeFields()
         yo._checkMemoIntegrity()
         meta.current = -1

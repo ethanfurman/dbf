@@ -9,7 +9,7 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 90, 3):
+if dbf.version != (0, 90, 5):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -2030,6 +2030,21 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.resize_field('name', 40)
         new_record = table[5].scatter_fields()
         yo.assertEqual(test_record['orderdate'], new_record['orderdate'])
+    def test15(yo):
+        "memos available after close/open"
+        table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
+        table.append(('Author','dashing, debonair, delightful'))
+        table.close()
+        table.open()
+        yo.assertEqual(tuple(table[0]), ('Author','dashing, debonair, delightful'))
+        table.close()
+        table2 = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3')
+        table2.append(('Benedict', 'brilliant, bombastic, bothered'))
+        table2.close()
+        table.open()
+        yo.assertEqual(table[0].name, 'Benedict')
+        yo.assertEqual(table[0].desc, 'brilliant, bombastic, bothered')
+
 
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"

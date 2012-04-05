@@ -2739,7 +2739,6 @@ class DbfTable(object):
                 yo._meta_only = True
         if yo._meta.mfd is not None:
             if not keep_memos:
-                yo._meta.original_ignorememos = yo._meta.ignorememos
                 yo._meta.ignorememos = True
             else:
                 memo_fields = []

@@ -9,7 +9,7 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 90, 5):
+if dbf.version != (0, 90, 6):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -2044,7 +2044,17 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.open()
         yo.assertEqual(table[0].name, 'Benedict')
         yo.assertEqual(table[0].desc, 'brilliant, bombastic, bothered')
-
+        table.close()
+    def test16(yo):
+        "_(type)_field access as (type)_field"
+        yo.assertEqual(yo.dbf_table.numeric_fields, yo.dbf_table._numeric_fields)
+        yo.assertEqual(yo.vfp_table.numeric_fields, yo.vfp_table._numeric_fields)
+    def test17(yo):
+        "table.type(field) == ('C', Char)"
+        table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
+        yo.assertEqual(table.type('name'), ('C', Char))
+        yo.assertEqual(table.type('name').type, 'C')
+        yo.assertEqual(table.type('name').cls, Char)
 
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"

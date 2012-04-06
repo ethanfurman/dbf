@@ -150,7 +150,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 90, 5)
+version = (0, 90, 6)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -1910,6 +1910,21 @@ def ezip(*iters):
         break
 
 # Public classes
+
+class FieldType(tuple):
+    "tuple with named attributes for representing a fields dbf type and python class"
+    __slots__= ()
+    def __new__(cls, *args):
+        if len(args) != 2:
+            raise TypeError("%s should be called with Type and Class" % cls.__name__)
+        return tuple.__new__(cls, args)
+    @property
+    def type(self):
+        return self[0]
+    @property
+    def cls(self):
+        return self[1]
+
 class DbfTable(object):
     """Provides a framework for dbf style tables."""
     _version = 'basic memory table'
@@ -2341,6 +2356,16 @@ class DbfTable(object):
     def __exit__(yo, *exc_info):
         yo.close()
     def __getattr__(yo, name):
+        if name in (
+                'memotypes',
+                'fixed_fields',
+                'variable_fields',
+                'character_fields',
+                'numeric_fields',
+                'decimal_fields',
+                'currency_fields',
+                ):
+            return getattr(yo, '_'+name)
         if name in ('_table'):
                 if yo._meta.ondisk:
                     yo._table = yo._Table(len(yo), yo._meta)
@@ -3122,9 +3147,9 @@ class DbfTable(object):
                 yo._meta.current = -1
                 raise Bof()
     def type(yo, field):
-        "returns type of field"
+        "returns (dbf type, class) of field"
         if field in yo:
-            return yo._meta[field]['type']
+            return FieldType(yo._meta[field]['type'], yo._meta[field]['class'])
         raise DbfError("%s is not a field in %s" % (field, yo.filename))
     def zap(yo, areyousure=False):
         """removes all records from table -- this cannot be undone!

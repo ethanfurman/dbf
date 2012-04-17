@@ -150,13 +150,13 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 90, 6)
+version = (0, 91, 0)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
         'DbfError', 'DataOverflow', 'FieldMissing', 'NonUnicode',
         'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
-        'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical',
+        'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
         'NullDate', 'NullDateTime', 'NullTime', 
         'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal',
         'guess_table_type', 'table_type',
@@ -369,7 +369,6 @@ class NullType(object):
     __and__ = __iand__ = __rand__ = _null
     __xor__ = __ixor__ = __rxor__ = _null
     __or__ = __ior__ = __ror__ = _null
-    __divmod__ = __rdivmod__ = _null
     __truediv__ = __itruediv__ = __rtruediv__ = _null
     __floordiv__ = __ifloordiv__ = __rfloordiv__ = _null
     __lshift__ = __ilshift__ = __rlshift__ = _null
@@ -813,7 +812,10 @@ class Time(object):
         return nt
     def __add__(yo, other):
         if yo and isinstance(other, (datetime.timedelta)):
-            return Time(yo._time + other)
+            t = yo._time
+            t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
+            t += other
+            return Time(t.hour, t.minute, t.second, t.microsecond)
         else:
             return NotImplemented
     def __eq__(yo, other):
@@ -916,12 +918,12 @@ class Time(object):
         return bool(yo._time)
     __radd__ = __add__
     def __rsub__(yo, other):
-        if yo and isinstance(other, (datetime.time)):
-            return other - yo._time
-        elif yo and isinstance(other, (Time)):
-            return other._time - yo._time
-        elif yo and isinstance(other, (datetime.timedelta)):
-            return Time(other - yo._datetime)
+        if yo and isinstance(other, (Time, datetime.time)):
+            t = yo._time
+            t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
+            other = datetime.datetime(2012, 6, 27, other.hour, other.minute, other.second, other.microsecond)
+            other -= t
+            return other
         else:
             return NotImplemented
     def __repr__(yo):
@@ -934,12 +936,17 @@ class Time(object):
             return yo.isoformat()
         return ""
     def __sub__(yo, other):
-        if yo and isinstance(other, (datetime.time)):
-            return yo._time - other
-        elif yo and isinstance(other, (Time)):
-            return yo._time - other._time
+        if yo and isinstance(other, (Time, datetime.time)):
+            t = yo._time
+            t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
+            o = datetime.datetime(2012, 6, 27, other.hour, other.minute, other.second, other.microsecond)
+            t -= other
+            return Time(t.hour, t.minute, t.second, t.microsecond)
         elif yo and isinstance(other, (datetime.timedelta)):
-            return Time(yo._time - other)
+            t = yo._time
+            t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
+            t -= other
+            return Time(t.hour, t.minute, t.second, t.microsecond)
         else:
             return NotImplemented
     @staticmethod
@@ -952,115 +959,460 @@ Time._null_time._time = None
 NullTime = Time()
 
 class Logical(object):
+    """return type for Logical fields; 
+    can take the values of True, False, or None/Null"""
+    def __add__(x, y):
+        if isinstance(y, type(None)) or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return int(x) + i
+
+    __radd__ = __iadd__ = __add__
+    def __sub__(x, y):
+        if isinstance(y, type(None)) or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return int(x) - i
+    __isub__ = __sub__
+    def __rsub__(y, x):
+        if isinstance(x, type(None)) or x is Unknown or y is Unknown:
+            return Unknown
+        try:
+            i = int(x)
+        except Exception:
+            return NotImplemented
+        return i - int(y)
+    def __mul__(x, y):
+        if x == 0 or y == 0:
+            return 0
+        elif isinstance(y, type(None)) or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return int(x) * i
+    __rmul__ = __imul__ = __mul__
+    def __div__(x, y):
+        if isinstance(y, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return int(x).__div__(i)
+    __idiv__ = __div__
+    def __rdiv__(y, x):
+        if isinstance(x, type(None)) or y == 0 or x is Unknown or y is Unknown:
+            return Unknown
+        try:
+            i = int(x)
+        except Exception:
+            return NotImplemented
+        return i.__div__(int(y))
+    def __truediv__(x, y):
+        if isinstance(y, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return int(x).__truediv__(i)
+    __itruediv__ = __truediv__
+    def __rtruediv__(y, x):
+        if isinstance(x, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(x)
+        except Exception:
+            return NotImplemented
+        return i.__truediv__(int(y))
+    def __floordiv__(x, y):
+        if isinstance(y, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return int(x).__floordiv__(i)
+    __ifloordiv__ = __floordiv__
+    def __rfloordiv__(y, x):
+        if isinstance(x, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(x)
+        except Exception:
+            return NotImplemented
+        return i.__floordiv__(int(y))
+    def __divmod__(x, y):
+        if isinstance(y, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return (Unknown, Unknown)
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return divmod(int(x), i)
+    def __rdivmod__(y, x):
+        if isinstance(x, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return (Unknown, Unknown)
+        try:
+            i = int(x)
+        except Exception:
+            return NotImplemented
+        return divmod(i, int(y))
+    def __mod__(x, y):
+        if isinstance(y, type(None)) or y == 0 or y is Unknown or x is Unknown:
+            return Unknown
+        try:
+            i = int(y)
+        except Exception:
+            return NotImplemented
+        return int(x) % i
+    __imod__ = __mod__
+    def __rmod__(y, x):
+        if isinstance(x, type(None)) or y == 0 or x is Unknown or y is Unknown:
+            return Unknown
+        try:
+            i = int(x)
+        except Exception:
+            return NotImplemented
+        return i % int(y)
+    def __pow__(x, y):
+        if not isinstance(y, (x.__class__, bool, type(None), int)):
+            return NotImplemented
+        if isinstance(y, type(None)) or y is Unknown:
+            return Unknown
+        i = int(y)
+        if i == 0:
+            return 1
+        if x is Unknown:
+            return Unknown
+        return int(x) ** i
+    __ipow__ = __pow__
+    def __rpow__(y, x):
+        if not isinstance(x, (y.__class__, bool, type(None), int)):
+            return NotImplemented
+        if y is Unknown:
+            return Unknown
+        i = int(y)
+        if i == 0:
+            return 1
+        if x is Unknown or isinstance(x, type(None)):
+            return Unknown
+        return int(x) ** i
+    def __lshift__(x, y):
+        if isinstance(y, type(None)) or x is Unknown or y is Unknown:
+            return Unknown
+        return int(x.value) << int(y)
+    __ilshift__ = __lshift__
+    def __rlshift__(y, x):
+        if isinstance(x, type(None)) or x is Unknown or y is Unknown:
+            return Unknown
+        return int(x) << int(y)
+    def __rshift__(x, y):
+        if isinstance(y, type(None)) or x is Unknown or y is Unknown:
+            return Unknown
+        return int(x.value) >> int(y)
+    __irshift__ = __rshift__
+    def __rrshift__(y, x):
+        if isinstance(x, type(None)) or x is Unknown or y is Unknown:
+            return Unknown
+        return int(x) >> int(y)
+    def __neg__(x):
+        "NEG (negation)"
+        if x in (Truth, Falsth):
+            return -x.value
+        return Unknown
+    def __pos__(x):
+        "POS (posation)"
+        if x in (Truth, Falsth):
+            return +x.value
+        return Unknown
+    def __abs__(x):
+        if x in (Truth, Falsth):
+            return abs(x.value)
+        return Unknown
+    def __invert__(x):
+        if x in (Truth, Falsth):
+            return ~x.value
+        return Unknown
+    def __complex__(x):
+        if x.value is None:
+            raise ValueError("unable to return complex() of %r" % x)
+        return complex(x.value)
+    def __int__(x):
+        if x.value is None:
+            raise ValueError("unable to return int() of %r" % x)
+        return int(x.value)
+    def __long__(x):
+        if x.value is None:
+            raise ValueError("unable to return long() of %r" % x)
+        return long(x.value)
+    def __float__(x):
+        if x.value is None:
+            raise ValueError("unable to return float() of %r" % x)
+        return float(x.value)
+    def __oct__(x):
+        if x.value is None:
+            raise ValueError("unable to return oct() of %r" % x)
+        return oct(x.value)
+    def __hex__(x):
+        if x.value is None:
+            raise ValueError("unable to return hex() of %r" % x)
+        return hex(x.value)
+        
+    def __and__(x, y):
+        """AND (conjunction) x & y:
+        True iff both x, y are True
+        False iff at least one of x, y is False
+        Unknown otherwise"""
+        if (isinstance(x, int) and not isinstance(x, bool)) or (isinstance(y, int) and not isinstance(y, bool)):
+            if x == 0 or y == 0:
+                return 0
+            elif x is Unknown or y is Unknown:
+                return Unknown
+            return int(x) & int(y)
+        elif x in (False, Falsth) or y in (False, Falsth):
+            return Falsth
+        elif x in (True, Truth) and y in (True, Truth):
+            return Truth
+        elif isinstance(x, type(None)) or isinstance(y, type(None)) or y is Unknown or x is Unknown:
+            return Unknown
+        return NotImplemented
+    __rand__ = __and__
+    def __or__(x, y):
+        "OR (disjunction): x | y => True iff at least one of x, y is True"
+        if (isinstance(x, int) and not isinstance(x, bool)) or (isinstance(y, int) and not isinstance(y, bool)):
+            if x is Unknown or y is Unknown:
+                return Unknown
+            return int(x) | int(y)
+        elif x in (True, Truth) or y in (True, Truth):
+            return Truth
+        elif x in (False, Falsth) and y in (False, Falsth):
+            return Falsth
+        elif isinstance(x, type(None)) or isinstance(y, type(None)) or y is Unknown or x is Unknown:
+            return Unknown
+        return NotImplemented
+    __ror__ = __or__
+    def __xor__(x, y):
+        "XOR (parity) x ^ y: True iff only one of x,y is True"
+        if (isinstance(x, int) and not isinstance(x, bool)) or (isinstance(y, int) and not isinstance(y, bool)):
+            if x is Unknown or y is Unknown:
+                return Unknown
+            return int(x) ^ int(y)
+        elif x in (True, Truth, False, Falsth) and y in (True, Truth, False, Falsth):
+            return {
+                    (True, True)  : Falsth,
+                    (True, False) : Truth,
+                    (False, True) : Truth,
+                    (False, False): Falsth,
+                   }[(x, y)]
+        elif isinstance(x, type(None)) or isinstance(y, type(None)) or y is Unknown or x is Unknown:
+            return Unknown
+        return NotImplemented
+    __rxor__ = __xor__
+    def __new__(cls, value=None):
+        if value is None or value is Null:
+            return cls.unknown
+        elif isinstance(value, (str, unicode)):
+            if value.lower() in ('t','true','y','yes','on'):
+                return cls.true
+            elif value.lower() in ('f','false','n','no','off'):
+                return cls.false
+            elif value.lower() in ('?','unknown','null','none',' ',''):
+                return cls.unknown
+            else:
+                raise ValueError('unknown value for Logical: %s' % value)
+        else:
+            return (cls.false, cls.true)[bool(value)]
+    def __nonzero__(x):
+        if x is Unknown:
+            raise TypeError('True/False value of %r is unknown' % x)
+        return x.value is True
+    def __eq__(x, y):
+        if isinstance(y, x.__class__):
+            return x.value == y.value
+        elif isinstance(y, (bool, type(None), int)):
+            return x.value == y
+        return NotImplemented
+    def __ge__(x, y):
+        if isinstance(y, type(None)) or x is Unknown or y is Unknown:
+            return x.value == None
+        elif isinstance(y, x.__class__):
+            return x.value >= y.value
+        elif isinstance(y, (bool, int)):
+            return x.value >= y
+        return NotImplemented
+    def __gt__(x, y):
+        if isinstance(y, type(None)) or x is Unknown or y is Unknown:
+            return False
+        elif isinstance(y, x.__class__):
+            return x.value > y.value
+        elif isinstance(y, (bool, int)):
+            return x.value > y
+        return NotImplemented
+    def __le__(x, y):
+        if isinstance(y, type(None)) or x is Unknown or y is Unknown:
+            return x.value == None
+        elif isinstance(y, x.__class__):
+            return x.value <= y.value
+        elif isinstance(y, (bool, int)):
+            return x.value <= y
+        return NotImplemented
+    def __lt__(x, y):
+        if isinstance(y, type(None)) or x is Unknown or y is Unknown:
+            return False
+        elif isinstance(y, x.__class__):
+            return x.value < y.value
+        elif isinstance(y, (bool, int)):
+            return x.value < y
+        return NotImplemented
+    def __ne__(x, y):
+        if isinstance(y, x.__class__):
+            return x.value != y.value
+        elif isinstance(y, (bool, type(None), int)):
+            return x.value != y
+        return NotImplemented
+    def __hash__(x):
+        return hash(x.value)
+    def __index__(x):
+        if x.value is False:
+            return 0
+        elif x.value is True:
+            return 1
+        return 2
+    def __repr__(x):
+        return "Logical(%r)" % x.string
+    def __str__(x):
+        return x.string
+Logical.true = object.__new__(Logical)
+Logical.true.value = True
+Logical.true.string = 'T'
+Logical.false = object.__new__(Logical)
+Logical.false.value = False
+Logical.false.string = 'F'
+Logical.unknown = object.__new__(Logical)
+Logical.unknown.value = None
+Logical.unknown.string = '?'
+Truth = Logical(True)
+Falsth = Logical(False)
+Unknown = Logical()
+
+class Quantum(object):
     """return type for Logical fields; implements boolean algebra
     can take the values of True, False, or None/Null"""
-    _debug = False
     def A(x, y):
         "OR (disjunction): x | y => True iff at least one of x, y is True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is True or y is not Unknown and y == True:
+        if x.value is True or y is not Other and y == True:
             return x.true
-        elif x.value is False and y is not Unknown and y == False:
+        elif x.value is False and y is not Other and y == False:
             return x.false
-        return Unknown
+        return Other
     def _C_material(x, y):
         "IMP (material implication) x >> y => False iff x == True and y == False"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (x.value is False
-            or (x.value is True and y is not Unknown and y == True)):
+            or (x.value is True and y is not Other and y == True)):
             return x.true
-        elif x.value is True and y is not Unknown and y == False:
+        elif x.value is True and y is not Other and y == False:
             return False
-        return Unknown
+        return Other
     def _C_material_reversed(y, x):
         "IMP (material implication) x >> y => False iff x = True and y = False"
         if not isinstance(x, (y.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if (x is not Unknown and x == False
-            or (x is not Unknown and x == True and y.value is True)):
+        if (x is not Other and x == False
+            or (x is not Other and x == True and y.value is True)):
             return y.true
-        elif x is not Unknown and x == True and y.value is False:
+        elif x is not Other and x == True and y.value is False:
             return y.false
-        return Unknown
+        return Other
     def _C_relevant(x, y):
-        "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if x is False"
+        "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Other if x is False"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is True and y is not Unknown and y == True:
+        if x.value is True and y is not Other and y == True:
             return x.true
-        if x.value is True and y is not Unknown and y == False:
+        if x.value is True and y is not Other and y == False:
             return x.false
-        return Unknown
+        return Other
     def _C_relevant_reversed(y, x):
-        "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Unknown if y is False"
+        "IMP (relevant implication) x >> y => True iff both x, y are True, False iff x == True and y == False, Other if y is False"
         if not isinstance(x, (y.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x is not Unknown and x == True and y.value is True:
+        if x is not Other and x == True and y.value is True:
             return y.true
-        if x is not Unknown and x == True and y.value is False:
+        if x is not Other and x == True and y.value is False:
             return y.false
-        return Unknown
+        return Other
     def D(x, y):
         "NAND (negative AND) x.D(y): False iff x and y are both True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is False or y is not Unknown and y == False:
+        if x.value is False or y is not Other and y == False:
             return x.true
-        elif x.value is True and y is not Unknown and y == True:
+        elif x.value is True and y is not Other and y == True:
             return x.false
-        return Unknown
+        return Other
     def E(x, y):
         "EQV (equivalence) x.E(y): True iff x and y are the same"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         elif (
-            (x.value is True and y is not Unknown and y == True)
+            (x.value is True and y is not Other and y == True)
             or
-            (x.value is False and y is not Unknown and y == False)
+            (x.value is False and y is not Other and y == False)
             ):
             return x.true
         elif (
-            (x.value is True and y is not Unknown and y == False)
+            (x.value is True and y is not Other and y == False)
             or
-            (x.value is False and y is not Unknown and y == True)
+            (x.value is False and y is not Other and y == True)
             ):
             return x.false
-        return Unknown
+        return Other
     def J(x, y):
         "XOR (parity) x ^ y: True iff only one of x,y is True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (
-            (x.value is True and y is not Unknown and y == False)
+            (x.value is True and y is not Other and y == False)
             or
-            (x.value is False and y is not Unknown and y == True)
+            (x.value is False and y is not Other and y == True)
             ):
             return x.true
         if (
-            (x.value is False and y is not Unknown and y == False)
+            (x.value is False and y is not Other and y == False)
             or
-            (x.value is True and y is not Unknown and y == True)
+            (x.value is True and y is not Other and y == True)
             ):
             return x.false
-        return Unknown
+        return Other
     def K(x, y):
         "AND (conjunction) x & y: True iff both x, y are True"
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
-        if x.value is True and y is not Unknown and y == True:
+        if x.value is True and y is not Other and y == True:
             return x.true
-        elif x.value is False or y is not Unknown and y == False:
+        elif x.value is False or y is not Other and y == False:
             return x.false
-        return Unknown
+        return Other
     def N(x):
         "NEG (negation) -x: True iff x = False"
         if x is x.true:
             return x.false
         elif x is x.false:
             return x.true
-        return Unknown
+        return Other
     @classmethod
     def set_implication(cls, method):
         "sets IMP to material or relevant"
@@ -1085,25 +1437,25 @@ class Logical(object):
             elif value.lower() in ('?','unknown','null','none',' ',''):
                 return cls.unknown
             else:
-                raise ValueError('unknown value for Logical: %s' % value)
+                raise ValueError('unknown value for Quantum: %s' % value)
         else:
             return (cls.false, cls.true)[bool(value)]
     def __eq__(x, y):
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (
-            (x.value is True and y is not Unknown and y == True)
+            (x.value is True and y is not Other and y == True)
             or
-            (x.value is False and y is not Unknown and y == False)
+            (x.value is False and y is not Other and y == False)
             ):
             return x.true
         elif (
-            (x.value is True and y is not Unknown and y == False)
+            (x.value is True and y is not Other and y == False)
             or
-            (x.value is False and y is not Unknown and y == True)
+            (x.value is False and y is not Other and y == True)
             ):
             return x.false
-        return Unknown
+        return Other
     def __hash__(x):
         return hash(x.value)
     def __index__(x):
@@ -1117,24 +1469,24 @@ class Logical(object):
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
             return NotImplemented
         if (
-            (x.value is True and y is not Unknown and y == False)
+            (x.value is True and y is not Other and y == False)
             or
-            (x.value is False and y is not Unknown and y == True)
+            (x.value is False and y is not Other and y == True)
             ):
             return x.true
         elif (
-            (x.value is True and y is not Unknown and y == True)
+            (x.value is True and y is not Other and y == True)
             or
-            (x.value is False and y is not Unknown and y == False)
+            (x.value is False and y is not Other and y == False)
             ):
             return x.false
-        return Unknown
+        return Other
     def __nonzero__(x):
-        if x is Unknown:
+        if x is Other:
             raise TypeError('True/False value of %r is unknown' % x)
         return x.value is True
     def __repr__(x):
-        return "Logical(%r)" % x.string
+        return "Quantum(%r)" % x.string
     def __str__(x):
         return x.string
     __add__ = A
@@ -1150,19 +1502,19 @@ class Logical(object):
     __rrshift__ = None
     __rxor__ = J
     __xor__ = J
-Logical.true = object.__new__(Logical)
-Logical.true.value = True
-Logical.true.string = 'T'
-Logical.false = object.__new__(Logical)
-Logical.false.value = False
-Logical.false.string = 'F'
-Logical.unknown = object.__new__(Logical)
-Logical.unknown.value = None
-Logical.unknown.string = '?'
-Logical.set_implication('material')
-Truth = Logical(True)
-Falsth = Logical(False)
-Unknown = Logical()
+Quantum.true = object.__new__(Quantum)
+Quantum.true.value = True
+Quantum.true.string = 'Y'
+Quantum.false = object.__new__(Quantum)
+Quantum.false.value = False
+Quantum.false.string = 'N'
+Quantum.unknown = object.__new__(Quantum)
+Quantum.unknown.value = None
+Quantum.unknown.string = '?'
+Quantum.set_implication('material')
+On = Quantum(True)
+Off = Quantum(False)
+Other = Quantum()
 
 # Internal classes
 class _DbfRecord(object):
@@ -1726,7 +2078,7 @@ def retrieveLogical(bytes, fielddef={}, memo=None):
     return typ(bytes)
 def updateLogical(data, fielddef={}, memo=None):
     "Returns 'T' if logical is True, 'F' if False, '?' otherwise"
-    if data is Unknown or data is None or data is Null:
+    if data is Unknown or data is None or data is Null or data is Other:
         return '?'
     if data == True:
         return 'T'
@@ -1912,7 +2264,7 @@ def ezip(*iters):
 # Public classes
 
 class FieldType(tuple):
-    "tuple with named attributes for representing a fields dbf type and python class"
+    "tuple with named attributes for representing a field's dbf type and python class"
     __slots__= ()
     def __new__(cls, *args):
         if len(args) != 2:
@@ -4609,7 +4961,8 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
     extra_fields can be used to add additional fields -- should be normal field specifiers (list)"""
     reader = csv.reader(open(csvfile))
     if field_names:
-        field_names = ['%s M' % fn for fn in field_names]
+        if ' ' not in field_names[0]:
+            field_names = ['%s M' % fn for fn in field_names]
     else:
         field_names = ['f0 M']
     mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size)
@@ -4688,9 +5041,9 @@ class fake_module(object):
         sys.modules["%s.%s" % (__name__, self.name)] = self
 
 fake_module('api',
-    'Table', 'List', 'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical',
-    'NullDate', 'NullDateTime', 'NullTime', 
-    'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal',
+    'Table', 'List', 'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
+    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 
+    'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
     'DbfError', 'DataOverflow', 'FieldMissing', 'NonUnicode',
     'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
     ).register()

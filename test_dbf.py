@@ -2499,9 +2499,9 @@ class Test_Quantum(unittest.TestCase):
 
 class Test_Dbf_Creation(unittest.TestCase):
     "Testing table creation..."
-    def test00(self):
+    def test_exceptions(self):
         "exceptions"
-    def test01(self):
+    def test_dbf_memory_tables(self):
         "dbf tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
@@ -2511,7 +2511,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                 table.close()
                 self.assertEqual(fieldlist, actualFields)
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
-    def test02(self):
+    def test_dbf_disk_tables(self):
         "dbf table on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
@@ -2524,7 +2524,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                 self.assertEqual(fieldlist, actualFields)
                 last_byte = open(table.filename, 'rb').read()[-1]
                 self.assertEqual(last_byte, '\x1a')
-    def test03(self):
+    def test_fp_memory_tables(self):
         "fp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
                   'litres F(11,5)', 'blob G', 'graphic P']
@@ -2534,7 +2534,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                 actualFields = table.structure()
                 table.close()
                 self.assertEqual(fieldlist, actualFields)
-    def test04(self):
+    def test_fp_disk_tables(self):
         "fp tables on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
                   'litres F(11,5)', 'blob G', 'graphic P']
@@ -2546,20 +2546,25 @@ class Test_Dbf_Creation(unittest.TestCase):
                 actualFields = table.structure()
                 table.close()
                 self.assertEqual(fieldlist, actualFields)
-    def test05(self):
+    def test_vfp_memory_tables(self):
         "vfp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
-                  'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P']
+                  'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P',
+                  'menu C(50) binary', 'graduated L null', 'fired D null', 'cipher C(50) nocptrans null',
+                  ]
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
+                fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
-    def test06(self):
+    def test_vfp_disk_tables(self):
         "vfp tables on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
-                  'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P']
+                  'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P',
+                  'menu C(50) binary', 'graduated L null', 'fired D null', 'cipher C(50) nocptrans null',
+                  ]
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'tempvfp'), ';'.join(fieldlist), dbf_type='vfp')
@@ -2567,10 +2572,69 @@ class Test_Dbf_Creation(unittest.TestCase):
                 table = Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
                 actualFields = table.structure()
                 table.close()
+                fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
-    def test07(self):
+class Test_Dbf_Destruction(unittest.TestCase):
+    "Testing __del__ and friends"
+    def setUp(self):
+        self.dbf_table = Table(
+                os.path.join(tempdir, 'dbf_table'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
+                dbf_type='db3',
+                )
+        self.vfp_table = Table(
+                os.path.join(tempdir, 'vfp_table'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y',
+                dbf_type='vfp',
+                )
+
+    def test_autowrite_on_record_destruction(self):
+        "automatically write records on object destruction"
+        table = self.dbf_table
+        table.append({'name':'old boring name'})
+        old_data = table[0].scatter_fields()
+        new_name = table[0].name = '!BRAND NEW NAME!'
+        self.assertEqual(unicode(new_name), table[0].name.strip())
+    def test_autowrite_on_table_close(self):
+        "automatically write records on table close"
+        table = self.dbf_table
+        table.append({'name':'old boring name'})
+        record = table[0]
+        new_name = record.name = '?DIFFERENT NEW NAME?'
+        table.close()
+        table2 = Table(table.filename)
+        self.assertEqual(unicode(new_name), table2[0].name.strip())
+    #def test_autowrite_on_table_destruction(self):
+    #    "automatically write records on table destruction (no close() called)"
+    #    table = self.dbf_table
+    #    name = table.filename
+    #    del self.dbf_table
+    #    record = table.append({'name':'old boring name'})
+    #    new_name = record.name = '-YET ANOTHER NEW NAME-'
+    #    del table
+    #    del record
+    #    table = Table(name)
+    #    self.assertEqual(unicode(new_name), table[0].name.strip())
+
+class Test_Dbf_Records(unittest.TestCase):
+    "Testing adding records"
+    def setUp(self):
+        self.dbf_table = Table(
+                os.path.join(tempdir, 'dbf_table'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
+                dbf_type='db3',
+                )
+        self.vfp_table = Table(
+                os.path.join(tempdir, 'vfp_table'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y',
+                dbf_type='vfp',
+                )
+
+    def test_dbf_adding_records(self):
         "dbf table:  adding records"
-        table = Table(os.path.join(tempdir, 'temptable'), 'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3')
+        table = self.dbf_table
         namelist = []
         paidlist = []
         qtylist = []
@@ -2602,12 +2666,13 @@ class Test_Dbf_Creation(unittest.TestCase):
         orderlist.append(None)
         desclist.append('')
         table.append()
+        self.assertEqual(len(table), len(floats)+1)
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
         table.close()
         last_byte = open(table.filename, 'rb').read()[-1]
         self.assertEqual(last_byte, '\x1a')
-        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = Table(table.filename, dbf_type='db3')
         self.assertEqual(len(table), len(floats)+1)
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
@@ -2639,10 +2704,9 @@ class Test_Dbf_Creation(unittest.TestCase):
         self.assertEqual(record.desc, desclist[i])
         i += 1
         self.assertEqual(i, len(table))
-    def test08(self):
+    def test_vfp_adding_records(self):
         "vfp table:  adding records"
-        table = Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); paid L; qty N(11,5); orderdate D;'
-                ' desc M; mass B; weight F(18,3); age I; meeting T; misc G; photo P; price Y', dbf_type='vfp')
+        table = self.vfp_table
         namelist = []
         paidlist = []
         qtylist = []
@@ -2708,7 +2772,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         pricelist.append(Decimal('0.0'))
         table.append()
         table.close()
-        table = Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
+        table = Table(table.filename, dbf_type='vfp')
         self.assertEqual(len(table), len(floats)+1)
         i = 0
         for record in table[:-1]:
@@ -2761,31 +2825,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         self.assertEqual(record.photo, photolist[i])
         self.assertEqual(table[i].photo, photolist[i])
         i += 1
-    def test09(self):
-        "automatically write records on object destruction"
-        table = Table(os.path.join(tempdir, 'temptable'))
-        old_data = table[0].scatter_fields()
-        new_name = table[0].name = '!BRAND NEW NAME!'
-        self.assertEqual(unicode(new_name), table[0].name.strip())
-    def test10(self):
-        "automatically write records on table close"
-        table = Table(os.path.join(tempdir, 'temptable'))
-        record = table[0]
-        new_name = record.name = '?DIFFERENT NEW NAME?'
-        table.close()
-        del record
-        table.open()
-        self.assertEqual(unicode(new_name), table[0].name.strip())
-    def test11(self):
-        "automatically write records on table destruction (no close() called)"
-        table = Table(os.path.join(tempdir, 'temptable'))
-        record = table[0]
-        new_name = record.name = '-YET ANOTHER NEW NAME-'
-        del table
-        del record
-        table = Table(os.path.join(tempdir, 'temptable'))
-        self.assertEqual(unicode(new_name), table[0].name.strip())
-    def test12(self):
+    def test_empty_is_none(self):
         "empty and None values"
         table = Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
         record = table.append()
@@ -2809,7 +2849,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         self.assertTrue(record.married is None)
         self.assertTrue(record.appt is None)
         self.assertEqual(record.wisdom, '')
-    def test13(self):
+    def test_custom_data_type(self):
         "custom data types"
         table = Table(
             filename=':memory:',
@@ -2850,7 +2890,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         self.assertTrue(record.married is NullDate)
         self.assertTrue(record.appt is NullDateTime)
         self.assertTrue(type(record.wisdom) is Char, "record.wisdom is %r, but should be Char" % type(record.wisdom))
-    def test14(self):
+    def test_datatypes_param(self):
         "field_types with normal data type but None on empty"
         table = Table(
             filename=':memory:',
@@ -2860,9 +2900,9 @@ class Test_Dbf_Creation(unittest.TestCase):
             )
         record = table.append()
         self.assertTrue(type(record.name) is type(None), "record.name is %r, not None" % type(record.name))
-        self.assertTrue(type(record.born) is bool, "record.born is %r, not False" % type(record.born))
+        self.assertTrue(type(record.born) is bool, "record.born is %r, not bool" % type(record.born))
         self.assertTrue(record.name is None)
-        self.assertTrue(record.born is False, "record.born is %r, not Unknown" % record.born)
+        self.assertTrue(record.born is False, "record.born is %r, not False" % record.born)
         record.name = 'Ethan               '
         record.born = True
         self.assertEqual(type(record.name), str, "record.name is %r, but should be Char" % record.wisdom)
@@ -2873,24 +2913,30 @@ class Test_Dbf_Creation(unittest.TestCase):
         record.born = None
         self.assertTrue(record.name is None)
         self.assertTrue(record.born is False)
-    def test15(self):
+    def test_null_type(self):
         "NullType"
         from pprint import pprint
         table = Table(
             filename=':memory:',
-            field_specs='name C(20); born L; married D; appt T; wisdom M',
-            default_data_types=dict(C=Char, L=Logical, D=Date, T=DateTime, M=Char),
+            field_specs='name C(20) null; born L null; married D null; appt T null; wisdom M null',
+            default_data_types=dict(
+                    C=(Char, NoneType, NullType),
+                    L=(Logical, NoneType, NullType),
+                    D=(Date, NoneType, NullType),
+                    T=(DateTime, NoneType, NullType),
+                    M=(Char, NoneType, NullType),
+                    ),
             dbf_type='vfp',
             )
         #print '\n\n', pprint(table._meta.fieldtypes), '\n'
         #print '\n', pprint(table._meta)
         #return
         record = table.append()
-        self.assertEqual(record.name, '')
-        self.assertEqual(record.born is Unknown, True)
-        self.assertEqual(record.married, NullDate)
-        self.assertEqual(record.appt, NullDateTime)
-        self.assertEqual(record.wisdom, '')
+        self.assertEqual(record.name, None)
+        self.assertEqual(record.born, None)
+        self.assertEqual(record.married, None)
+        self.assertEqual(record.appt, None)
+        self.assertEqual(record.wisdom, None)
         record.name = 'Ethan               '
         record.born = True
         record.married = datetime.date(2001, 6, 27)
@@ -2906,38 +2952,66 @@ class Test_Dbf_Creation(unittest.TestCase):
         self.assertEqual(type(record.appt), DateTime)
         self.assertEqual(record.wisdom, 'timing is everything')
         self.assertEqual(type(record.wisdom), Char)
-        record.name = Char()
-        record.born = Falsth
-        record.married = NullDate
-        record.appt = NullTime
-        record.wisdom = Char()
-        self.assertEqual(record.name, '')
-        self.assertEqual(type(record.name), Char)
-        self.assertFalse(record.born)
-        self.assertTrue(record.born is Falsth)
-        self.assertTrue(record.married is NullDate)
-        self.assertTrue(record.appt is NullDateTime)
-        self.assertEqual(record.wisdom, '')
-        self.assertEqual(type(record.wisdom), Char)
+        record.name = Null
+        record.born = Null
+        record.married = Null
+        record.appt = Null
+        record.wisdom = Null
+        self.assertTrue(record.name is Null)
+        self.assertTrue(record.born is Null)
+        self.assertTrue(record.born is Null)
+        self.assertTrue(record.married is Null)
+        self.assertTrue(record.appt is Null)
+        self.assertTrue(record.wisdom is Null)
         record.name = None
         record.born = None
         record.married = None
         record.appt = None
         record.wisdom = None
-        self.assertEqual(record.name, '')
-        self.assertEqual(type(record.name), Char)
-        self.assertRaises(TypeError, bool, record.born)
-        self.assertTrue(record.born is Unknown)
-        self.assertTrue(record.married is NullDate)
-        self.assertTrue(record.appt is NullDateTime)
-        self.assertEqual(record.wisdom, '')
-        self.assertEqual(type(record.wisdom), Char)
+        self.assertTrue(record.name is None)
+        self.assertTrue(record.born is None)
+        self.assertTrue(record.married is None)
+        self.assertTrue(record.appt is None)
+        self.assertTrue(record.wisdom is None)
 
-    def test16(self):
-        "check non-ascii text"
+    def test_nonascii_text_cptrans(self):
+        "check non-ascii text to unicode"
         table = Table('main')
         for record in table:
             record.scatter_fields()
+
+    def test_nonascii_text_no_cptrans(self):
+        "check non-ascii text to bytes"
+        table = Table(':memory:', 'bindata C(50) binary', codepage='cp1252', dbf_type='vfp')
+        table.append(dict(bindata=''.join(chr(c) for c in range(128, 128+50))))
+        self.assertEqual(table[0].bindata, ''.join(chr(c) for c in range(128, 128+50)))
+
+    def test_add_null_field(self):
+        "adding a null field to an existing table"
+        table = Table(
+            self.vfp_table.filename,
+            'name C(50); age N(3,0)',
+            dbf_type='vfp',
+            )
+        def _50(text):
+            return text + ' ' * (50 - len(text))
+        data = ( (_50('Ethan'), 29), (_50('Joseph'), 33), (_50('Michael'), 54), )
+        for datum in data:
+            table.append(datum)
+        for datum, recordum in zip(data, table):
+            self.assertEqual(datum, tuple(recordum))
+
+    def test_remove_null_field(self):
+        "removing null fields from an existing table"
+
+    def test_change_null_field(self):
+        "making an existing field nullable"
+
+    def test_add_field_to_null(self):
+        "adding a normal field to a table with null fields"
+
+    def test_remove_field_from_null(self):
+        "removing a normal field from a table with null fields"
 
 
 class Test_Dbf_Functions(unittest.TestCase):
@@ -3182,7 +3256,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         i = 0
         for record in table:
             self.assertEqual(record.desc, u'')
-            self.assertEqual(record.paid is Unknown, True)
+            self.assertEqual(record.paid is None, True)
             self.assertEqual(record.mass, 0.0)
             i += 1
         self.assertEqual(i, len(table))

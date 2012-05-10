@@ -9,7 +9,7 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 91, 0):
+if dbf.version != (0, 92, 0):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -2497,10 +2497,23 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(-false, true)
         self.assertEquals(-none is none, True)
 
+class Test_Exceptions(unittest.TestCase):
+    def test_bad_field_specs_on_creation(self):
+        pass
+    def test_too_many_fields_on_creation(self):
+        pass
+    def test_too_many_records_in_table(self):
+        pass
+    def test_too_many_fields_to_change_to_null(self):
+        pass
+    def test_adding_exsting_field_to_table(self):
+        pass
+    def test_deleting_non_existing_field_from_table(self):
+        pass
+
+
 class Test_Dbf_Creation(unittest.TestCase):
     "Testing table creation..."
-    def test_exceptions(self):
-        "exceptions"
     def test_dbf_memory_tables(self):
         "dbf tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
@@ -2574,52 +2587,11 @@ class Test_Dbf_Creation(unittest.TestCase):
                 table.close()
                 fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
-class Test_Dbf_Destruction(unittest.TestCase):
-    "Testing __del__ and friends"
-    def setUp(self):
-        self.dbf_table = Table(
-                os.path.join(tempdir, 'dbf_table'),
-                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
-                dbf_type='db3',
-                )
-        self.vfp_table = Table(
-                os.path.join(tempdir, 'vfp_table'),
-                'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
-                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y',
-                dbf_type='vfp',
-                )
-
-    def test_autowrite_on_record_destruction(self):
-        "automatically write records on object destruction"
-        table = self.dbf_table
-        table.append({'name':'old boring name'})
-        old_data = table[0].scatter_fields()
-        new_name = table[0].name = '!BRAND NEW NAME!'
-        self.assertEqual(unicode(new_name), table[0].name.strip())
-    def test_autowrite_on_table_close(self):
-        "automatically write records on table close"
-        table = self.dbf_table
-        table.append({'name':'old boring name'})
-        record = table[0]
-        new_name = record.name = '?DIFFERENT NEW NAME?'
-        table.close()
-        table2 = Table(table.filename)
-        self.assertEqual(unicode(new_name), table2[0].name.strip())
-    #def test_autowrite_on_table_destruction(self):
-    #    "automatically write records on table destruction (no close() called)"
-    #    table = self.dbf_table
-    #    name = table.filename
-    #    del self.dbf_table
-    #    record = table.append({'name':'old boring name'})
-    #    new_name = record.name = '-YET ANOTHER NEW NAME-'
-    #    del table
-    #    del record
-    #    table = Table(name)
-    #    self.assertEqual(unicode(new_name), table[0].name.strip())
 
 class Test_Dbf_Records(unittest.TestCase):
     "Testing adding records"
     def setUp(self):
+        dbf._debug = False
         self.dbf_table = Table(
                 os.path.join(tempdir, 'dbf_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M',
@@ -2631,6 +2603,10 @@ class Test_Dbf_Records(unittest.TestCase):
                 ' weight F(18,3); age I; meeting T; misc G; photo P; price Y',
                 dbf_type='vfp',
                 )
+
+    def tearDown(self):
+        self.dbf_table.close()
+        self.vfp_table.close()
 
     def test_dbf_adding_records(self):
         "dbf table:  adding records"
@@ -2825,6 +2801,34 @@ class Test_Dbf_Records(unittest.TestCase):
         self.assertEqual(record.photo, photolist[i])
         self.assertEqual(table[i].photo, photolist[i])
         i += 1
+
+    def test_char_memo_return_type(self):
+        "check character fields return type"
+        table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp')
+        table.append(('another one bites the dust', "and another one's gone, and another one's gone..."))
+        table.append()
+        for record in table:
+            self.assertTrue(type(record.text) is unicode)
+            self.assertTrue(type(record.memo) is unicode)
+        
+        table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp',
+            default_data_types=dict(C=Char, M=Char))
+        table.append(('another one bites the dust', "and another one's gone, and another one's gone..."))
+        table.append()
+        for record in table:
+            self.assertTrue(type(record.text) is Char)
+            self.assertTrue(type(record.memo) is Char)
+
+        table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp',
+            default_data_types=dict(C=(Char, NoneType), M=(Char, NoneType)))
+        table.append(('another one bites the dust', "and another one's gone, and another one's gone..."))
+        table.append()
+        record = table[0]
+        self.assertTrue(type(record.text) is Char)
+        self.assertTrue(type(record.memo) is Char)
+        record = table[1]
+        self.assertTrue(type(record.text) is NoneType)
+        self.assertTrue(type(record.memo) is NoneType)
     def test_empty_is_none(self):
         "empty and None values"
         table = Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
@@ -2982,12 +2986,15 @@ class Test_Dbf_Records(unittest.TestCase):
 
     def test_nonascii_text_no_cptrans(self):
         "check non-ascii text to bytes"
-        table = Table(':memory:', 'bindata C(50) binary', codepage='cp1252', dbf_type='vfp')
-        table.append(dict(bindata=''.join(chr(c) for c in range(128, 128+50))))
+        table = Table(':memory:', 'bindata C(50) binary; binmemo M binary', codepage='cp1252', dbf_type='vfp')
+        high_ascii = ''.join(chr(c) for c in range(128, 128+50))
+        table.append(dict(bindata=high_ascii, binmemo=high_ascii))
         self.assertEqual(table[0].bindata, ''.join(chr(c) for c in range(128, 128+50)))
+        self.assertEqual(table[0].binmemo, ''.join(chr(c) for c in range(128, 128+50)))
 
     def test_add_null_field(self):
         "adding a null field to an existing table"
+        self.vfp_table.close()
         table = Table(
             self.vfp_table.filename,
             'name C(50); age N(3,0)',
@@ -2998,20 +3005,169 @@ class Test_Dbf_Records(unittest.TestCase):
         data = ( (_50('Ethan'), 29), (_50('Joseph'), 33), (_50('Michael'), 54), )
         for datum in data:
             table.append(datum)
-        for datum, recordum in zip(data, table):
-            self.assertEqual(datum, tuple(recordum))
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum, tuple(recordnum))
+        table.add_fields('fired D null')
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum, tuple(recordnum)[:2])
+        data += ((_50('Daniel'), 44, Null), )
+        table.append(('Daniel', 44, Null))
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum)[:2])
+        self.assertTrue(datum[2] is recordnum[2])
+        table.close()
+        table = Table(table.filename)
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[0:2], tuple(recordnum)[:2])
+        self.assertTrue(datum[2] is recordnum[2])
+
 
     def test_remove_null_field(self):
         "removing null fields from an existing table"
+        self.vfp_table.close()
+        table = Table(
+            self.vfp_table.filename,
+            'name C(50); age N(3,0); fired D null',
+            dbf_type='vfp',
+            )
+        def _50(text):
+            return text + ' ' * (50 - len(text))
+        data = ( (_50('Ethan'), 29, Null), (_50('Joseph'), 33, Null), (_50('Michael'), 54, Date(2010, 5, 3)))
+        for datum in data:
+            table.append(datum)
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum)[:2])
+            self.assertTrue(datum[2] is recordnum[2] or datum[2] == recordnum[2])
+        table.delete_fields('fired')
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum))
+        data += ((_50('Daniel'), 44), )
+        table.append(('Daniel', 44))
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum))
+        table.close()
+        table = Table(table.filename)
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum))
 
     def test_change_null_field(self):
-        "making an existing field nullable"
+        "making an existing field nullable (or not)"
+        table = self.vfp_table
+        namelist = []
+        paidlist = []
+        qtylist = []
+        orderlist = []
+        desclist = []
+        for i in range(10):
+            name = words[i]
+            paid = len(words[i]) % 3 == 0
+            qty = floats[i]
+            orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
+            desc = ' '.join(words[i:i+50])
+            namelist.append(unicode(name))
+            paidlist.append(paid)
+            qtylist.append(qty)
+            orderlist.append(orderdate)
+            desclist.append(desc)
+            record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
+        # plus a blank record
+        namelist.append('')
+        paidlist.append(None)
+        qtylist.append(None)
+        orderlist.append(None)
+        desclist.append('')
+        table.append()
+        for field in table.field_names:
+            self.assertEqual(table.nullable_field(field), False)
+        dbf._debug = True
+        table.allow_nulls('name, qty')
+        for field in table.field_names:
+            if field in 'name qty'.split():
+                self.assertEqual(table.nullable_field(field), True)
+            else:
+                self.assertEqual(table.nullable_field(field), False)
+        table[0].write_record(name=Null, qty=Null)
+        self.assertTrue(table[0].name is Null)
+        self.assertTrue(table[0].qty is Null)
+        table.disallow_nulls('qty')
+        for field in table.field_names:
+            if field in 'name'.split():
+                self.assertEqual(table.nullable_field(field), True)
+            else:
+                self.assertEqual(table.nullable_field(field), False)
+        table.disallow_nulls('name')
+        for field in table.field_names:
+            self.assertEqual(table.nullable_field(field), False)
+
 
     def test_add_field_to_null(self):
         "adding a normal field to a table with null fields"
+        self.vfp_table.close()
+        table = Table(
+            self.vfp_table.filename,
+            'name C(50); age N(3,0); fired D null',
+            dbf_type='vfp',
+            )
+        def _50(text):
+            return text + ' ' * (50 - len(text))
+        data = ( (_50('Ethan'), 29, Null), (_50('Joseph'), 33, Null), (_50('Michael'), 54, Date(2010, 7, 4)), )
+        for datum in data:
+            table.append(datum)
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum)[:2])
+            self.assertTrue(datum[2] is recordnum[2] or datum[2] == recordnum[2])
+        dbf._debug = True
+        table.add_fields('tenure N(3,0)')
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum)[:2])
+            self.assertTrue(datum[2] is recordnum[2] or datum[2] == recordnum[2])
+        data += ((_50('Daniel'), 44, Date(2005, 1, 31), 15 ), )
+        table.append(('Daniel', 44, Date(2005, 1, 31), 15))
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum)[:2])
+            self.assertTrue(datum[2] is recordnum[2] or datum[2] == recordnum[2])
+        self.assertEqual(datum[3], recordnum[3])
+        table.close()
+        table = Table(table.filename)
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum)[:2])
+            self.assertTrue(datum[2] is recordnum[2] or datum[2] == recordnum[2])
+        self.assertEqual(datum[3], recordnum[3])
+
 
     def test_remove_field_from_null(self):
         "removing a normal field from a table with null fields"
+        mfd = self.vfp_table._meta.mfd
+        self.vfp_table.close()
+        mfd = None
+        table = Table(
+            self.vfp_table.filename,
+            'name C(50); age N(3,0); fired D null',
+            dbf_type='vfp',
+            )
+        def _50(text):
+            return text + ' ' * (50 - len(text))
+        data = ( (_50('Ethan'), 29, Null), (_50('Joseph'), 33, Null), (_50('Michael'), 54, Date(2010, 7, 4)), )
+        for datum in data:
+            table.append(datum)
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[:2], tuple(recordnum)[:2])
+            self.assertTrue(datum[2] is recordnum[2] or datum[2] == recordnum[2])
+        table.delete_fields('age')
+        dbf._debug = False
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[0], recordnum[0])
+            self.assertTrue(datum[-1] is recordnum[1] or datum[-1] == recordnum[1])
+        data += ((_50('Daniel'), Date(2001, 11, 13)), )
+        table.append(('Daniel', Date(2001, 11, 13)))
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[0], recordnum[0])
+            self.assertTrue(datum[-1] is recordnum[1] or datum[-1] == recordnum[1])
+        table.close()
+        table = Table(table.filename)
+        for datum, recordnum in zip(data, table):
+            self.assertEqual(datum[0], recordnum[0])
+            self.assertTrue(datum[-1] is recordnum[-1] or datum[-1] == recordnum[-1], "name = %s; datum[-1] = %r;  recordnum[-1] = %r" % (datum[0], datum[-1], recordnum[-1]))
 
 
 class Test_Dbf_Functions(unittest.TestCase):
@@ -3094,6 +3250,10 @@ class Test_Dbf_Functions(unittest.TestCase):
             photo = ' '.join(words[i:i+50:7])
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
+    def tearDown(self):
+        self.dbf_table.close()
+        self.vfp_table.close()
+
     def test01(self):
         "dbf table:  adding and deleting fields"
         table = self.dbf_table
@@ -3104,7 +3264,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         desclist = self.dbf_desclist
         table.delete_fields('name')
         table.close()
-        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = Table(table.filename, dbf_type='db3')
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
         i = 0
@@ -3119,6 +3279,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(table[i].desc, desclist[i])
             self.assertEqual(record.desc, desclist[i])
             i += 1
+        first, middle, last = table[0], table[len(table)//2], table[-1]
         table.delete_fields('paid, orderdate')
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
@@ -3131,6 +3292,8 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(record.desc, desclist[i])
             i += 1
         self.assertEqual(i, len(table))
+        self.assertTrue('paid' not in first.field_names)
+        self.assertTrue('orderdate' not in first.field_names)
         table.add_fields('name C(25); paid L; orderdate D')
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
@@ -3140,6 +3303,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(record.name, ' ' * 25)
             self.assertEqual(record.paid, None)
             self.assertEqual(record.orderdate, None)
+            self.assertEqual(record.desc, desclist[i])
             i += 1
         self.assertEqual(i, len(table))
         i = 0
@@ -3218,8 +3382,6 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(abs(record.qty - qtylist[i]) < .00001, True)
             self.assertEqual(table[i].orderdate, orderlist[i])
             self.assertEqual(record.orderdate, orderlist[i])
-            self.assertEqual(record.mass, masslist[i])
-            self.assertEqual(table[i].mass, masslist[i])
             self.assertEqual(record.weight, weightlist[i])
             self.assertEqual(table[i].weight, weightlist[i])
             self.assertEqual(record.age, agelist[i])
@@ -3230,6 +3392,8 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
+            self.assertEqual(record.mass, masslist[i])
+            self.assertEqual(table[i].mass, masslist[i])
             i += 1
         table.delete_fields('paid, mass')
         i = 0
@@ -3323,7 +3487,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table = Table(':memory:', 'name C(10)', dbf_type='db3')
         table.append(multiple=10)
         self.assertEqual(table.current(), table[0])
-        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = self.dbf_table              # Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
         total = len(table)
         table.bottom()
         self.assertEqual(table.record_number, total)
@@ -3806,6 +3970,109 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(table.type('name').type, 'C')
         self.assertEqual(table.type('name').cls, Char)
 
+    def test18(self):
+        "memo fields accessible after .backup()"
+        table = self.dbf_table
+        table.create_backup()
+        backup = dbf.Table(table.backup)
+        desclist = self.dbf_desclist
+        for i in range(len(desclist)):
+            self.assertEqual(desclist[i], backup[i].desc)
+    def test19(self):
+        "Write loop commits changes"
+        table = self.dbf_table
+        for record in Write(table):
+            record.name = '!BRAND NEW NAME!'
+        for record in table:
+            self.assertEqual(record.name, '!BRAND NEW NAME!         ')
+            record.name = '-old boring name-'
+        for record in table:
+            self.assertEqual(record.name, '!BRAND NEW NAME!         ')
+
+class TestWhatever(unittest.TestCase):
+    "move tests here to run one at a time while debugging"
+    def setUp(self):
+        "create a dbf and vfp table"
+        self.dbf_table = table = Table(
+            os.path.join(tempdir, 'temptable'),
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            )
+        namelist = self.dbf_namelist = []
+        paidlist = self.dbf_paidlist = []
+        qtylist = self.dbf_qtylist = []
+        orderlist = self.dbf_orderlist = []
+        desclist = self.dbf_desclist = []
+        for i in range(len(floats)):
+            name = '%-25s' % words[i]
+            paid = len(words[i]) % 3 == 0
+            qty = floats[i]
+            orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
+            desc = ' '.join(words[i:i+50])
+            namelist.append(name)
+            paidlist.append(paid)
+            qtylist.append(qty)
+            orderlist.append(orderdate)
+            desclist.append(desc)
+            record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
+
+        self.vfp_table = table = Table(
+                os.path.join(tempdir, 'tempvfp'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
+                ' weight F(18,3); age I; meeting T; misc G; photo P',
+                dbf_type='vfp',
+                )
+        namelist = self.vfp_namelist = []
+        paidlist = self.vfp_paidlist = []
+        qtylist = self.vfp_qtylist = []
+        orderlist = self.vfp_orderlist = []
+        desclist = self.vfp_desclist = []
+        masslist = self.vfp_masslist = []
+        weightlist = self.vfp_weightlist = []
+        agelist = self.vfp_agelist = []
+        meetlist = self.vfp_meetlist = []
+        misclist = self.vfp_misclist = []
+        photolist = self.vfp_photolist = []
+        for i in range(len(floats)):
+            name = words[i]
+            paid = len(words[i]) % 3 == 0
+            qty = floats[i]
+            orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
+            desc = ' '.join(words[i:i+50])
+            mass = floats[i] * floats[i] / 2.0
+            weight = floats[i] * 3
+            age = numbers[i]
+            name = words[i]
+            paid = len(words[i]) % 3 == 0
+            qty = floats[i]
+            orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
+            desc = ' '.join(words[i:i+50])
+            mass = floats[i] * floats[i] / 2.0
+            weight = floats[i] * 3
+            age = numbers[i]
+            meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1, \
+                      (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
+            misc = ' '.join(words[i:i+50:3])
+            photo = ' '.join(words[i:i+50:7])
+            namelist.append('%-25s' % name)
+            paidlist.append(paid)
+            qtylist.append(qty)
+            orderlist.append(orderdate)
+            desclist.append(desc)
+            masslist.append(mass)
+            weightlist.append(weight)
+            agelist.append(age)
+            meetlist.append(meeting)
+            misclist.append(misc)
+            photolist.append(photo)
+            meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1,
+                      (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
+            misc = ' '.join(words[i:i+50:3])
+            photo = ' '.join(words[i:i+50:7])
+            record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
+                    'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
+    def tearDown(self):
+        self.dbf_table.close()
+        self.vfp_table.close()
 class Test_Dbf_Lists(unittest.TestCase):
     "DbfList tests"
     def setUp(self):
@@ -3821,6 +4088,8 @@ class Test_Dbf_Lists(unittest.TestCase):
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
+    def tearDown(self):
+        self.dbf_table.close()
     def test01(self):
         "addition and subtraction"
         table1 = self.dbf_table

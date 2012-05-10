@@ -1,22 +1,34 @@
 dbf.py is a pure Python library that provides access to dBase III, Foxpro, and
 Visual Foxpro database tables.
 
-It does not currently support index files, auto-incrementing fields, and
+It does not currently support index files, auto-incrementing fields, nor
 Varchar fields.
 
-Unicode is always returned.
+Unicode is returned for Character/Memo fields (unless they are marked as
+binary or nocptrans).
+
+datetime.date/None is returned for Date (empty values are None)
+
+True/False/None is returned for Logical ('?' value is None).
+
+int/float/None is returned for Numeric (depending on decimals == 0; empty
+values, and '*' values are None (Visual Foxpro stores '*' when value is
+too big to fit in field (this module raises an Exception instead))).
+
+In all cases returns Null if a Null was stored (Nulls are not supported in
+dBase III tables).
 
 Helper classes include
-  - Logical: a tri-state boolean
-  - Char: auto-trims trailing-whitespace, and trailing-whitespace insenstive
-          compares
+  - Logical: a tri-state boolean that mimics bool() where possible
+  - Char: auto-trims trailing-whitespace, and uses trailing-whitespace 
+          insenstive compares
   - Index: in-memory index of table
   - List: list-like structure that leaves records on disk until needed
 
 
 sample table & data:
 
-  sample = dbf.table('/temp/sample'; "name C(30), age N(3,0); wisdom M")
+  sample = dbf.table('/temp/sample'; "name C(30); age N(3,0); wisdom M")
 
   record = sample.append()
   record['name'] = 'Ethan'
@@ -37,5 +49,7 @@ retrieving data to store it somewhere else:
   for record in source:
     data = record.scatterFields()   # creates dictionary {fieldname:value, fieldname:value, ...}
     data = list(record)             # creates list of values in field order
+    data = tuple(record)            # creates a tuple of values in field order
+    # note that records support indexing: record[1] == record.age == record['age']
     # do something with the data
 

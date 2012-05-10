@@ -18,6 +18,7 @@ too big to fit in field (this module raises an Exception instead))).
 In all cases returns Null if a Null was stored (Nulls are not supported in
 dBase III tables).
 
+
 Helper classes include
   - Logical: a tri-state boolean that mimics bool() where possible
   - Char: auto-trims trailing-whitespace, and uses trailing-whitespace 
@@ -53,3 +54,7 @@ retrieving data to store it somewhere else:
     # note that records support indexing: record[1] == record.age == record['age']
     # do something with the data
 
+
+KNOWN ISSUES:
+    updating a record will not reindex that record unless write_record() or
+    reindex() is called

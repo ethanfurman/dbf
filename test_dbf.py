@@ -9,7 +9,7 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 92, 1):
+if dbf.version != (0, 92, 2):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -138,6 +138,7 @@ class Test_Char(unittest.TestCase):
         self.assertRaises(ValueError, Char, False)
         self.assertRaises(ValueError, Char, type)
         self.assertRaises(ValueError, Char, str)
+        self.assertRaises(ValueError, Char, None)
     def test_bools_and_none(self):
         "booleans and None"
         empty = Char()
@@ -146,8 +147,6 @@ class Test_Char(unittest.TestCase):
         self.assertFalse(bool(one))
         actual = Char('1')
         self.assertTrue(bool(actual))
-        none = Char(None)
-        self.assertTrue(none == None)
     def test_equality(self):
         "equality"
         a1 = Char('a')
@@ -483,14 +482,14 @@ class Test_Logical(unittest.TestCase):
     "Testing Logical"
     def test_unknown(self):
         "Unknown"
-        for unk in '', '?', ' ', None, Null:
+        for unk in '', '?', ' ', None, Null, Unknown, Other:
             huh = unknown = Logical(unk)
-            self.assertEqual(huh == None, True)
-            self.assertEqual(huh != None, False)
-            self.assertEqual(huh != True, True)
-            self.assertEqual(huh == True, False)
-            self.assertEqual(huh != False, True)
-            self.assertEqual(huh == False, False)
+            self.assertEqual(huh == None, True, "huh is %r from %r, which is not None" % (huh, unk))
+            self.assertEqual(huh != None, False, "huh is %r from %r, which is not None" % (huh, unk))
+            self.assertEqual(huh != True, True, "huh is %r from %r, which is not None" % (huh, unk))
+            self.assertEqual(huh == True, False, "huh is %r from %r, which is not None" % (huh, unk))
+            self.assertEqual(huh != False, True, "huh is %r from %r, which is not None" % (huh, unk))
+            self.assertEqual(huh == False, False, "huh is %r from %r, which is not None" % (huh, unk))
             if py_ver >= (2, 5):
                 self.assertEqual((0, 1, 2)[huh], 2)
     def test_true(self):
@@ -2178,6 +2177,20 @@ class Test_Quantum(unittest.TestCase):
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 2)
         huh = Quantum(Null())
+        self.assertEqual(huh is dbf.Other, True)
+        self.assertEqual((huh != huh) is unknown, True)
+        self.assertEqual((huh != True) is unknown, True)
+        self.assertEqual((huh != False) is unknown, True)
+        if py_ver >= (2, 5):
+            self.assertEqual((0, 1, 2)[huh], 2)            
+        huh = Quantum(Other)
+        self.assertEqual(huh is dbf.Other, True)
+        self.assertEqual((huh != huh) is unknown, True)
+        self.assertEqual((huh != True) is unknown, True)
+        self.assertEqual((huh != False) is unknown, True)
+        if py_ver >= (2, 5):
+            self.assertEqual((0, 1, 2)[huh], 2)            
+        huh = Quantum(Unknown)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)

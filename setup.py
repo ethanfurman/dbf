@@ -6,9 +6,9 @@ import dbf
 html_docs = glob('dbf/html/*')
 
 long_desc="""
-Currently supports dBase III, and FoxPro - Visual FoxPro tables. Text is returned as unicode, and codepage settings in tables are honored. Null fields are now supported.  Documentation needs work, but author is very responsive to e-mails.
+Currently supports dBase III, FoxPro, and Visual FoxPro tables. Text is returned as unicode, and codepage settings in tables are honored. Memos and Null fields are supported.  Documentation needs work, but author is very responsive to e-mails.
 
-Not supported: index files (but can create tempory non-file indexes), and auto-incrementing fields.
+Not supported: index files (but can create tempory non-file indexes), auto-incrementing fields, and Varchar fields.
 """
 
 setup( name='dbf',

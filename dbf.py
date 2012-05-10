@@ -155,7 +155,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 92, 0)
+version = (0, 92, 1)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -163,6 +163,7 @@ __all__ = (
         'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
         'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
         'NullDate', 'NullDateTime', 'NullTime', 
+        'Write',
         'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal',
         'guess_table_type', 'table_type',
         'add_fields', 'delete_fields', 'get_fields', 'rename_field',
@@ -199,8 +200,6 @@ temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TEMP") or ""
 
 default_type = 'db3'    # default format if none specified
 sql_user_functions = {}      # user-defined sql functions
-
-_debug = False
 
 #class Context(object):
 #    "used to hold user-configurable settings"
@@ -1669,10 +1668,6 @@ class _DbfRecord(object):
                 index(yo)
     def __contains__(yo, key):
         return key in yo._layout.fields or key in ['record_number','delete_flag']
-    #def __del__(yo):
-    #    if not yo._layout.inmemory:
-    #        yo._update_disk()
-    #        yo._layout.dfd.flush()
     def __iter__(yo):
         return (yo[field] for field in yo._layout.fields if not yo._layout[field][FLAGS] & SYSTEM)
     def __getattr__(yo, name):
@@ -3308,9 +3303,6 @@ class DbfTable(object):
                     cls,
                     empty,
                     )
-            #if meta[name][TYPE] in yo._memotypes and meta.memo is None:
-            #    meta.newmemofile = True
-            #    meta.memo = yo._memoClass(meta)
         yo._buildHeaderFields()
         yo._update_disk()
         if old_table is not None:
@@ -3856,7 +3848,6 @@ class DbfTable(object):
             specs[END] = start + new_size                   #yo._meta[victim]['end'] = start + new_size
             yo._meta[victim] = tuple(specs)
             blank = array('c', ' ' * new_size)
-            #print "\nstart=%s\nend=%s\neff_end=%s\nnew_size=%s\n\n" % (start, end, eff_end, new_size)
             for record in yo:
                 new_data = blank[:]
                 new_data[:eff_end] = record._data[start:start+eff_end]
@@ -4519,7 +4510,6 @@ class List(object):
         yo._maybe_add((new_record.record_table, new_record.record_number, yo.key(new_record)))
         if yo._current == -1 and yo._list:
             yo._current = 0
-        #return new_record
     def bottom(yo):
         if yo._list:
             yo._current = len(yo._list) - 1
@@ -4679,10 +4669,6 @@ class Index(object):
         if record.record_table is yo._table:
             return record.record_number in yo._records
         raise ValueError("record is from table %r, not %r" % (record.table, yo._table))
-        #record = yo.key(record)
-        #if not isinstance(record, tuple):
-        #    record = (record, )
-        #return yo.find(record) != -1
     def __getitem__(yo, key):
         if isinstance(key, int):
             count = len(yo._values)
@@ -5052,7 +5038,6 @@ def sql_criteria(records, criteria):
     g = sql_user_functions.copy()
     g['List'] = List
     function %= (criteria, fields, criteria)
-    #print function
     exec function in g
     return g['func']
 
@@ -5082,7 +5067,6 @@ def sql_cmd(command, field_names):
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset+6:]
     function %= (command, pre_fields, command, post_fields)
-    #print function
     exec function in g
     return g['func']
 

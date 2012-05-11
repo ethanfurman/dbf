@@ -9,7 +9,7 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 92, 2):
+if dbf.version != (0, 93, 0):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -366,7 +366,7 @@ class Test_Date_Time(unittest.TestCase):
         self.assertEqual(dos != dos, False)
         self.assertEqual(tres != tres, False)
 class Test_Null(unittest.TestCase):
-    def test_01(self):
+    def test_all(self):
         null = Null = dbf.Null()
         self.assertTrue(null is dbf.Null())
 
@@ -2146,7 +2146,11 @@ class Test_Logical(unittest.TestCase):
 
 class Test_Quantum(unittest.TestCase):
     "Testing Quantum"
-    def test01(self):
+    def test_exceptions(self):
+        "errors"
+        self.assertRaises(ValueError, Quantum, 'wrong')
+
+    def test_other(self):
         "Other"
         huh = unknown = Quantum('')
         self.assertEqual(huh is dbf.Other, True)
@@ -2155,6 +2159,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 2)
+
         huh = Quantum('?')
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
@@ -2162,6 +2167,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 2)
+
         huh = Quantum(' ')
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
@@ -2169,6 +2175,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 2)
+
         huh = Quantum(None)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
@@ -2176,28 +2183,32 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 2)
+
         huh = Quantum(Null())
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)            
+            self.assertEqual((0, 1, 2)[huh], 2)
+            
         huh = Quantum(Other)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)            
+            self.assertEqual((0, 1, 2)[huh], 2)
+
         huh = Quantum(Unknown)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)            
-    def test02(self):
+            self.assertEqual((0, 1, 2)[huh], 2)
+
+    def test_true(self):
         "true"
         huh = Quantum('True')
         unknown = Quantum('?')
@@ -2206,47 +2217,38 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != None) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 1)
-    def test03(self):
-        "true"
+
         huh = Quantum('yes')
         unknown = Quantum('?')
         self.assertEqual(huh, True)
         self.assertNotEqual(huh, False)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test04(self):
-        "true"
         huh = Quantum('t')
         unknown = Quantum('?')
         self.assertEqual(huh, True)
         self.assertNotEqual(huh, False)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test05(self):
-        "true"
         huh = Quantum('Y')
         unknown = Quantum('?')
         self.assertEqual(huh, True)
         self.assertNotEqual(huh, False)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test06(self):
-        "true"
         huh = Quantum(7)
         unknown = Quantum('?')
         self.assertEqual(huh, True)
         self.assertNotEqual(huh, False)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test07(self):
-        "true"
         huh = Quantum(['blah'])
         unknown = Quantum('?')
         self.assertEqual(huh, True)
         self.assertNotEqual(huh, False)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test08(self):
+    def test_false(self):
         "false"
         huh = Quantum('false')
         unknown = Quantum('?')
@@ -2255,47 +2257,38 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != None) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 0)
-    def test09(self):
-        "false"
+            
         huh = Quantum('No')
         unknown = Quantum('?')
         self.assertEqual(huh, False)
         self.assertNotEqual(huh, True)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test10(self):
-        "false"
         huh = Quantum('F')
         unknown = Quantum('?')
         self.assertEqual(huh, False)
         self.assertNotEqual(huh, True)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test11(self):
-        "false"
         huh = Quantum('n')
         unknown = Quantum('?')
         self.assertEqual(huh, False)
         self.assertNotEqual(huh, True)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test12(self):
-        "false"
         huh = Quantum(0)
         unknown = Quantum('?')
         self.assertEqual(huh, False)
         self.assertNotEqual(huh, True)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test13(self):
-        "false"
         huh = Quantum([])
         unknown = Quantum('?')
         self.assertEqual(huh, False)
         self.assertNotEqual(huh, True)
         self.assertEqual((huh != None) is unknown, True)
 
-    def test14(self):
+    def test_singletons(self):
         "singletons"
         heh = Quantum(True)
         hah = Quantum('Yes')
@@ -2306,10 +2299,8 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(heh is hah, True)
         self.assertEquals(ick is ack, True)
         self.assertEquals(unk is bla, True)
-    def test15(self):
-        "errors"
-        self.assertRaises(ValueError, Quantum, 'wrong')
-    def test16(self):
+
+    def test_or(self):
         "or"
         true = Quantum(True)
         false = Quantum(False)
@@ -2356,7 +2347,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(True | unknown, true)
         self.assertEquals(False | unknown is unknown, True)
         self.assertEquals(None | unknown is unknown, True)
-    def test17(self):
+    def test_and(self):
         "and"
         true = Quantum(True)
         false = Quantum(False)
@@ -2403,7 +2394,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(True & unknown is unknown, True)
         self.assertEquals(False & unknown, false)
         self.assertEquals(None & unknown is unknown, True)
-    def test18(self):
+    def test_xor(self):
         "xor"
         true = Quantum(True)
         false = Quantum(False)
@@ -2429,7 +2420,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(True ^ unknown is unknown, True)
         self.assertEquals(False ^ unknown is unknown, True)
         self.assertEquals(None ^ unknown is unknown, True)
-    def test19(self):
+    def test_implication_material(self):
         "implication, material"
         true = Quantum(True)
         false = Quantum(False)
@@ -2455,7 +2446,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(True >> unknown is unknown, True)
         self.assertEquals(False >> unknown, true)
         self.assertEquals(None >> unknown is unknown, True)
-    def test20(self):
+    def test_implication_relevant(self):
         "implication, relevant"
         true = Quantum(True)
         false = Quantum(False)
@@ -2482,7 +2473,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(True >> unknown is unknown, True)
         self.assertEquals(False >> unknown is unknown, True)
         self.assertEquals(None >> unknown is unknown, True)
-    def test21(self):
+    def test_nand(self):
         "negative and"
         true = Quantum(True)
         false = Quantum(False)
@@ -2501,7 +2492,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEquals(true.D(None) is unknown, True)
         self.assertEquals(false.D(None), true)
         self.assertEquals(unknown.D(None) is unknown, True)
-    def test22(self):
+    def test_negation(self):
         "negation"
         true = Quantum(True)
         false = Quantum(False)
@@ -3267,7 +3258,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.dbf_table.close()
         self.vfp_table.close()
 
-    def test01(self):
+    def test_add_fields_to_dbf_table(self):
         "dbf table:  adding and deleting fields"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3342,7 +3333,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(record.desc, desclist[i])
             i += 1
         table.close()
-    def test02(self):
+    def test_add_fields_to_vfp_table(self):
         "vfp table:  adding and deleting fields"
         table = self.vfp_table
         namelist = self.vfp_namelist
@@ -3472,7 +3463,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(table[i].photo, photolist[i])
             i += 1
         table.close()
-    def test03(self):
+    def test_len_contains_iter(self):
         "basic function tests - len, contains & iterators"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3491,7 +3482,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(record, table[i])
             i += 1
 
-    def test04(self):
+    def test_top_bottom_etc(self):
         "basic function tests - top, bottom, next, prev, current, goto, delete, undelete"
         table = Table(':memory:', 'name C(10)', dbf_type='db3')
         self.assertRaises(Bof, table.current)
@@ -3624,7 +3615,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(i, len(table))
 
 
-    def test05(self):
+    def test_finding_ordering_searching(self):
         "finding, ordering, searching"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3700,7 +3691,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(len(records), unordered.count(number))
 
         table.close()
-    def test06(self):
+    def test_scatter_gather_new(self):
         "scattering and gathering fields, and new()"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3740,7 +3731,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             newrecord = table5.append(record)
         table.close()
         table2.close()
-    def test07(self):
+    def test_rename_contains_has_key(self):
         "renaming fields, __contains__, has_key"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3762,7 +3753,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual('newfield' in table, False)
         table.close()
 
-    def test08(self):
+    def test_dbf_record_kamikaze(self):
         "kamikaze"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3793,7 +3784,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.close()
         table2.close()
 
-    def test09(self):
+    def test_multiple_append(self):
         "multiple append"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3832,7 +3823,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                     self.assertEqual(record[field], samerecord[field])
         table3.close()
         table.close()
-    def test10(self):
+    def test_slices(self):
         "slices"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3854,7 +3845,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(slice6, list(table[:9:2]))
         slice7 = [table[-1], table[-2], table[-3]]
         self.assertEqual(slice7, list(table[-1:-4:-1]))
-    def test11(self):
+    def test_record_reset(self):
         "reset record"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3868,7 +3859,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(table[0].name, table[1].name)
         table[0].write_record(name='Python rocks!')
         self.assertNotEqual(table[0].name, table[1].name)
-    def test12(self):
+    def test_adding_memos(self):
         "adding memos to existing records"
         table = Table(':memory:', 'name C(50); age N(3,0)', dbf_type='db3')
         table.append(('user', 0))
@@ -3902,7 +3893,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
-    def test13(self):
+    def test_from_csv(self):
         "from_csv"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3944,7 +3935,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
 
-    def test14(self):
+    def test_resize(self):
         "resize"
         table = self.dbf_table
         namelist = self.dbf_namelist 
@@ -3957,7 +3948,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.resize_field('name', 40)
         new_record = table[5].scatter_fields()
         self.assertEqual(test_record['orderdate'], new_record['orderdate'])
-    def test15(self):
+    def test_memos_after_close(self):
         "memos available after close/open"
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
         table.append(('Author','dashing, debonair, delightful'))
@@ -3972,18 +3963,18 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(table[0].name, 'Benedict')
         self.assertEqual(table[0].desc, 'brilliant, bombastic, bothered')
         table.close()
-    def test16(self):
+    def test_field_categories(self):
         "_(type)_field access as (type)_field"
         self.assertEqual(self.dbf_table.numeric_fields, self.dbf_table._numeric_fields)
         self.assertEqual(self.vfp_table.numeric_fields, self.vfp_table._numeric_fields)
-    def test17(self):
+    def test_field_type(self):
         "table.type(field) == ('C', Char)"
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
         self.assertEqual(table.type('name'), ('C', Char))
         self.assertEqual(table.type('name').type, 'C')
         self.assertEqual(table.type('name').cls, Char)
 
-    def test18(self):
+    def test_memo_after_backup(self):
         "memo fields accessible after .backup()"
         table = self.dbf_table
         table.create_backup()
@@ -3991,7 +3982,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         desclist = self.dbf_desclist
         for i in range(len(desclist)):
             self.assertEqual(desclist[i], backup[i].desc)
-    def test19(self):
+    def test_write_loop(self):
         "Write loop commits changes"
         table = self.dbf_table
         for record in Write(table):
@@ -4103,7 +4094,7 @@ class Test_Dbf_Lists(unittest.TestCase):
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
     def tearDown(self):
         self.dbf_table.close()
-    def test01(self):
+    def test_add_subtract(self):
         "addition and subtraction"
         table1 = self.dbf_table
         list1 = table1[::2]
@@ -4121,7 +4112,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         self.assertEqual(33, len(list1 - list2))
         self.assertEqual(17, len(list2 - list1))
         table1.close()
-    def test02(self):
+    def test_append_extend(self):
         "appending and extending"
         table1 = self.dbf_table
         list1 = table1[::2]
@@ -4136,7 +4127,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         self.assertEqual(68, len(list1))
         self.assertEqual(67, len(list2))
         table1.close()
-    def test03(self):
+    def test_index(self):
         "indexing"
         table1 = self.dbf_table
         list1 = table1[::2]
@@ -4147,7 +4138,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         for rec in list3:
             self.assertRaises(ValueError, list1.index, rec )
         table1.close()
-    def test04(self):
+    def test_sort(self):
         "sorting"
         table1 = self.dbf_table
         list1 = table1[::2]
@@ -4159,7 +4150,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         for trec, lrec in zip(index, list4):
             self.assertEqual(trec.record_number, lrec.record_number)
         table1.close()
-    def test05(self):
+    def test_keys(self):
         "keys"
         table1 = self.dbf_table
         field = table1.field_names[0]

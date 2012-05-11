@@ -6,7 +6,7 @@ Copyright
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.92.00 as of 10 May 2012
+    - Version: 0.93.000 as of 11 May 2012
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -155,7 +155,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 92, 2)
+version = (0, 93, 0)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -179,17 +179,13 @@ import os
 import struct
 import sys
 import time
-import traceback
-import unicodedata
 import weakref
 
 from array import array
 from bisect import bisect_left, bisect_right
-import decimal 
+import decimal
 from decimal import Decimal
 from math import floor
-from shutil import copyfileobj
-from stat import ST_SIZE
 from types import NoneType
 
 LOGICAL_BAD_IS_FALSE = True # if bad data in logical fields, return False? (else raise error)
@@ -375,44 +371,43 @@ class DbfError(Exception):
     "Fatal errors elicit this response."
 class DataOverflow(DbfError):
     "Data too large for field"
-    def __init__(yo, message, data=None):
-        DbfError.__init__(yo, message)
-        yo.data = data
+    def __init__(self, message, data=None):
+        DbfError.__init__(self, message)
+        self.data = data
 class BadData(DbfError):
     "bad data in table"
-    def __init__(yo, message, data=None):
-        DbfError.__init__(yo, message)
-        yo.data = data
-        yo.message = message
+    def __init__(self, message, data=None):
+        DbfError.__init__(self, message)
+        self.data = data
 class FieldMissing(KeyError, DbfError):
     "Field does not exist in table"
-    def __init__(yo, fieldname):
-        KeyError.__init__(yo, '%s:  no such field in table' % fieldname)
-        DbfError.__init__(yo, '%s:  no such field in table' % fieldname)
-        yo.data = fieldname
+    def __init__(self, fieldname):
+        KeyError.__init__(self, '%s:  no such field in table' % fieldname)
+        DbfError.__init__(self, '%s:  no such field in table' % fieldname)
+        self.data = fieldname
 class NonUnicode(DbfError):
     "Data for table not in unicode"
-    def __init__(yo, message=None):
-        DbfError.__init__(yo, message)
+    def __init__(self, message=None):
+        DbfError.__init__(self, message)
 class DbfWarning(Exception):
     "Normal operations elicit this response"
 class Eof(DbfWarning, StopIteration):
     "End of file reached"
     message = 'End of file reached'
-    def __init__(yo):
-        StopIteration.__init__(yo, yo.message)
-        DbfWarning.__init__(yo, yo.message)
+    def __init__(self):
+        StopIteration.__init__(self, self.message)
+        DbfWarning.__init__(self, self.message)
 class Bof(DbfWarning, StopIteration):
     "Beginning of file reached"
     message = 'Beginning of file reached'
-    def __init__(yo):
-        StopIteration.__init__(yo, yo.message)
-        DbfWarning.__init__(yo, yo.message)
+    def __init__(self):
+        StopIteration.__init__(self, self.message)
+        DbfWarning.__init__(self, self.message)
 class DoNotIndex(DbfWarning):
     "Returned by indexing functions to suppress a record from becoming part of the index"
     message = 'Not indexing record'
-    def __init__(yo):
-        DbfWarning.__init__(yo, yo.message)
+    def __init__(self):
+        DbfWarning.__init__(self, self.message)
 # wrappers around datetime and logical objects to allow null values
 Unknown = Other = object() # gets replaced later by their final values
 class NullType(object):
@@ -443,20 +438,20 @@ class NullType(object):
     if sys.version_info[:2] >= (2, 6):
         __hash__ = None
     else:
-        def __hash__(yo):
+        def __hash__(self):
             raise TypeError("unhashable type: 'Null'")
 
     def __new__(cls):
         return cls.null
-    def __nonzero__(yo):
+    def __nonzero__(self):
         return False
-    def __repr__(yo):
+    def __repr__(self):
         return '<null>'
-    def __setattr__(yo, name, value):
+    def __setattr__(self, name, value):
         return None
-    def __setitem___(yo, index, value):
+    def __setitem___(self, index, value):
         return None
-    def __str__(yo):
+    def __str__(self):
         return ''
 NullType.null = object.__new__(NullType)
 Null = NullType()
@@ -467,41 +462,41 @@ class Char(str):
         if not isinstance(text, (str, unicode, cls)):
             raise ValueError("Unable to automatically coerce %r to Char" % text)
         return str.__new__(cls, text)
-    def __eq__(yo, other):
+    def __eq__(self, other):
         "ignores trailing whitespace"
-        if not isinstance(other, (yo.__class__, str)):
+        if not isinstance(other, (self.__class__, str)):
             return NotImplemented
-        return yo.rstrip() == other.rstrip()
-    def __ge__(yo, other):
+        return self.rstrip() == other.rstrip()
+    def __ge__(self, other):
         "ignores trailing whitespace"
-        if not isinstance(other, (yo.__class__, str)):
+        if not isinstance(other, (self.__class__, str)):
             return NotImplemented
-        return yo.rstrip() >= other.rstrip()
-    def __gt__(yo, other):
+        return self.rstrip() >= other.rstrip()
+    def __gt__(self, other):
         "ignores trailing whitespace"
-        if not isinstance(other, (yo.__class__, str)):
+        if not isinstance(other, (self.__class__, str)):
             return NotImplemented
-        return yo.rstrip() > other.rstrip()
-    def __le__(yo, other):
+        return self.rstrip() > other.rstrip()
+    def __le__(self, other):
         "ignores trailing whitespace"
-        if not isinstance(other, (yo.__class__, str)):
+        if not isinstance(other, (self.__class__, str)):
             return NotImplemented
-        return yo.rstrip() <= other.rstrip()
-    def __lt__(yo, other):
+        return self.rstrip() <= other.rstrip()
+    def __lt__(self, other):
         "ignores trailing whitespace"
-        if not isinstance(other, (yo.__class__, str)):
+        if not isinstance(other, (self.__class__, str)):
             return NotImplemented
-        return yo.rstrip() < other.rstrip()
-    def __ne__(yo, other):
+        return self.rstrip() < other.rstrip()
+    def __ne__(self, other):
         "ignores trailing whitespace"
-        if not isinstance(other, (yo.__class__, str)):
+        if not isinstance(other, (self.__class__, str)):
             return NotImplemented
-        return yo.rstrip() != other.rstrip()
-    def __nonzero__(yo):
+        return self.rstrip() != other.rstrip()
+    def __nonzero__(self):
         "ignores trailing whitespace"
-        return bool(yo.rstrip())
-    def __str__(yo):
-        return yo.rstrip()
+        return bool(self.rstrip())
+    def __str__(self):
+        return self.rstrip()
 
 class Date(object):
     "adds null capable datetime.date constructs"
@@ -518,46 +513,46 @@ class Date(object):
         else:
             nd._date = datetime.date(year, month, day)
         return nd
-    def __add__(yo, other):
-        if yo and isinstance(other, (datetime.timedelta)):
-            return Date(yo._date + other)
+    def __add__(self, other):
+        if self and isinstance(other, (datetime.timedelta)):
+            return Date(self._date + other)
         else:
             return NotImplemented
-    def __eq__(yo, other):
-        if isinstance(other, yo.__class__):
-            return yo._date == other._date
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self._date == other._date
         if isinstance(other, datetime.date):
-            return yo._date == other
+            return self._date == other
         if isinstance(other, type(None)):
-            return yo._date is None
+            return self._date is None
         return NotImplemented
-    def __getattr__(yo, name):
-        return yo._date.__getattribute__(name)
-    def __ge__(yo, other):
+    def __getattr__(self, name):
+        return self._date.__getattribute__(name)
+    def __ge__(self, other):
         if isinstance(other, (datetime.date)):
-            return yo._date >= other
+            return self._date >= other
         elif isinstance(other, (Date)):
             if other:
-                return yo._date >= other._date
+                return self._date >= other._date
             return False
         return NotImplemented
-    def __gt__(yo, other):
+    def __gt__(self, other):
         if isinstance(other, (datetime.date)):
-            return yo._date > other
+            return self._date > other
         elif isinstance(other, (Date)):
             if other:
-                return yo._date > other._date
+                return self._date > other._date
             return True
         return NotImplemented
-    def __hash__(yo):
-        return hash(yo._date)
-    def __le__(yo, other):
-        if yo:
+    def __hash__(self):
+        return hash(self._date)
+    def __le__(self, other):
+        if self:
             if isinstance(other, (datetime.date)):
-                return yo._date <= other
+                return self._date <= other
             elif isinstance(other, (Date)):
                 if other:
-                    return yo._date <= other._date
+                    return self._date <= other._date
                 return False
         else:
             if isinstance(other, (datetime.date)):
@@ -567,13 +562,13 @@ class Date(object):
                     return True
                 return True
         return NotImplemented
-    def __lt__(yo, other):
-        if yo:
+    def __lt__(self, other):
+        if self:
             if isinstance(other, (datetime.date)):
-                return yo._date < other
+                return self._date < other
             elif isinstance(other, (Date)):
                 if other:
-                    return yo._date < other._date
+                    return self._date < other._date
                 return False
         else:
             if isinstance(other, (datetime.date)):
@@ -583,13 +578,13 @@ class Date(object):
                     return True
                 return False
         return NotImplemented
-    def __ne__(yo, other):
-        if yo:
+    def __ne__(self, other):
+        if self:
             if isinstance(other, (datetime.date)):
-                return yo._date != other
+                return self._date != other
             elif isinstance(other, (Date)):
                 if other:
-                    return yo._date != other._date
+                    return self._date != other._date
                 return True
         else:
             if isinstance(other, (datetime.date)):
@@ -599,39 +594,39 @@ class Date(object):
                     return True
                 return False
         return NotImplemented
-    def __nonzero__(yo):
-        return bool(yo._date)
+    def __nonzero__(self):
+        return bool(self._date)
     __radd__ = __add__
-    def __rsub__(yo, other):
-        if yo and isinstance(other, (datetime.date)):
-            return other - yo._date
-        elif yo and isinstance(other, (Date)):
-            return other._date - yo._date
-        elif yo and isinstance(other, (datetime.timedelta)):
-            return Date(other - yo._date)
+    def __rsub__(self, other):
+        if self and isinstance(other, (datetime.date)):
+            return other - self._date
+        elif self and isinstance(other, (Date)):
+            return other._date - self._date
+        elif self and isinstance(other, (datetime.timedelta)):
+            return Date(other - self._date)
         else:
             return NotImplemented
-    def __repr__(yo):
-        if yo:
-            return "Date(%d, %d, %d)" % yo.timetuple()[:3]
+    def __repr__(self):
+        if self:
+            return "Date(%d, %d, %d)" % self.timetuple()[:3]
         else:
             return "Date()"
-    def __str__(yo):
-        if yo:
-            return yo.isoformat()
+    def __str__(self):
+        if self:
+            return self.isoformat()
         return ""
-    def __sub__(yo, other):
-        if yo and isinstance(other, (datetime.date)):
-            return yo._date - other
-        elif yo and isinstance(other, (Date)):
-            return yo._date - other._date
-        elif yo and isinstance(other, (datetime.timedelta)):
-            return Date(yo._date - other)
+    def __sub__(self, other):
+        if self and isinstance(other, (datetime.date)):
+            return self._date - other
+        elif self and isinstance(other, (Date)):
+            return self._date - other._date
+        elif self and isinstance(other, (datetime.timedelta)):
+            return Date(self._date - other)
         else:
             return NotImplemented
-    def date(yo):
-        if yo:
-            return yo._date
+    def date(self):
+        if self:
+            return self._date
         return None
     @classmethod
     def fromordinal(cls, number):
@@ -646,16 +641,16 @@ class Date(object):
         if yyyymmdd in ('', '        ','no date'):
             return cls()
         return cls(datetime.date(int(yyyymmdd[:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:])))
-    def strftime(yo, format):
-        if yo:
-            return yo._date.strftime(format)
+    def strftime(self, format):
+        if self:
+            return self._date.strftime(format)
         return ''
     @classmethod
     def today(cls):
         return cls(datetime.date.today())
-    def ymd(yo):
-        if yo:
-            return "%04d%02d%02d" % yo.timetuple()[:3]
+    def ymd(self):
+        if self:
+            return "%04d%02d%02d" % self.timetuple()[:3]
         else:
             return '        '
 Date.max = Date(datetime.date.max)
@@ -679,32 +674,32 @@ class DateTime(object):
         elif year is not None:
             ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsec)
         return ndt
-    def __add__(yo, other):
-        if yo and isinstance(other, (datetime.timedelta)):
-            return DateTime(yo._datetime + other)
+    def __add__(self, other):
+        if self and isinstance(other, (datetime.timedelta)):
+            return DateTime(self._datetime + other)
         else:
             return NotImplemented
-    def __eq__(yo, other):
-        if isinstance(other, yo.__class__):
-            return yo._datetime == other._datetime
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self._datetime == other._datetime
         if isinstance(other, datetime.date):
-            return yo._datetime == other
+            return self._datetime == other
         if isinstance(other, type(None)):
-            return yo._datetime is None
+            return self._datetime is None
         return NotImplemented
-    def __getattr__(yo, name):
-        if yo:
-            attribute = yo._datetime.__getattribute__(name)
+    def __getattr__(self, name):
+        if self:
+            attribute = self._datetime.__getattribute__(name)
             return attribute
         else:
             raise AttributeError('null DateTime object has no attribute %s' % name)
-    def __ge__(yo, other):
-        if yo:
+    def __ge__(self, other):
+        if self:
             if isinstance(other, (datetime.datetime)):
-                return yo._datetime >= other
+                return self._datetime >= other
             elif isinstance(other, (DateTime)):
                 if other:
-                    return yo._datetime >= other._datetime
+                    return self._datetime >= other._datetime
                 return False
         else:
             if isinstance(other, (datetime.datetime)):
@@ -714,13 +709,13 @@ class DateTime(object):
                     return False
                 return True
         return NotImplemented
-    def __gt__(yo, other):
-        if yo:
+    def __gt__(self, other):
+        if self:
             if isinstance(other, (datetime.datetime)):
-                return yo._datetime > other
+                return self._datetime > other
             elif isinstance(other, (DateTime)):
                 if other:
-                    return yo._datetime > other._datetime
+                    return self._datetime > other._datetime
                 return True
         else:
             if isinstance(other, (datetime.datetime)):
@@ -730,15 +725,15 @@ class DateTime(object):
                     return False
                 return False
         return NotImplemented
-    def __hash__(yo):
-        return yo._datetime.__hash__()
-    def __le__(yo, other):
-        if yo:
+    def __hash__(self):
+        return self._datetime.__hash__()
+    def __le__(self, other):
+        if self:
             if isinstance(other, (datetime.datetime)):
-                return yo._datetime <= other
+                return self._datetime <= other
             elif isinstance(other, (DateTime)):
                 if other:
-                    return yo._datetime <= other._datetime
+                    return self._datetime <= other._datetime
                 return False
         else:
             if isinstance(other, (datetime.datetime)):
@@ -748,13 +743,13 @@ class DateTime(object):
                     return True
                 return True
         return NotImplemented
-    def __lt__(yo, other):
-        if yo:
+    def __lt__(self, other):
+        if self:
             if isinstance(other, (datetime.datetime)):
-                return yo._datetime < other
+                return self._datetime < other
             elif isinstance(other, (DateTime)):
                 if other:
-                    return yo._datetime < other._datetime
+                    return self._datetime < other._datetime
                 return False
         else:
             if isinstance(other, (datetime.datetime)):
@@ -764,13 +759,13 @@ class DateTime(object):
                     return True
                 return False
         return NotImplemented
-    def __ne__(yo, other):
-        if yo:
+    def __ne__(self, other):
+        if self:
             if isinstance(other, (datetime.datetime)):
-                return yo._datetime != other
+                return self._datetime != other
             elif isinstance(other, (DateTime)):
                 if other:
-                    return yo._datetime != other._datetime
+                    return self._datetime != other._datetime
                 return True
         else:
             if isinstance(other, (datetime.datetime)):
@@ -780,36 +775,36 @@ class DateTime(object):
                     return True
                 return False
         return NotImplemented
-    def __nonzero__(yo):
-        return bool(yo._datetime)
+    def __nonzero__(self):
+        return bool(self._datetime)
     __radd__ = __add__
-    def __rsub__(yo, other):
-        if yo and isinstance(other, (datetime.datetime)):
-            return other - yo._datetime
-        elif yo and isinstance(other, (DateTime)):
-            return other._datetime - yo._datetime
-        elif yo and isinstance(other, (datetime.timedelta)):
-            return DateTime(other - yo._datetime)
+    def __rsub__(self, other):
+        if self and isinstance(other, (datetime.datetime)):
+            return other - self._datetime
+        elif self and isinstance(other, (DateTime)):
+            return other._datetime - self._datetime
+        elif self and isinstance(other, (datetime.timedelta)):
+            return DateTime(other - self._datetime)
         else:
             return NotImplemented
-    def __repr__(yo):
-        if yo:
+    def __repr__(self):
+        if self:
             return "DateTime(%d, %d, %d, %d, %d, %d, %d)" % (
-                yo._datetime.timetuple()[:6] + (yo._datetime.microsecond, )
+                self._datetime.timetuple()[:6] + (self._datetime.microsecond, )
                 )
         else:
             return "DateTime()"
-    def __str__(yo):
-        if yo:
-            return yo.isoformat()
+    def __str__(self):
+        if self:
+            return self.isoformat()
         return ""
-    def __sub__(yo, other):
-        if yo and isinstance(other, (datetime.datetime)):
-            return yo._datetime - other
-        elif yo and isinstance(other, (DateTime)):
-            return yo._datetime - other._datetime
-        elif yo and isinstance(other, (datetime.timedelta)):
-            return DateTime(yo._datetime - other)
+    def __sub__(self, other):
+        if self and isinstance(other, (datetime.datetime)):
+            return self._datetime - other
+        elif self and isinstance(other, (DateTime)):
+            return self._datetime - other._datetime
+        elif self and isinstance(other, (datetime.timedelta)):
+            return DateTime(self._datetime - other)
         else:
             return NotImplemented
     @classmethod
@@ -817,13 +812,13 @@ class DateTime(object):
         if Date(date) and Time(time):
             return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond)
         return cls()
-    def date(yo):
-        if yo:
-            return Date(yo.year, yo.month, yo.day)
+    def date(self):
+        if self:
+            return Date(self.year, self.month, self.day)
         return Date()
-    def datetime(yo):
-        if yo:
-            return yo._datetime
+    def datetime(self):
+        if self:
+            return self._datetime
         return None
     @classmethod    
     def fromordinal(cls, number):
@@ -837,9 +832,9 @@ class DateTime(object):
     @classmethod
     def now(cls):
         return cls(datetime.datetime.now())
-    def time(yo):
-        if yo:
-            return Time(yo.hour, yo.minute, yo.second, yo.microsecond)
+    def time(self):
+        if self:
+            return Time(self.hour, self.minute, self.second, self.microsecond)
         return Time()
     @classmethod
     def utcnow(cls):
@@ -868,35 +863,35 @@ class Time(object):
         elif hour is not None:
             nt._time = datetime.time(hour, minute, second, microsec)
         return nt
-    def __add__(yo, other):
-        if yo and isinstance(other, (datetime.timedelta)):
-            t = yo._time
+    def __add__(self, other):
+        if self and isinstance(other, (datetime.timedelta)):
+            t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
             t += other
             return Time(t.hour, t.minute, t.second, t.microsecond)
         else:
             return NotImplemented
-    def __eq__(yo, other):
-        if isinstance(other, yo.__class__):
-            return yo._time == other._time
+    def __eq__(self, other):
+        if isinstance(other, self.__class__):
+            return self._time == other._time
         if isinstance(other, datetime.time):
-            return yo._time == other
+            return self._time == other
         if isinstance(other, type(None)):
-            return yo._time is None
+            return self._time is None
         return NotImplemented
-    def __getattr__(yo, name):
-        if yo:
-            attribute = yo._time.__getattribute__(name)
+    def __getattr__(self, name):
+        if self:
+            attribute = self._time.__getattribute__(name)
             return attribute
         else:
             raise AttributeError('null Time object has no attribute %s' % name)
-    def __ge__(yo, other):
-        if yo:
+    def __ge__(self, other):
+        if self:
             if isinstance(other, (datetime.time)):
-                return yo._time >= other
+                return self._time >= other
             elif isinstance(other, (Time)):
                 if other:
-                    return yo._time >= other._time
+                    return self._time >= other._time
                 return False
         else:
             if isinstance(other, (datetime.time)):
@@ -906,13 +901,13 @@ class Time(object):
                     return False
                 return True
         return NotImplemented
-    def __gt__(yo, other):
-        if yo:
+    def __gt__(self, other):
+        if self:
             if isinstance(other, (datetime.time)):
-                return yo._time > other
+                return self._time > other
             elif isinstance(other, (DateTime)):
                 if other:
-                    return yo._time > other._time
+                    return self._time > other._time
                 return True
         else:
             if isinstance(other, (datetime.time)):
@@ -922,15 +917,15 @@ class Time(object):
                     return False
                 return False
         return NotImplemented
-    def __hash__(yo):
-        return yo._datetime.__hash__()
-    def __le__(yo, other):
-        if yo:
+    def __hash__(self):
+        return self._datetime.__hash__()
+    def __le__(self, other):
+        if self:
             if isinstance(other, (datetime.time)):
-                return yo._time <= other
+                return self._time <= other
             elif isinstance(other, (Time)):
                 if other:
-                    return yo._time <= other._time
+                    return self._time <= other._time
                 return False
         else:
             if isinstance(other, (datetime.time)):
@@ -940,13 +935,13 @@ class Time(object):
                     return True
                 return True
         return NotImplemented
-    def __lt__(yo, other):
-        if yo:
+    def __lt__(self, other):
+        if self:
             if isinstance(other, (datetime.time)):
-                return yo._time < other
+                return self._time < other
             elif isinstance(other, (Time)):
                 if other:
-                    return yo._time < other._time
+                    return self._time < other._time
                 return False
         else:
             if isinstance(other, (datetime.time)):
@@ -956,13 +951,13 @@ class Time(object):
                     return True
                 return False
         return NotImplemented
-    def __ne__(yo, other):
-        if yo:
+    def __ne__(self, other):
+        if self:
             if isinstance(other, (datetime.time)):
-                return yo._time != other
+                return self._time != other
             elif isinstance(other, (Time)):
                 if other:
-                    return yo._time != other._time
+                    return self._time != other._time
                 return True
         else:
             if isinstance(other, (datetime.time)):
@@ -972,36 +967,36 @@ class Time(object):
                     return True
                 return False
         return NotImplemented
-    def __nonzero__(yo):
-        return bool(yo._time)
+    def __nonzero__(self):
+        return bool(self._time)
     __radd__ = __add__
-    def __rsub__(yo, other):
-        if yo and isinstance(other, (Time, datetime.time)):
-            t = yo._time
+    def __rsub__(self, other):
+        if self and isinstance(other, (Time, datetime.time)):
+            t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
             other = datetime.datetime(2012, 6, 27, other.hour, other.minute, other.second, other.microsecond)
             other -= t
             return other
         else:
             return NotImplemented
-    def __repr__(yo):
-        if yo:
-            return "Time(%d, %d, %d, %d)" % (yo.hour, yo.minute, yo.second, yo.microsecond)
+    def __repr__(self):
+        if self:
+            return "Time(%d, %d, %d, %d)" % (self.hour, self.minute, self.second, self.microsecond)
         else:
             return "Time()"
-    def __str__(yo):
-        if yo:
-            return yo.isoformat()
+    def __str__(self):
+        if self:
+            return self.isoformat()
         return ""
-    def __sub__(yo, other):
-        if yo and isinstance(other, (Time, datetime.time)):
-            t = yo._time
+    def __sub__(self, other):
+        if self and isinstance(other, (Time, datetime.time)):
+            t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
             o = datetime.datetime(2012, 6, 27, other.hour, other.minute, other.second, other.microsecond)
             t -= other
             return Time(t.hour, t.minute, t.second, t.microsecond)
-        elif yo and isinstance(other, (datetime.timedelta)):
-            t = yo._time
+        elif self and isinstance(other, (datetime.timedelta)):
+            t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
             t -= other
             return Time(t.hour, t.minute, t.second, t.microsecond)
@@ -1578,21 +1573,21 @@ Other = Quantum()
 class _DbfRecord(object):
     """Provides routines to extract and save data within the fields of a dbf record."""
     __slots__ = ['_recnum', '_layout', '_data', '_dirty', '__weakref__']
-    def _retrieveFieldValue(yo, index, name):
+    def _retrieve_field_value(self, index, name):
         """calls appropriate routine to convert value stored in field from array
         @param record_data: the data portion of the record
         @type record_data: array of characters
         @param fielddef: description of the field definition
         @type fielddef: dictionary with keys 'type', 'start', 'length', 'end', 'decimals', and 'flags'
         @returns: python data stored in field"""
-        fielddef = yo._layout[name]
+        fielddef = self._layout[name]
         flags = fielddef[FLAGS]
         nullable = flags & NULLABLE
         binary = flags & BINARY
         if nullable:
             byte, bit = divmod(index, 8)
-            null_def = yo._layout['_nullflags']
-            null_data = yo._data[null_def[START]:null_def[END]]
+            null_def = self._layout['_nullflags']
+            null_data = self._data[null_def[START]:null_def[END]]
             try:
                 if ord(null_data[byte]) >> bit & 1:
                     return Null
@@ -1600,28 +1595,28 @@ class _DbfRecord(object):
                 print null_data
                 print index
                 print byte, bit
-                print len(yo._data), yo._data
+                print len(self._data), self._data
                 print null_def
                 print null_data
                 raise
 
-        record_data = yo._data[fielddef[START]:fielddef[END]]
+        record_data = self._data[fielddef[START]:fielddef[END]]
         field_type = fielddef[TYPE]
-        retrieve = yo._layout.fieldtypes[field_type]['Retrieve']
-        datum = retrieve(record_data, fielddef, yo._layout.memo, yo._layout.decoder)
+        retrieve = self._layout.fieldtypes[field_type]['Retrieve']
+        datum = retrieve(record_data, fielddef, self._layout.memo, self._layout.decoder)
         return datum
-    def _updateFieldValue(yo, index, name, value):
+    def _update_field_value(self, index, name, value):
         "calls appropriate routine to convert value to ascii bytes, and save it in record"
-        fielddef = yo._layout[name]
+        fielddef = self._layout[name]
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
         binary = flags & BINARY
         nullable = flags & NULLABLE
-        update = yo._layout.fieldtypes[field_type]['Update']
+        update = self._layout.fieldtypes[field_type]['Update']
         if nullable:
             byte, bit = divmod(index, 8)
-            null_def = yo._layout['_nullflags']
-            null_data = yo._data[null_def[START]:null_def[END]].tostring()
+            null_def = self._layout['_nullflags']
+            null_data = self._data[null_def[START]:null_def[END]].tostring()
             null_data = [ord(c) for c in null_data]
             if value is Null:
                 null_data[byte] |= 1 << bit
@@ -1629,9 +1624,9 @@ class _DbfRecord(object):
             else:
                 null_data[byte] &= 0xff ^ 1 << bit
             null_data = array('c', [chr(n) for n in null_data])
-            yo._data[null_def[START]:null_def[END]] = null_data
+            self._data[null_def[START]:null_def[END]] = null_data
         if value is not Null:
-            bytes = array('c', update(value, fielddef, yo._layout.memo, yo._layout.input_decoder, yo._layout.encoder))
+            bytes = array('c', update(value, fielddef, self._layout.memo, self._layout.input_decoder, self._layout.encoder))
             size = fielddef[LENGTH]
             if len(bytes) > size:
                 raise DataOverflow("tried to store %d bytes in %d byte field" % (len(bytes), size))
@@ -1639,24 +1634,25 @@ class _DbfRecord(object):
             start = fielddef[START]
             end = start + size
             blank[:len(bytes)] = bytes[:]
-            yo._data[start:end] = blank[:]
-        yo._dirty = True
-    def _update_disk(yo, location='', data=None):
-        layout = yo._layout
+            self._data[start:end] = blank[:]
+        self._dirty = True
+        self._layout._dirty = True
+    def _update_disk(self, location='', data=None):
+        layout = self._layout
         if not layout.inmemory:
             header = layout.header
-            if yo._recnum < 0:
+            if self._recnum < 0:
                 raise DbfError("Attempted to update record that has been packed")
             if location == '':
-                location = yo._recnum * header.record_length + header.start
+                location = self._recnum * header.record_length + header.start
             if data is None:
-                data = yo._data
+                data = self._data
             layout.dfd.seek(location)
             layout.dfd.write(data)
-            yo._dirty = False
+            self._dirty = False
         if layout.table() is not None:  # is None when table is being destroyed
-            for index in yo.record_table._indexen:
-                index(yo)
+            for index in self.record_table._indexen:
+                index(self)
     def __new__(cls, recnum, layout, kamikaze='', _fromdisk=False):
         """record = ascii array of entire record; layout=record specification; memo = memo object for table"""
         record = object.__new__(cls)
@@ -1665,7 +1661,7 @@ class _DbfRecord(object):
         record._layout = layout
         header = layout.header
         if layout.blankrecord is None and not _fromdisk:
-            record._createBlankRecord()
+            record._create_blank_record()
         record._data = layout.blankrecord
         if recnum == -1:                    # not a disk-backed record
             return record
@@ -1685,273 +1681,270 @@ class _DbfRecord(object):
         if not _fromdisk and not layout.inmemory:
             record._update_disk()
         return record
-    def __contains__(yo, key):
-        return key in yo._layout.fields or key in ['record_number','delete_flag']
-    def __iter__(yo):
-        return (yo[field] for field in yo._layout.fields if not yo._layout[field][FLAGS] & SYSTEM)
-    def __getattr__(yo, name):
+    def __contains__(self, key):
+        return key in self._layout.user_fields or key in ['record_number','delete_flag']
+    def __iter__(self):
+        return (self[field] for field in self._layout.user_fields)
+    def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
             raise AttributeError, 'Method %s is not implemented.' % name
         elif name == 'record_number':
-            return yo._recnum
+            return self._recnum
         elif name == 'delete_flag':
-            return yo._data[0] != ' '
-        elif not name in yo._layout.fields:
+            return self._data[0] != ' '
+        elif not name in self._layout.fields:
             raise FieldMissing(name)
         try:
-            index = yo._layout.fields.index(name)
-            value = yo._retrieveFieldValue(index, name)
+            index = self._layout.fields.index(name)
+            value = self._retrieve_field_value(index, name)
             return value
         except DbfError, error:
-            error.message = "field --%s-- is %s -> %s" % (name, yo._layout.fieldtypes[fielddef['type']]['Type'], error.message)
+            error.message = "field --%s-- is %s -> %s" % (name, self._layout.fieldtypes[fielddef['type']]['Type'], error.message)
             raise
-    def __getitem__(yo, item):
+    def __getitem__(self, item):
         if isinstance(item, (int, long)):
-            fields = [f for f in yo._layout.fields if not yo._layout[f][FLAGS] & SYSTEM]
+            fields = self._layout.user_fields
             field_count = len(fields)
             if not -field_count <= item < field_count:
                 raise IndexError("Field offset %d is not in record" % item)
-            return yo[fields[item]]
+            return self[fields[item]]
         elif isinstance(item, slice):
             sequence = []
-            for index in yo._layout.fields[item]:
-                sequence.append(yo[index])
+            for index in self._layout.fields[item]:
+                sequence.append(self[index])
             return sequence
         elif isinstance(item, (str, unicode)):
-            return yo.__getattr__(item)
+            return self.__getattr__(item)
         else:
             raise TypeError("%r is not a field name" % item)
-    def __len__(yo):
-        return yo._layout.header.field_count
-    def __setattr__(yo, name, value):
-        if name in yo.__slots__:
-            object.__setattr__(yo, name, value)
+    def __len__(self):
+        return self._layout.user_field_count
+    def __setattr__(self, name, value):
+        if name in self.__slots__:
+            object.__setattr__(self, name, value)
             return
-        elif not name in yo._layout.fields:
+        elif not name in self._layout.fields:
             raise FieldMissing(name)
-        index = yo._layout.fields.index(name)
+        index = self._layout.fields.index(name)
         try:
-            yo._updateFieldValue(index, name, value)
+            self._update_field_value(index, name, value)
         except DbfError, error:
-            fielddef = yo._layout[name]
-            message = "%s (%s) = %r --> %s" % (name, yo._layout.fieldtypes[fielddef[TYPE]]['Type'], value, error.message)
+            fielddef = self._layout[name]
+            message = "%s (%s) = %r --> %s" % (name, self._layout.fieldtypes[fielddef[TYPE]]['Type'], value, error.message)
             data = name
             err_cls = error.__class__
             raise err_cls(message, data)
-    def __setitem__(yo, name, value):
+    def __setitem__(self, name, value):
         if isinstance(name, (str, unicode)):
-            yo.__setattr__(name, value)
+            self.__setattr__(name, value)
         elif isinstance(name, (int, long)):
-            yo.__setattr__(yo._layout.fields[name], value)
+            self.__setattr__(self._layout.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
-            for field in yo._layout.fields[name]:
+            for field in self._layout.fields[name]:
                 sequence.append(field)
             if len(sequence) != len(value):
                 raise DbfError("length of slices not equal")
             for field, val in zip(sequence, value):
-                yo[field] = val
+                self[field] = val
         else:
             raise TypeError("%s is not a field name" % name)
-    def __str__(yo):
+    def __str__(self):
         result = []
-        for seq, field in enumerate(yo.field_names):
-            if yo._layout[field][FLAGS] & SYSTEM:
-                continue
-            result.append("%3d - %-10s: %r" % (seq, field, yo[field]))
+        for seq, field in enumerate(self.field_names):
+            result.append("%3d - %-10s: %r" % (seq, field, self[field]))
         return '\n'.join(result)
-    def __repr__(yo):
-        return yo._data.tostring()
+    def __repr__(self):
+        return self._data.tostring()
     #@classmethod
-    def _createBlankRecord(yo):
+    def _create_blank_record(self):
         "creates a blank record data chunk"
-        layout = yo._layout
+        layout = self._layout
         ondisk = layout.ondisk
         layout.ondisk = False
-        yo._data = array('c', ' ' * layout.header.record_length)
+        self._data = array('c', ' ' * layout.header.record_length)
         layout.memofields = []
         for index, name in enumerate(layout.fields):
             if name == '_nullflags':
-                yo._data[layout['_nullflags'][START]:layout['_nullflags'][END]] = array('c', chr(0) * layout['_nullflags'][LENGTH])
+                self._data[layout['_nullflags'][START]:layout['_nullflags'][END]] = array('c', chr(0) * layout['_nullflags'][LENGTH])
         for index, name in enumerate(layout.fields):
             if name != '_nullflags':
-                yo._updateFieldValue(index, name, None)
+                self._update_field_value(index, name, None)
                 if layout[name][TYPE] in layout.memotypes:
                     layout.memofields.append(name)
-        layout.blankrecord = yo._data[:]
+        layout.blankrecord = self._data[:]
         layout.ondisk = ondisk
-    def delete_record(yo):
+    def delete_record(self):
         "marks record as deleted"
-        yo._data[0] = '*'
-        yo._dirty = True
-        return yo
+        self._data[0] = '*'
+        self._dirty = True
+        return self
     @property
-    def field_names(yo):
+    def field_names(self):
         "fields in table/record"
-        return [f for f in yo._layout.fields if not yo._layout[f][FLAGS] & SYSTEM]
-    def gather_fields(yo, dictionary, drop=False):
+        return self._layout.user_fields[:]
+    def gather_fields(self, dictionary, drop=False):
         """saves a dictionary into a record's fields
         keys with no matching field will raise a FieldMissing exception unless drop_missing = True
         if an Exception occurs the record is restored before reraising"""
-        old_data = yo._data[:]
+        old_data = self._data[:]
         try:
             for key, value in dictionary.items():
-                if not key in yo.field_names:
+                if not key in self.field_names:
                     if drop:
                         continue
                     raise FieldMissing(key)
-                yo.__setattr__(key, value)
+                self.__setattr__(key, value)
         except:
-            yo._data[:] = old_data
+            self._data[:] = old_data
             raise
-        return yo
+        return self
     @property
-    def has_been_deleted(yo):
+    def has_been_deleted(self):
         "marked for deletion?"
-        return yo._data[0] == '*'
+        return self._data[0] == '*'
     @property
-    def record_number(yo):
+    def record_number(self):
         "physical record number"
-        return yo._recnum
+        return self._recnum
     @property
-    def record_table(yo):
+    def record_table(self):
         "table associated with record"
-        table = yo._layout.table()
+        table = self._layout.table()
         if table is None:
             raise DbfError("table is no longer available")
         return table
-    def reindex(yo):
+    def reindex(self):
         "rerun all indices with this record"
-        for dbfindex in yo._layout.table()._indexen:
-            dbfindex(yo)
-    def reset_record(yo, keep_fields=None):
+        for dbfindex in self._layout.table()._indexen:
+            dbfindex(self)
+    def reset_record(self, keep_fields=None):
         "blanks record, except for field in keep_fields"
         if keep_fields is None:
             keep_fields = []
         keep = {}
         for field in keep_fields:
-            keep[field] = yo[field]
-        if yo._layout.blankrecord == None:
-            yo._createBlankRecord()
-        yo._data[:] = yo._layout.blankrecord[:]
+            keep[field] = self[field]
+        if self._layout.blankrecord == None:
+            self._create_blank_record()
+        self._data[:] = self._layout.blankrecord[:]
         for field in keep_fields:
-            yo[field] = keep[field]
-        yo._dirty = True
-        return yo
-    def scatter_fields(yo, blank=False):
+            self[field] = keep[field]
+        self._dirty = True
+        return self
+    def scatter_fields(self, blank=False):
         "returns a dictionary of fieldnames and values which can be used with gather_fields().  if blank is True, values are empty."
-        keys = [field for field in yo._layout.fields if not yo._layout[field][FLAGS] & SYSTEM]
+        keys = self._layout.user_fields
         if blank:
             values = []
-            layout = yo._layout
+            layout = self._layout
             for key in keys:
                 fielddef = layout[key]
                 empty = fielddef[EMPTY]
                 values.append(empty())
         else:
-            values = [yo[field] for field in keys]
+            values = [self[field] for field in keys]
         return dict(zip(keys, values))
-    def undelete_record(yo):
+    def undelete_record(self):
         "marks record as active"
-        yo._data[0] = ' '
-        yo._dirty = True
-        return yo
-    def write_record(yo, _force=False, **kwargs):
+        self._data[0] = ' '
+        self._dirty = True
+        return self
+    def write_record(self, _force=False, **kwargs):
         "write record data to disk (updates indices)"
         if kwargs:
-            yo.gather_fields(kwargs)
-        if yo._dirty or _force:
-            yo._update_disk()
+            self.gather_fields(kwargs)
+        if self._dirty or _force:
+            self._update_disk()
             return 1
         return 0
 class _DbfMemo(object):
     """Provides access to memo fields as dictionaries
        must override _init, _get_memo, and _put_memo to
        store memo contents to disk"""
-    def _init(yo):
+    def _init(self):
         "initialize disk file usage"
-    def _get_memo(yo, block):
+    def _get_memo(self, block):
         "retrieve memo contents from disk"
-    def _put_memo(yo, data):
+    def _put_memo(self, data):
         "store memo contents to disk"
-    def _zap(yo):
+    def _zap(self):
         "resets memo structure back to zero memos"
-        yo.memory.clear()
-        yo.nextmemo = 1
-    def __init__(yo, meta):
+        self.memory.clear()
+        self.nextmemo = 1
+    def __init__(self, meta):
         ""
-        yo.meta = meta
-        yo.memory = {}
-        yo.nextmemo = 1
-        yo._init()
-        yo.meta.newmemofile = False
-    def get_memo(yo, block):
+        self.meta = meta
+        self.memory = {}
+        self.nextmemo = 1
+        self._init()
+        self.meta.newmemofile = False
+    def get_memo(self, block):
         "gets the memo in block"
-        if yo.meta.ignorememos or not block:
+        if self.meta.ignorememos or not block:
             return ''
-        if yo.meta.ondisk:
-            return yo._get_memo(block)
+        if self.meta.ondisk:
+            return self._get_memo(block)
         else:
-            return yo.memory[block]
-    def put_memo(yo, data):
+            return self.memory[block]
+    def put_memo(self, data):
         "stores data in memo file, returns block number"
-        if yo.meta.ignorememos or data == '':
+        if self.meta.ignorememos or data == '':
             return 0
-        if yo.meta.inmemory:
-            thismemo = yo.nextmemo
-            yo.nextmemo += 1
-            yo.memory[thismemo] = data
+        if self.meta.inmemory:
+            thismemo = self.nextmemo
+            self.nextmemo += 1
+            self.memory[thismemo] = data
         else:
-            thismemo = yo._put_memo(data)
+            thismemo = self._put_memo(data)
         return thismemo
 class _Db3Memo(_DbfMemo):
-    def _init(yo):
+    def _init(self):
         "dBase III specific"
-        yo.meta.memo_size= 512
-        yo.record_header_length = 2
-        if yo.meta.ondisk and not yo.meta.ignorememos:
-            if yo.meta.newmemofile:
-                yo.meta.mfd = open(yo.meta.memoname, 'w+b')
-                yo.meta.mfd.write(packLongInt(1) + '\x00' * 508)
+        self.meta.memo_size= 512
+        self.record_header_length = 2
+        if self.meta.ondisk and not self.meta.ignorememos:
+            if self.meta.newmemofile:
+                self.meta.mfd = open(self.meta.memoname, 'w+b')
+                self.meta.mfd.write(pack_long_int(1) + '\x00' * 508)
             else:
                 try:
-                    yo.meta.mfd = open(yo.meta.memoname, 'r+b')
-                    yo.meta.mfd.seek(0)
-                    next = yo.meta.mfd.read(4)
-                    yo.nextmemo = unpackLongInt(next)
-                except Exception:
-                    traceback.print_exc()
-                    raise DbfError("memo file appears to be corrupt")
-    def _get_memo(yo, block):
+                    self.meta.mfd = open(self.meta.memoname, 'r+b')
+                    self.meta.mfd.seek(0)
+                    next = self.meta.mfd.read(4)
+                    self.nextmemo = unpack_long_int(next)
+                except Exception, exc:
+                    raise DbfError("memo file appears to be corrupt: %r" % exc.args)
+    def _get_memo(self, block):
         block = int(block)
-        yo.meta.mfd.seek(block * yo.meta.memo_size)
+        self.meta.mfd.seek(block * self.meta.memo_size)
         eom = -1
         data = ''
         while eom == -1:
-            newdata = yo.meta.mfd.read(yo.meta.memo_size)
+            newdata = self.meta.mfd.read(self.meta.memo_size)
             if not newdata:
                 return data
             data += newdata
             eom = data.find('\x1a\x1a')
         return data[:eom]
-    def _put_memo(yo, data):
+    def _put_memo(self, data):
         data = data
-        length = len(data) + yo.record_header_length  # room for two ^Z at end of memo
-        blocks = length // yo.meta.memo_size
-        if length % yo.meta.memo_size:
+        length = len(data) + self.record_header_length  # room for two ^Z at end of memo
+        blocks = length // self.meta.memo_size
+        if length % self.meta.memo_size:
             blocks += 1
-        thismemo = yo.nextmemo
-        yo.nextmemo = thismemo + blocks
-        yo.meta.mfd.seek(0)
-        yo.meta.mfd.write(packLongInt(yo.nextmemo))
-        yo.meta.mfd.seek(thismemo * yo.meta.memo_size)
-        yo.meta.mfd.write(data)
-        yo.meta.mfd.write('\x1a\x1a')
-        double_check = yo._get_memo(thismemo)
+        thismemo = self.nextmemo
+        self.nextmemo = thismemo + blocks
+        self.meta.mfd.seek(0)
+        self.meta.mfd.write(pack_long_int(self.nextmemo))
+        self.meta.mfd.seek(thismemo * self.meta.memo_size)
+        self.meta.mfd.write(data)
+        self.meta.mfd.write('\x1a\x1a')
+        double_check = self._get_memo(thismemo)
         if len(double_check) != len(data):
             uhoh = open('dbf_memo_dump.err','wb')
             uhoh.write('thismemo: %d' % thismemo)
-            uhoh.write('nextmemo: %d' % yo.nextmemo)
+            uhoh.write('nextmemo: %d' % self.nextmemo)
             uhoh.write('saved: %d bytes' % len(data))
             uhoh.write(data)
             uhoh.write('retrieved: %d bytes' % len(double_check))
@@ -1959,70 +1952,69 @@ class _Db3Memo(_DbfMemo):
             uhoh.close()
             raise DbfError("unknown error: memo not saved")
         return thismemo
-    def _zap(yo):
-        if yo.meta.ondisk and not yo.meta.ignorememos:
-            mfd = yo.meta.mfd
+    def _zap(self):
+        if self.meta.ondisk and not self.meta.ignorememos:
+            mfd = self.meta.mfd
             mfd.seek(0)
             mfd.truncate(0)
-            mfd.write(packLongInt(1) + '\x00' * 508)
+            mfd.write(pack_long_int(1) + '\x00' * 508)
             mfd.flush()
 
 class _VfpMemo(_DbfMemo):
-    def _init(yo):
+    def _init(self):
         "Visual Foxpro 6 specific"
-        if yo.meta.ondisk and not yo.meta.ignorememos:
-            yo.record_header_length = 8
-            if yo.meta.newmemofile:
-                if yo.meta.memo_size == 0:
-                    yo.meta.memo_size = 1
-                elif 1 < yo.meta.memo_size < 33:
-                    yo.meta.memo_size *= 512
-                yo.meta.mfd = open(yo.meta.memoname, 'w+b')
-                nextmemo = 512 // yo.meta.memo_size
-                if nextmemo * yo.meta.memo_size < 512:
+        if self.meta.ondisk and not self.meta.ignorememos:
+            self.record_header_length = 8
+            if self.meta.newmemofile:
+                if self.meta.memo_size == 0:
+                    self.meta.memo_size = 1
+                elif 1 < self.meta.memo_size < 33:
+                    self.meta.memo_size *= 512
+                self.meta.mfd = open(self.meta.memoname, 'w+b')
+                nextmemo = 512 // self.meta.memo_size
+                if nextmemo * self.meta.memo_size < 512:
                     nextmemo += 1
-                yo.nextmemo = nextmemo
-                yo.meta.mfd.write(packLongInt(nextmemo, bigendian=True) + '\x00\x00' + \
-                        packShortInt(yo.meta.memo_size, bigendian=True) + '\x00' * 504)
+                self.nextmemo = nextmemo
+                self.meta.mfd.write(pack_long_int(nextmemo, bigendian=True) + '\x00\x00' + \
+                        pack_short_int(self.meta.memo_size, bigendian=True) + '\x00' * 504)
             else:
                 try:
-                    yo.meta.mfd = open(yo.meta.memoname, 'r+b')
-                    yo.meta.mfd.seek(0)
-                    header = yo.meta.mfd.read(512)
-                    yo.nextmemo = unpackLongInt(header[:4], bigendian=True)
-                    yo.meta.memo_size = unpackShortInt(header[6:8], bigendian=True)
-                except:
-                    traceback.print_exc()
-                    raise DbfError("memo file appears to be corrupt")
-    def _get_memo(yo, block):
-        yo.meta.mfd.seek(block * yo.meta.memo_size)
-        header = yo.meta.mfd.read(8)
-        length = unpackLongInt(header[4:], bigendian=True)
-        return yo.meta.mfd.read(length)
-    def _put_memo(yo, data):
+                    self.meta.mfd = open(self.meta.memoname, 'r+b')
+                    self.meta.mfd.seek(0)
+                    header = self.meta.mfd.read(512)
+                    self.nextmemo = unpack_long_int(header[:4], bigendian=True)
+                    self.meta.memo_size = unpack_short_int(header[6:8], bigendian=True)
+                except Exception, exc:
+                    raise DbfError("memo file appears to be corrupt: %r" % exc.args)
+    def _get_memo(self, block):
+        self.meta.mfd.seek(block * self.meta.memo_size)
+        header = self.meta.mfd.read(8)
+        length = unpack_long_int(header[4:], bigendian=True)
+        return self.meta.mfd.read(length)
+    def _put_memo(self, data):
         data = data
-        yo.meta.mfd.seek(0)
-        thismemo = unpackLongInt(yo.meta.mfd.read(4), bigendian=True)
-        yo.meta.mfd.seek(0)
-        length = len(data) + yo.record_header_length
-        blocks = length // yo.meta.memo_size
-        if length % yo.meta.memo_size:
+        self.meta.mfd.seek(0)
+        thismemo = unpack_long_int(self.meta.mfd.read(4), bigendian=True)
+        self.meta.mfd.seek(0)
+        length = len(data) + self.record_header_length
+        blocks = length // self.meta.memo_size
+        if length % self.meta.memo_size:
             blocks += 1
-        yo.meta.mfd.write(packLongInt(thismemo+blocks, bigendian=True))
-        yo.meta.mfd.seek(thismemo*yo.meta.memo_size)
-        yo.meta.mfd.write('\x00\x00\x00\x01' + packLongInt(len(data), bigendian=True) + data)
+        self.meta.mfd.write(pack_long_int(thismemo+blocks, bigendian=True))
+        self.meta.mfd.seek(thismemo*self.meta.memo_size)
+        self.meta.mfd.write('\x00\x00\x00\x01' + pack_long_int(len(data), bigendian=True) + data)
         return thismemo
-    def _zap(yo):
-        if yo.meta.ondisk and not yo.meta.ignorememos:
-            mfd = yo.meta.mfd
+    def _zap(self):
+        if self.meta.ondisk and not self.meta.ignorememos:
+            mfd = self.meta.mfd
             mfd.seek(0)
             mfd.truncate(0)
-            nextmemo = 512 // yo.meta.memo_size
-            if nextmemo * yo.meta.memo_size < 512:
+            nextmemo = 512 // self.meta.memo_size
+            if nextmemo * self.meta.memo_size < 512:
                 nextmemo += 1
-            yo.nextmemo = nextmemo
-            mfd.write(packLongInt(nextmemo, bigendian=True) + '\x00\x00' + \
-                    packShortInt(yo.meta.memo_size, bigendian=True) + '\x00' * 504)
+            self.nextmemo = nextmemo
+            mfd.write(pack_long_int(nextmemo, bigendian=True) + '\x00\x00' + \
+                    pack_short_int(self.meta.memo_size, bigendian=True) + '\x00' * 504)
             mfd.flush()
 
 class DbfCsv(csv.Dialect):
@@ -2040,7 +2032,7 @@ csv.register_dialect('dbf', DbfCsv)
 
 VFPTIME = 1721425
 
-def packShortInt(value, bigendian=False):
+def pack_short_int(value, bigendian=False):
         "Returns a two-bye integer from the value, or raises DbfError"
         # 256 / 65,536
         if value > 65535:
@@ -2049,7 +2041,7 @@ def packShortInt(value, bigendian=False):
             return struct.pack('>H', value)
         else:
             return struct.pack('<H', value)
-def packLongInt(value, bigendian=False):
+def pack_long_int(value, bigendian=False):
         "Returns a four-bye integer from the value, or raises DbfError"
         # 256 / 65,536 / 16,777,216
         if value > 4294967295:
@@ -2058,24 +2050,24 @@ def packLongInt(value, bigendian=False):
             return struct.pack('>L', value)
         else:
             return struct.pack('<L', value)
-def packStr(string):
+def pack_str(string):
         "Returns an 11 byte, upper-cased, null padded string suitable for field names; raises DbfError if the string is bigger than 10 bytes"
         if len(string) > 10:
             raise DbfError("Maximum string size is ten characters -- %s has %d characters" % (string, len(string)))
         return struct.pack('11s', string.upper())       
-def unpackShortInt(bytes, bigendian=False):
+def unpack_short_int(bytes, bigendian=False):
         "Returns the value in the two-byte integer passed in"
         if bigendian:
             return struct.unpack('>H', bytes)[0]
         else:
             return struct.unpack('<H', bytes)[0]
-def unpackLongInt(bytes, bigendian=False):
+def unpack_long_int(bytes, bigendian=False):
         "Returns the value in the four-byte integer passed in"
         if bigendian:
             return int(struct.unpack('>L', bytes)[0])
         else:
             return int(struct.unpack('<L', bytes)[0])
-def unpackStr(chars):
+def unpack_str(chars):
         "Returns a normal, lower-cased string from a null-padded byte string"
         field = struct.unpack('%ds' % len(chars), chars)[0]
         name = []
@@ -2084,10 +2076,10 @@ def unpackStr(chars):
                 break
             name.append(ch.lower())
         return ''.join(name)
-def unsupportedType(something, *ignore):
+def unsupported_type(something, *ignore):
     "called if a data type is not supported for that style of table"
     return something
-def retrieveCharacter(bytes, fielddef, memo, decoder):
+def retrieve_character(bytes, fielddef, memo, decoder):
     "Returns the string in bytes as fielddef[CLASS] or fielddef[EMPTY]"
     data = bytes.tostring()
     if not data.strip():
@@ -2098,7 +2090,7 @@ def retrieveCharacter(bytes, fielddef, memo, decoder):
     if fielddef[FLAGS] & BINARY:
         return data
     return fielddef[CLASS](decoder(data)[0])
-def updateCharacter(string, fielddef, memo, decoder, encoder):
+def update_character(string, fielddef, memo, decoder, encoder):
     "returns the string as bytes (not unicode) as fielddef[CLASS] or fielddef[EMPTY]"
     if string == None:
         return fielddef[LENGTH] * ' '
@@ -2113,11 +2105,11 @@ def updateCharacter(string, fielddef, memo, decoder, encoder):
                 raise BadData("unable to coerce %r(%r) to string" % (type(string), string))
             string = decoder(string)[0]
         return encoder(string)[0]
-def retrieveCurrency(bytes, fielddef, *ignore):
+def retrieve_currency(bytes, fielddef, *ignore):
     "returns the currency value in bytes"
     value = struct.unpack('<q', bytes)[0]
     return fielddef[CLASS](("%de-4" % value).strip())
-def updateCurrency(value, *ignore):
+def update_currency(value, *ignore):
     "returns the value to be stored in the record's disk data"
     if value == None:
         value = 0
@@ -2125,7 +2117,7 @@ def updateCurrency(value, *ignore):
     if not -9223372036854775808 < currency < 9223372036854775808:
         raise DataOverflow("value %s is out of bounds" % value)
     return struct.pack('<q', currency)
-def retrieveDate(bytes, fielddef, *ignore):
+def retrieve_date(bytes, fielddef, *ignore):
     "Returns the ascii coded date as fielddef[CLASS] or fielddef[EMPTY]"
     text = bytes.tostring()
     if text == '        ':
@@ -2137,29 +2129,29 @@ def retrieveDate(bytes, fielddef, *ignore):
     month = int(text[4:6])
     day = int(text[6:8])
     return fielddef[CLASS](year, month, day)
-def updateDate(moment, *ignore):
+def update_date(moment, *ignore):
     "returns the Date or datetime.date object ascii-encoded (yyyymmdd)"
     if moment == None:
         return '        '
     return "%04d%02d%02d" % moment.timetuple()[:3]
-def retrieveDouble(bytes, fielddef, *ignore):
+def retrieve_double(bytes, fielddef, *ignore):
     "Returns the double in bytes as fielddef[CLASS] ('default' == float)"
     typ = fielddef[CLASS]
     if typ == 'default':
         typ = float
     return typ(struct.unpack('<d', bytes)[0])
-def updateDouble(value, *ignore):
+def update_double(value, *ignore):
     "returns the value to be stored in the record's disk data"
     if value == None:
         value = 0
     return struct.pack('<d', float(value))
-def retrieveInteger(bytes, fielddef, *ignore):
+def retrieve_integer(bytes, fielddef, *ignore):
     "Returns the binary number stored in bytes in little-endian format as fielddef[CLASS]"
     typ = fielddef[CLASS]
     if typ == 'default':
         typ = int
     return typ(struct.unpack('<i', bytes)[0])
-def updateInteger(value, *ignore):
+def update_integer(value, *ignore):
     "returns value in little-endian binary format"
     if value == None:
         value = 0
@@ -2170,7 +2162,7 @@ def updateInteger(value, *ignore):
     if not -2147483648 < value < 2147483647:
         raise DataOverflow("Integer size exceeded.  Possible: -2,147,483,648..+2,147,483,647.  Attempted: %d" % value)
     return struct.pack('<i', int(value))
-def retrieveLogical(bytes, fielddef, *ignore):
+def retrieve_logical(bytes, fielddef, *ignore):
     "Returns True if bytes is 't', 'T', 'y', or 'Y', None if '?', and False otherwise"
     cls = fielddef[CLASS]
     empty = fielddef[EMPTY]
@@ -2188,7 +2180,7 @@ def retrieveLogical(bytes, fielddef, *ignore):
     else:
         raise BadData('Logical field contained %r' % bytes)
     return typ(bytes)
-def updateLogical(data, *ignore):
+def update_logical(data, *ignore):
     "Returns 'T' if logical is True, 'F' if False, '?' otherwise"
     if data is Unknown or data is None or data is Null or data is Other:
         return '?'
@@ -2197,7 +2189,7 @@ def updateLogical(data, *ignore):
     if data == False:
         return 'F'
     raise ValueError("unable to automatically coerce %r to Logical" % data)
-def retrieveMemo(bytes, fielddef, memo, decoder):
+def retrieve_memo(bytes, fielddef, memo, decoder):
     "Returns the block of data from a memo file"
     stringval = bytes.tostring().strip()
     if not stringval:
@@ -2210,7 +2202,7 @@ def retrieveMemo(bytes, fielddef, memo, decoder):
     if fielddef[FLAGS] & BINARY:
         return data
     return fielddef[CLASS](decoder(data)[0])
-def updateMemo(string, fielddef, memo, decoder, encoder):
+def update_memo(string, fielddef, memo, decoder, encoder):
     "Writes string as a memo, returns the block number it was saved into"
     if string == None:
         string = ''
@@ -2228,7 +2220,7 @@ def updateMemo(string, fielddef, memo, decoder, encoder):
     if block == 0:
         block = ''
     return "%*s" % (fielddef[LENGTH], block)
-def retrieveNumeric(bytes, fielddef, *ignore):
+def retrieve_numeric(bytes, fielddef, *ignore):
     "Returns the number stored in bytes as integer if field spec for decimals is 0, float otherwise"
     string = bytes.tostring().strip()
     cls = fielddef[CLASS]
@@ -2244,7 +2236,7 @@ def retrieveNumeric(bytes, fielddef, *ignore):
             return float(string)
     else:
         return cls(string.strip())
-def updateNumeric(value, fielddef, *ignore):
+def update_numeric(value, fielddef, *ignore):
     "returns value as ascii representation, rounding decimal portion as necessary"
     if value == None:
         return fielddef[LENGTH] * ' '
@@ -2260,7 +2252,7 @@ def updateNumeric(value, fielddef, *ignore):
     if integersize > maxintegersize:
         raise DataOverflow('Integer portion too big')
     return "%*.*f" % (fielddef[LENGTH], fielddef[DECIMALS], value)
-def retrieveVfpDateTime(bytes, fielddef, *ignore):
+def retrieve_vfp_datetime(bytes, fielddef, *ignore):
     """returns the date/time stored in bytes; dates <= 01/01/1981 00:00:00
     may not be accurate;  BC dates are nulled."""
     # two four-byte integers store the date and time.
@@ -2271,14 +2263,14 @@ def retrieveVfpDateTime(bytes, fielddef, *ignore):
             return None
         return cls()
     cls = fielddef[CLASS]
-    time = unpackLongInt(bytes[4:])
+    time = unpack_long_int(bytes[4:])
     microseconds = (time % 1000) * 1000
     time = time // 1000                      # int(round(time, -3)) // 1000 discard milliseconds
     hours = time // 3600
     mins = time % 3600 // 60
     secs = time % 3600 % 60
     time = datetime.time(hours, mins, secs, microseconds)
-    possible = unpackLongInt(bytes[:4])
+    possible = unpack_long_int(bytes[:4])
     possible -= VFPTIME
     possible = max(0, possible)
     try:
@@ -2288,7 +2280,7 @@ def retrieveVfpDateTime(bytes, fielddef, *ignore):
         print bytes
         print possible
     return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond)
-def updateVfpDateTime(moment, *ignore):
+def update_vfp_datetime(moment, *ignore):
     """sets the date/time stored in moment
     moment must have fields year, month, day, hour, minute, second, microsecond"""
     bytes = ['\x00'] * 8
@@ -2298,10 +2290,10 @@ def updateVfpDateTime(moment, *ignore):
         second = moment.second
         millisecond = moment.microsecond // 1000       # convert from millionths to thousandths
         time = ((hour * 3600) + (minute * 60) + second) * 1000 + millisecond
-        bytes[4:] = updateInteger(time)
-        bytes[:4] = updateInteger(moment.toordinal() + VFPTIME)
+        bytes[4:] = update_integer(time)
+        bytes[:4] = update_integer(moment.toordinal() + VFPTIME)
     return ''.join(bytes)
-def retrieveVfpMemo(bytes, fielddef, memo, decoder):
+def retrieve_vfp_memo(bytes, fielddef, memo, decoder):
     "Returns the block of data from a memo file"
     block = struct.unpack('<i', bytes)[0]
     if not block:
@@ -2313,7 +2305,7 @@ def retrieveVfpMemo(bytes, fielddef, memo, decoder):
     if fielddef[FLAGS] & BINARY:
         return data
     return fielddef[CLASS](decoder(data)[0])
-def updateVfpMemo(string, fielddef, memo, decoder, encoder):
+def update_vfp_memo(string, fielddef, memo, decoder, encoder):
     "Writes string as a memo, returns the block number it was saved into"
     if string == None:
         string = ''
@@ -2329,9 +2321,9 @@ def updateVfpMemo(string, fielddef, memo, decoder, encoder):
         string = encoder(string)[0]
     block = memo.put_memo(string)
     return struct.pack('<i', block)
-def addCharacter(format, flags):
+def add_character(format, flags):
     if format[0][0] != '(' or format[0][-1] != ')' or any([f not in flags for f in format[1:]]):
-        raise DbfError("Format for Character field creation is <C(n)%s>, not <C%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Character field creation is <C(n)%s>, not <C%s>" % field_spec_error_text(format, flags))
     length = int(format[0][1:-1])
     if not 0 < length < 255:
         raise ValueError
@@ -2340,9 +2332,9 @@ def addCharacter(format, flags):
     for f in format[1:]:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addDate(format, flags):
+def add_date(format, flags):
     if any([f not in flags for f in format[1:]]):
-        raise DbfError("Format for Date field creation is <D%s>, not <D%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Date field creation is <D%s>, not <D%s>" % field_spec_error_text(format, flags))
     length = 8
     decimals = 0
     flag = 0
@@ -2350,27 +2342,27 @@ def addDate(format, flags):
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addLogical(format, flags):
+def add_logical(format, flags):
     if any([f not in flags for f in format[1:]]):
-        raise DbfError("Format for Logical field creation is <L%s>, not <L%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Logical field creation is <L%s>, not <L%s>" % field_spec_error_text(format, flags))
     length = 1
     decimals = 0
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addMemo(format, flags):
+def add_memo(format, flags):
     if any(f not in flags for f in format[1:]):
-        raise DbfError("Format for Memo field creation is <M(n)%s>, not <M%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Memo field creation is <M(n)%s>, not <M%s>" % field_spec_error_text(format, flags))
     length = 10
     decimals = 0
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addNumeric(format, flags):
+def add_numeric(format, flags):
     if len(format) > 1 or format[0][0] != '(' or format[0][-1] != ')' or any(f not in flags for f in format[1:]):
-        raise DbfError("Format for Numeric field creation is <N(s,d)%s>, not <N%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Numeric field creation is <N(s,d)%s>, not <N%s>" % field_spec_error_text(format, flags))
     length, decimals = format[0][1:-1].split(',')
     length = int(length)
     decimals = int(decimals)
@@ -2382,54 +2374,54 @@ def addNumeric(format, flags):
     if decimals and not 0 < decimals <= length - 2:
         raise DbfError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
     return length, decimals, flag
-def addVfpCurrency(format, flags):
+def add_vfp_currency(format, flags):
     if any(f not in flags for f in format[1:]):
-        raise DbfError("Format for Currency field creation is <Y%s>, not <Y%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Currency field creation is <Y%s>, not <Y%s>" % field_spec_error_text(format, flags))
     length = 8
     decimals = 0
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addVfpDateTime(format, flags):
+def add_vfp_datetime(format, flags):
     if any(f not in flags for f in format[1:]):
-        raise DbfError("Format for DateTime field creation is <T%s>, not <T%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for DateTime field creation is <T%s>, not <T%s>" % field_spec_error_text(format, flags))
     length = 8
     decimals = 8
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addVfpDouble(format, flags):
+def add_vfp_double(format, flags):
     if any(f not in flags for f in format[1:]):
-        raise DbfError("Format for Double field creation is <B%s>, not <B%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Double field creation is <B%s>, not <B%s>" % field_spec_error_text(format, flags))
     length = 8
     decimals = 0
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addVfpInteger(format, flags):
+def add_vfp_integer(format, flags):
     if any(f not in flags for f in format[1:]):
-        raise DbfError("Format for Integer field creation is <I%s>, not <I%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Integer field creation is <I%s>, not <I%s>" % field_spec_error_text(format, flags))
     length = 4
     decimals = 0
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addVfpMemo(format, flags):
+def add_vfp_memo(format, flags):
     if any(f not in flags for f in format[1:]):
-        raise DbfError("Format for Memo field creation is <M%s>, not <M%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Memo field creation is <M%s>, not <M%s>" % field_spec_error_text(format, flags))
     length = 4
     decimals = 0
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
-def addVfpNumeric(format, flags):
+def add_vfp_numeric(format, flags):
     if format[0][0] != '(' or format[0][-1] != ')' or any(f not in flags for f in format[1:]):
-        raise DbfError("Format for Numeric field creation is <N(s,d)%s>, not <N%s>" % fieldSpecErrorText(format, flags))
+        raise DbfError("Format for Numeric field creation is <N(s,d)%s>, not <N%s>" % field_spec_error_text(format, flags))
     length, decimals = format[0][1:-1].split(',')
     length = int(length)
     decimals = int(decimals)
@@ -2441,7 +2433,7 @@ def addVfpNumeric(format, flags):
     if decimals and not 0 < decimals <= length - 2:
         raise DbfError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
     return length, decimals, flag
-def fieldSpecErrorText(format, flags):
+def field_spec_error_text(format, flags):
     "generic routine for error text for the add...() functions"
     flg = ''
     if flags:
@@ -2492,26 +2484,26 @@ class DbfTable(object):
     _max_fields = 255
     _max_records = 4294967296
     @MutableDefault
-    def _fieldtypes():
+    def _field_types():
         return {
                 'C' : {
-                        'Type':'Character', 'Init':addCharacter, 'Blank':str, 'Retrieve':retrieveCharacter, 'Update':updateCharacter,
+                        'Type':'Character', 'Init':add_character, 'Blank':str, 'Retrieve':retrieve_character, 'Update':update_character,
                         'Class':unicode, 'Empty':unicode, 'flags':tuple(),
                         },
                 'D' : { 
-                        'Type':'Date', 'Init':addDate, 'Blank':Date, 'Retrieve':retrieveDate, 'Update':updateDate,
+                        'Type':'Date', 'Init':add_date, 'Blank':Date, 'Retrieve':retrieve_date, 'Update':update_date,
                         'Class':datetime.date, 'Empty':none, 'flags':tuple(),
                         },
                 'L' : { 
-                        'Type':'Logical', 'Init':addLogical, 'Blank':Logical, 'Retrieve':retrieveLogical, 'Update':updateLogical,
+                        'Type':'Logical', 'Init':add_logical, 'Blank':Logical, 'Retrieve':retrieve_logical, 'Update':update_logical,
                         'Class':bool, 'Empty':none, 'flags':tuple(),
                         },
                 'M' : { 
-                        'Type':'Memo', 'Init':addMemo, 'Blank':str, 'Retrieve':retrieveMemo, 'Update':updateMemo,
+                        'Type':'Memo', 'Init':add_memo, 'Blank':str, 'Retrieve':retrieve_memo, 'Update':update_memo,
                         'Class':unicode, 'Empty':unicode, 'flags':tuple(),
                         },
                 'N' : { 
-                        'Type':'Numeric', 'Init':addNumeric, 'Blank':int, 'Retrieve':retrieveNumeric, 'Update':updateNumeric,
+                        'Type':'Numeric', 'Init':add_numeric, 'Blank':int, 'Retrieve':retrieve_numeric, 'Update':update_numeric,
                         'Class':'default', 'Empty':none, 'flags':tuple(),
                         },
                 }
@@ -2532,7 +2524,7 @@ class DbfTable(object):
     _logical_fields = ('L', )
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x00'             # table type - none
-    _dbfTableHeader[8:10] = array('c', packShortInt(33))
+    _dbfTableHeader[8:10] = array('c', pack_short_int(33))
     _dbfTableHeader[10] = '\x01'            # record length -- one for delete flag
     _dbfTableHeader[29] = '\x00'            # code page -- none, using plain ascii
     _dbfTableHeader = _dbfTableHeader.tostring()
@@ -2545,30 +2537,30 @@ class DbfTable(object):
 
     class _DbfLists(object):
         "implements the weakref structure for DbfLists"
-        def __init__(yo):
-            yo._lists = set()
-        def __iter__(yo):
-            yo._lists = set([s for s in yo._lists if s() is not None])    
-            return (s() for s in yo._lists if s() is not None)
-        def __len__(yo):
-            yo._lists = set([s for s in yo._lists if s() is not None])
-            return len(yo._lists)
-        def add(yo, new_list):
-            yo._lists.add(weakref.ref(new_list))
-            yo._lists = set([s for s in yo._lists if s() is not None])
+        def __init__(self):
+            self._lists = set()
+        def __iter__(self):
+            self._lists = set([s for s in self._lists if s() is not None])    
+            return (s() for s in self._lists if s() is not None)
+        def __len__(self):
+            self._lists = set([s for s in self._lists if s() is not None])
+            return len(self._lists)
+        def add(self, new_list):
+            self._lists.add(weakref.ref(new_list))
+            self._lists = set([s for s in self._lists if s() is not None])
     class _Indexen(object):
         "implements the weakref structure for seperate indexes"
-        def __init__(yo):
-            yo._indexen = set()
-        def __iter__(yo):
-            yo._indexen = set([s for s in yo._indexen if s() is not None])    
-            return (s() for s in yo._indexen if s() is not None)
-        def __len__(yo):
-            yo._indexen = set([s for s in yo._indexen if s() is not None])
-            return len(yo._indexen)
-        def add(yo, new_list):
-            yo._indexen.add(weakref.ref(new_list))
-            yo._indexen = set([s for s in yo._indexen if s() is not None])
+        def __init__(self):
+            self._indexen = set()
+        def __iter__(self):
+            self._indexen = set([s for s in self._indexen if s() is not None])    
+            return (s() for s in self._indexen if s() is not None)
+        def __len__(self):
+            self._indexen = set([s for s in self._indexen if s() is not None])
+            return len(self._indexen)
+        def add(self, new_list):
+            self._indexen.add(weakref.ref(new_list))
+            self._indexen = set([s for s in self._indexen if s() is not None])
     class _MetaData(dict):
         "per table values"
         blankrecord = None
@@ -2586,37 +2578,38 @@ class DbfTable(object):
         nulls = None            # non-None when Nullable fields present
         user_fields = None      # not counting SYSTEM fields
         user_field_count = 0    # also not counting SYSTEM fields
+        _dirty = False          # updates last_update field on close if True
     class _TableHeader(object):
         "represents the data block that defines a tables type and layout"
-        def __init__(yo, data, pack_date, unpack_date):
+        def __init__(self, data, pack_date, unpack_date):
             if len(data) != 32:
                 raise DbfError('table header should be 32 bytes, but is %d bytes' % len(data))
-            yo.packDate = pack_date
-            yo.unpackDate = unpack_date
-            yo._data = array('c', data + '\x0d')
-        def codepage(yo, cp=None):
+            self.packDate = pack_date
+            self.unpackDate = unpack_date
+            self._data = array('c', data + '\x0d')
+        def codepage(self, cp=None):
             "get/set code page of table"
             if cp is None:
-                return yo._data[29]
+                return self._data[29]
             else:
                 cp, sd, ld = _codepage_lookup(cp)
-                yo._data[29] = cp                    
+                self._data[29] = cp                    
                 return cp
         @property
-        def data(yo):
+        def data(self):
             "main data structure"
-            date = yo.packDate(Date.today())
-            yo._data[1:4] = array('c', date)
-            return yo._data.tostring()
+            date = self.packDate(Date.today())
+            self._data[1:4] = array('c', date)
+            return self._data.tostring()
         @data.setter
-        def data(yo, bytes):
+        def data(self, bytes):
             if len(bytes) < 32:
                 raise DbfError("length for data of %d is less than 32" % len(bytes))
-            yo._data[:] = array('c', bytes)
+            self._data[:] = array('c', bytes)
         @property
-        def extra(yo):
+        def extra(self):
             "extra dbf info (located after headers, before data records)"
-            fieldblock = yo._data[32:]
+            fieldblock = self._data[32:]
             for i in range(len(fieldblock)//32+1):
                 cr = i * 32
                 if fieldblock[cr] == '\x0d':
@@ -2624,10 +2617,10 @@ class DbfTable(object):
             else:
                 raise DbfError("corrupt field structure")
             cr += 33    # skip past CR
-            return yo._data[cr:].tostring()
+            return self._data[cr:].tostring()
         @extra.setter
-        def extra(yo, data):
-            fieldblock = yo._data[32:]
+        def extra(self, data):
+            fieldblock = self._data[32:]
             for i in range(len(fieldblock)//32+1):
                 cr = i * 32
                 if fieldblock[cr] == '\x0d':
@@ -2635,12 +2628,12 @@ class DbfTable(object):
             else:
                 raise DbfError("corrupt field structure")
             cr += 33    # skip past CR
-            yo._data[cr:] = array('c', data)                             # extra
-            yo._data[8:10] = array('c', packShortInt(len(yo._data)))  # start
+            self._data[cr:] = array('c', data)                             # extra
+            self._data[8:10] = array('c', pack_short_int(len(self._data)))  # start
         @property
-        def field_count(yo):
+        def field_count(self):
             "number of fields (read-only)"
-            fieldblock = yo._data[32:]
+            fieldblock = self._data[32:]
             for i in range(len(fieldblock)//32+1):
                 cr = i * 32
                 if fieldblock[cr] == '\x0d':
@@ -2649,9 +2642,9 @@ class DbfTable(object):
                 raise DbfError("corrupt field structure")
             return len(fieldblock[:cr]) // 32
         @property
-        def fields(yo):
+        def fields(self):
             "field block structure"
-            fieldblock = yo._data[32:]
+            fieldblock = self._data[32:]
             for i in range(len(fieldblock)//32+1):
                 cr = i * 32
                 if fieldblock[cr] == '\x0d':
@@ -2660,8 +2653,8 @@ class DbfTable(object):
                 raise DbfError("corrupt field structure")
             return fieldblock[:cr].tostring()
         @fields.setter
-        def fields(yo, block):
-            fieldblock = yo._data[32:]
+        def fields(self, block):
+            fieldblock = self._data[32:]
             for i in range(len(fieldblock)//32+1):
                 cr = i * 32
                 if fieldblock[cr] == '\x0d':
@@ -2672,51 +2665,51 @@ class DbfTable(object):
             fieldlen = len(block)
             if fieldlen % 32 != 0:
                 raise DbfError("fields structure corrupt: %d is not a multiple of 32" % fieldlen)
-            yo._data[32:cr] = array('c', block)                           # fields
-            yo._data[8:10] = array('c', packShortInt(len(yo._data)))   # start
+            self._data[32:cr] = array('c', block)                           # fields
+            self._data[8:10] = array('c', pack_short_int(len(self._data)))   # start
             fieldlen = fieldlen // 32
             recordlen = 1                                     # deleted flag
             for i in range(fieldlen):
                 recordlen += ord(block[i*32+16])
-            yo._data[10:12] = array('c', packShortInt(recordlen))
+            self._data[10:12] = array('c', pack_short_int(recordlen))
         @property
-        def record_count(yo):
+        def record_count(self):
             "number of records (maximum 16,777,215)"
-            return unpackLongInt(yo._data[4:8].tostring())
+            return unpack_long_int(self._data[4:8].tostring())
         @record_count.setter
-        def record_count(yo, count):
-            yo._data[4:8] = array('c', packLongInt(count))
+        def record_count(self, count):
+            self._data[4:8] = array('c', pack_long_int(count))
         @property
-        def record_length(yo):
+        def record_length(self):
             "length of a record (read_only) (max of 65,535)"
-            return unpackShortInt(yo._data[10:12].tostring())
+            return unpack_short_int(self._data[10:12].tostring())
         @property
-        def start(yo):
+        def start(self):
             "starting position of first record in file (must be within first 64K)"
-            return unpackShortInt(yo._data[8:10].tostring())
+            return unpack_short_int(self._data[8:10].tostring())
         @start.setter
-        def start(yo, pos):
-            yo._data[8:10] = array('c', packShortInt(pos))
+        def start(self, pos):
+            self._data[8:10] = array('c', pack_short_int(pos))
         @property
-        def update(yo):
+        def update(self):
             "date of last table modification (read-only)"
-            return yo.unpackDate(yo._data[1:4].tostring())
+            return self.unpackDate(self._data[1:4].tostring())
         @property
-        def version(yo):
+        def version(self):
             "dbf version"
-            return yo._data[0]
+            return self._data[0]
         @version.setter
-        def version(yo, ver):
-            yo._data[0] = ver
+        def version(self, ver):
+            self._data[0] = ver
     class _Table(object):
         "implements the weakref table for records"
-        def __init__(yo, count, meta):
-            yo._meta = meta
-            yo._weakref_list = [weakref.ref(lambda x: None)] * count
-        def __getitem__(yo, index):
-            maybe = yo._weakref_list[index]()
+        def __init__(self, count, meta):
+            self._meta = meta
+            self._weakref_list = [weakref.ref(lambda x: None)] * count
+        def __getitem__(self, index):
+            maybe = self._weakref_list[index]()
             if maybe is None:
-                meta = yo._meta
+                meta = self._meta
                 header = meta.header
                 if index < 0:
                     index += header.record_count
@@ -2729,68 +2722,68 @@ class DbfTable(object):
                 if not bytes:
                     raise ValueError("unable to read record data from %s at location %d" % (meta.filename, location))
                 maybe = _DbfRecord(recnum=index, layout=meta, kamikaze=bytes, _fromdisk=True)
-                yo._weakref_list[index] = weakref.ref(maybe)
+                self._weakref_list[index] = weakref.ref(maybe)
             return maybe
-        def append(yo, record):
-            yo._weakref_list.append(weakref.ref(record))
-        def clear(yo):
-            yo._weakref_list[:] = []
-        def flush(yo):
-            for maybe in yo._weakref_list:
+        def append(self, record):
+            self._weakref_list.append(weakref.ref(record))
+        def clear(self):
+            self._weakref_list[:] = []
+        def flush(self):
+            for maybe in self._weakref_list:
                 maybe = maybe()
                 if maybe is not None and maybe._dirty:
                     maybe.write_record()            
-        def pop(yo):
-            return yo._weakref_list.pop()
+        def pop(self):
+            return self._weakref_list.pop()
     class DbfIterator(object):
         "returns records using current index"
-        def __init__(yo, table, update=False):
+        def __init__(self, table, update=False):
             "if update is True records are written during the loop"
-            yo._table = table
-            yo._index = -1
-            yo._more_records = True
-            yo._record = None
-            yo._update = update
-        def __iter__(yo):
-            return yo
-        def next(yo):
+            self._table = table
+            self._index = -1
+            self._more_records = True
+            self._record = None
+            self._update = update
+        def __iter__(self):
+            return self
+        def next(self):
             while True:
-                if yo._record is not None and yo._update:
-                    yo._record.write_record()
-                    yo._record = None
-                if not yo._more_records:
+                if self._record is not None and self._update:
+                    self._record.write_record()
+                    self._record = None
+                if not self._more_records:
                     break
-                yo._index += 1
-                if yo._index >= len(yo._table):
-                    yo._more_records = False
+                self._index += 1
+                if self._index >= len(self._table):
+                    self._more_records = False
                     break
-                record = yo._record = yo._table[yo._index]
-                if not yo._table.use_deleted and record.has_been_deleted:
+                record = self._record = self._table[self._index]
+                if not self._table.use_deleted and record.has_been_deleted:
                     continue
                 return record
             raise StopIteration
-    def _buildHeaderFields(yo):
+    def _build_header_fields(self):
         "constructs fieldblock for disk table"
         fieldblock = array('c', '')
         memo = False
         nulls = False
-        meta = yo._meta
+        meta = self._meta
         header = meta.header
-        header.version = chr(ord(header.version) & ord(yo._noMemoMask))
+        header.version = chr(ord(header.version) & ord(self._noMemoMask))
         meta.fields = [f for f in meta.fields if f != '_nullflags']
         for field in meta.fields:
             layout = meta[field]
             if meta.fields.count(field) > 1:
-                raise DbfError("corrupted field structure (noticed in _buildHeaderFields)")
+                raise DbfError("corrupted field structure (noticed in _build_header_fields)")
             fielddef = array('c', '\x00' * 32)
-            fielddef[:11] = array('c', packStr(meta.encoder(field)[0]))
+            fielddef[:11] = array('c', pack_str(meta.encoder(field)[0]))
             try:
                 fielddef[11] = layout[TYPE]
             except TypeError:
                 print
                 print repr(meta[field])
                 print repr(layout[TYPE])
-            fielddef[12:16] = array('c', packLongInt(layout[START]))
+            fielddef[12:16] = array('c', pack_long_int(layout[START]))
             fielddef[16] = chr(layout[LENGTH])
             fielddef[17] = chr(layout[DECIMALS])
             fielddef[18] = chr(layout[FLAGS])
@@ -2800,9 +2793,9 @@ class DbfTable(object):
             if layout[FLAGS] & NULLABLE:
                 nulls = True
         if memo:
-            header.version = chr(ord(header.version) | ord(yo._yesMemoMask))
+            header.version = chr(ord(header.version) | ord(self._yesMemoMask))
             if meta.memo is None:
-                meta.memo = yo._memoClass(meta)
+                meta.memo = self._memoClass(meta)
         else:
             if os.path.exists(meta.memoname):
                 if meta.mfd is not None:
@@ -2818,9 +2811,9 @@ class DbfTable(object):
             if one_more:
                 length += 1
             fielddef = array('c', '\x00' * 32)
-            fielddef[:11] = array('c', packStr('_nullflags'))
+            fielddef[:11] = array('c', pack_str('_nullflags'))
             fielddef[11] = '0'
-            fielddef[12:16] = array('c', packLongInt(start))
+            fielddef[12:16] = array('c', pack_long_int(start))
             fielddef[16] = chr(length)
             fielddef[17] = chr(0)
             fielddef[18] = chr(BINARY | SYSTEM)
@@ -2841,14 +2834,14 @@ class DbfTable(object):
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
 
-    def _checkMemoIntegrity(yo):
+    def _check_memo_integrity(self):
         "memory memos are simple dicts"
         pass
-    def _initializeFields(yo):
+    def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions from the disk file"
         old_fields = defaultdict(dict)
         missing = object()
-        meta = yo._meta
+        meta = self._meta
         for name in meta.fields:
             old_fields[name]['type'] = meta[name][TYPE]
             old_fields[name]['class'] = meta[name][CLASS]
@@ -2858,11 +2851,11 @@ class DbfTable(object):
         fieldsdef = meta.header.fields
         if len(fieldsdef) % 32 != 0:
             raise DbfError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
-        if len(fieldsdef) // 32 != yo._meta.header.field_count:
-            raise DbfError("Header shows %d fields, but field definition block has %d fields" % (yo._meta.header.field_count, len(fieldsdef)//32))
-        for i in range(yo._meta.header.field_count):
+        if len(fieldsdef) // 32 != self._meta.header.field_count:
+            raise DbfError("Header shows %d fields, but field definition block has %d fields" % (self._meta.header.field_count, len(fieldsdef)//32))
+        for i in range(self._meta.header.field_count):
             fieldblock = meta.decoder(fieldsdef[i*32:(i+1)*32])
-            name = unpackStr(fieldblock[:11])
+            name = unpack_str(fieldblock[:11])
             type = fieldblock[11]
             if not type in meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
@@ -2891,13 +2884,13 @@ class DbfTable(object):
                     cls,
                     empty,
                     )
-        yo._meta.user_fields = [f for f in yo._meta.fields if not yo._meta[f][FLAGS] & SYSTEM]
-        yo._meta.user_field_count = len(yo._meta.user_fields)
+        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
+        self._meta.user_field_count = len(self._meta.user_fields)
 
-    def _fieldLayout(yo, i):
+    def _field_layout(self, i):
         "Returns field information Name Type(Length[,Decimals])"
-        name = yo._meta.fields[i]
-        fielddef = yo._meta[name]
+        name = self._meta.fields[i]
+        fielddef = self._meta[name]
         type = fielddef[TYPE]
         length = fielddef[LENGTH]
         decimals = fielddef[DECIMALS]
@@ -2911,31 +2904,31 @@ class DbfTable(object):
             flags = ' ' + ' '.join(flags)
         else:
             flags = ''
-        if type in yo._decimal_fields:
+        if type in self._decimal_fields:
             description = "%s %s(%d,%d)%s" % (name, type, length, decimals, flags)
-        elif type in yo._fixed_fields:
+        elif type in self._fixed_fields:
             description = "%s %s%s" % (name, type, flags)
         else:
             description = "%s %s(%d)%s" % (name, type, length, flags)
         return description
-    def _loadtable(yo):
+    def _load_table(self):
         "loads the records from disk to memory"
-        if yo._meta_only:
-            raise DbfError("%s has been closed, records are unavailable" % yo.filename)
-        dfd = yo._meta.dfd
-        header = yo._meta.header
+        if self._meta_only:
+            raise DbfError("%s has been closed, records are unavailable" % self.filename)
+        dfd = self._meta.dfd
+        header = self._meta.header
         dfd.seek(header.start)
         allrecords = dfd.read()                     # kludge to get around mysterious errno 0 problems
         dfd.seek(0)
         length = header.record_length
         for i in range(header.record_count):
             record_data = allrecords[length*i:length*i+length]
-            yo._table.append(_DbfRecord(i, yo._meta, allrecords[length*i:length*i+length], _fromdisk=True))
+            self._table.append(_DbfRecord(i, self._meta, allrecords[length*i:length*i+length], _fromdisk=True))
         dfd.seek(0)
-    def _list_fields(yo, specs, sep=','):
+    def _list_fields(self, specs, sep=','):
         "standardizes field specs"
         if specs is None:
-            specs = yo.field_names
+            specs = self.field_names
         elif isinstance(specs, str):
             specs = specs.split(sep)
         else:
@@ -2943,44 +2936,44 @@ class DbfTable(object):
         specs = [s.strip() for s in specs]
         return specs
     @staticmethod
-    def _packDate(date):
+    def _pack_date(date):
             "Returns a group of three bytes, in integer form, of the date"
             return "%c%c%c" % (date.year-1900, date.month, date.day)
     @staticmethod
-    def _unpackDate(bytestr):
+    def _unpack_date(bytestr):
             "Returns a Date() of the packed three-byte date passed in"
             year, month, day = struct.unpack('<BBB', bytestr)
             year += 1900
             return Date(year, month, day)
-    def _update_disk(yo, headeronly=False):
+    def _update_disk(self, headeronly=False):
         "synchronizes the disk file with current data"
-        if yo._meta.inmemory:
+        if self._meta.inmemory:
             return
-        meta = yo._meta
+        meta = self._meta
         header = meta.header
         fd = meta.dfd
         fd.seek(0)
         fd.write(header.data)
         eof = header.start + header.record_count * header.record_length
         if not headeronly:
-            for record in yo:
+            for record in self:
                 if record._update_disk():
                     fd.flush()
             fd.truncate(eof)
-        if 'db3' in yo._versionabbr:
+        if 'db3' in self._versionabbr:
             fd.seek(0, SEEK_END)
             fd.write('\x1a')        # required for dBase III
             fd.flush()
             fd.truncate(eof + 1)
 
-    def __contains__(yo, key):
+    def __contains__(self, key):
         "field name based"
-        return key in yo.field_names
-    def __enter__(yo):
-        return yo
-    def __exit__(yo, *exc_info):
-        yo.close()
-    def __getattr__(yo, name):
+        return key in self.field_names or key in ['record_number','delete_flag']
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc_info):
+        self.close()
+    def __getattr__(self, name):
         if name in (
                 'memotypes',
                 'fixed_fields',
@@ -2990,30 +2983,30 @@ class DbfTable(object):
                 'decimal_fields',
                 'currency_fields',
                 ):
-            return getattr(yo, '_'+name)
+            return getattr(self, '_'+name)
         if name in ('_table'):
-                if yo._meta.ondisk:
-                    yo._table = yo._Table(len(yo), yo._meta)
+                if self._meta.ondisk:
+                    self._table = self._Table(len(self), self._meta)
                 else:
-                    yo._table = []
-                    yo._loadtable()
-        return object.__getattribute__(yo, name)
-    def __getitem__(yo, value):
+                    self._table = []
+                    self._load_table()
+        return object.__getattribute__(self, name)
+    def __getitem__(self, value):
         if type(value) == int:
-            if not -yo._meta.header.record_count <= value < yo._meta.header.record_count: 
+            if not -self._meta.header.record_count <= value < self._meta.header.record_count: 
                 raise IndexError("Record %d is not in table." % value)
-            return yo._table[value]
+            return self._table[value]
         elif type(value) == slice:
-            sequence = List(desc='%s -->  %s' % (yo.filename, value), field_names=yo.field_names)
-            yo._dbflists.add(sequence)
-            for index in range(len(yo))[value]:
-                record = yo._table[index]
-                if yo.use_deleted is True or not record.has_been_deleted:
+            sequence = List(desc='%s -->  %s' % (self.filename, value), field_names=self.field_names)
+            self._dbflists.add(sequence)
+            for index in range(len(self))[value]:
+                record = self._table[index]
+                if self.use_deleted is True or not record.has_been_deleted:
                     sequence.append(record)
             return sequence
         else:
             raise TypeError('type <%s> not valid for indexing' % type(value))
-    def __init__(yo, filename=':memory:', field_specs=None, memo_size=128, ignore_memos=False, 
+    def __init__(self, filename=':memory:', field_specs=None, memo_size=128, ignore_memos=False, 
                  read_only=False, keep_memos=False, meta_only=False, codepage=None, 
                  default_data_types={}, field_data_types={},    # e.g. 'name':str, 'age':float
                  ):
@@ -3029,39 +3022,39 @@ class DbfTable(object):
         if filename[0] == filename[-1] == ':':
             if field_specs is None:
                 raise DbfError("field list must be specified for memory tables")
-        elif type(yo) is DbfTable:
+        elif type(self) is DbfTable:
             raise DbfError("only memory tables supported")
-        yo._dbflists = yo._DbfLists()
-        yo._indexen = yo._Indexen()
-        yo._meta = meta = yo._MetaData()
-        meta.max_fields = yo._max_fields
-        meta.max_records = yo._max_records
-        meta.table = weakref.ref(yo)
+        self._dbflists = self._DbfLists()
+        self._indexen = self._Indexen()
+        self._meta = meta = self._MetaData()
+        meta.max_fields = self._max_fields
+        meta.max_records = self._max_records
+        meta.table = weakref.ref(self)
         meta.filename = filename
         meta.fields = []
         meta.user_fields = []
         meta.user_field_count = 0
-        meta.fieldtypes = fieldtypes = yo._fieldtypes
-        meta.fixed_fields = yo._fixed_fields
-        meta.variable_fields = yo._variable_fields
-        meta.character_fields = yo._character_fields
-        meta.decimal_fields = yo._decimal_fields
-        meta.numeric_fields = yo._numeric_fields
-        meta.memotypes = yo._memotypes
+        meta.fieldtypes = fieldtypes = self._field_types
+        meta.fixed_fields = self._fixed_fields
+        meta.variable_fields = self._variable_fields
+        meta.character_fields = self._character_fields
+        meta.decimal_fields = self._decimal_fields
+        meta.numeric_fields = self._numeric_fields
+        meta.memotypes = self._memotypes
         meta.ignorememos = meta.original_ignorememos = ignore_memos
         meta.memo_size = memo_size
         meta.input_decoder = codecs.getdecoder(input_decoding)      # from ascii to unicode
         meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
-        meta.header = header = yo._TableHeader(yo._dbfTableHeader, yo._packDate, yo._unpackDate)
-        header.extra = yo._dbfTableHeaderExtra
-        header.data        #force update of date
+        meta.header = header = self._TableHeader(self._dbfTableHeader, self._pack_date, self._unpack_date)
+        header.extra = self._dbfTableHeaderExtra
+        #header.data        #force update of date
         for field, types in default_data_types.items():
             if not isinstance(types, tuple):
                 types = (types, )
             for result_name, result_type in ezip(('Class','Empty','Null'), types):
                 fieldtypes[field][result_name] = result_type
         if filename[0] == filename[-1] == ':':
-            yo._table = []
+            self._table = []
             meta.ondisk = False
             meta.inmemory = True
             meta.memoname = filename
@@ -3069,13 +3062,13 @@ class DbfTable(object):
             base, ext = os.path.splitext(filename)
             if ext == '':
                 meta.filename =  base + '.dbf'
-            meta.memoname = base + yo._memoext
+            meta.memoname = base + self._memoext
             meta.ondisk = True
             meta.inmemory = False
         if codepage is not None:
             cp, sd, ld = _codepage_lookup(codepage)
-            yo._meta.decoder = codecs.getdecoder(sd) 
-            yo._meta.encoder = codecs.getencoder(sd)
+            self._meta.decoder = codecs.getdecoder(sd) 
+            self._meta.encoder = codecs.getencoder(sd)
         if field_specs:
             if meta.ondisk:
                 meta.dfd = open(meta.filename, 'w+b')
@@ -3085,26 +3078,26 @@ class DbfTable(object):
                 cp, sd, ld = _codepage_lookup(header.codepage())
                 meta.decoder = codecs.getdecoder(sd) 
                 meta.encoder = codecs.getencoder(sd)
-            yo.add_fields(field_specs)
+            self.add_fields(field_specs)
         else:
             try:
                 dfd = meta.dfd = open(meta.filename, 'r+b')
             except IOError, e:
                 raise DbfError(str(e))
             dfd.seek(0)
-            meta.header = header = yo._TableHeader(dfd.read(32), yo._packDate, yo._unpackDate)
-            if not header.version in yo._supported_tables:
+            meta.header = header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
+            if not header.version in self._supported_tables:
                 dfd.close()
                 dfd = None
                 raise DbfError(
                     "%s does not support %s [%x]" % 
-                    (yo._version,
+                    (self._version,
                     version_map.get(header.version, 'Unknown: %s' % header.version),
                     ord(header.version)))
             if codepage is None:
                 cp, sd, ld = _codepage_lookup(header.codepage())
-                yo._meta.decoder = codecs.getdecoder(sd) 
-                yo._meta.encoder = codecs.getencoder(sd)
+                self._meta.decoder = codecs.getdecoder(sd) 
+                self._meta.encoder = codecs.getencoder(sd)
             fieldblock = dfd.read(header.start - 32)
             for i in range(len(fieldblock)//32+1):
                 fieldend = i * 32
@@ -3116,16 +3109,16 @@ class DbfTable(object):
                 raise DbfError("corrupt field structure in header")
             header.fields = fieldblock[:fieldend]
             header.extra = fieldblock[fieldend+1:]  # skip trailing \r
-            yo._initializeFields()
-            yo._checkMemoIntegrity()
+            self._initialize_fields()
+            self._check_memo_integrity()
             meta.current = -1
-            if len(yo) > 0:
+            if len(self) > 0:
                 meta.current = 0
             dfd.seek(0)
             if meta_only:
-                yo.close(keep_table=False, keep_memos=False)
+                self.close(keep_table=False, keep_memos=False)
             elif read_only:
-                yo.close(keep_table=True, keep_memos=keep_memos)
+                self.close(keep_table=True, keep_memos=keep_memos)
 
         for field in meta.fields:
             field_type = meta[field][TYPE]
@@ -3145,26 +3138,26 @@ class DbfTable(object):
             meta[field] = meta[field][:-2] + tuple(classes)
 
         
-    def __iter__(yo):
+    def __iter__(self):
         "iterates over the table's records"
-        return yo.DbfIterator(yo)           
-    def __len__(yo):
+        return self.DbfIterator(self)           
+    def __len__(self):
         "returns number of records in table"
-        return yo._meta.header.record_count
-    def __nonzero__(yo):
+        return self._meta.header.record_count
+    def __nonzero__(self):
         "True if table has any records"
-        return yo._meta.header.record_count != 0
-    def __repr__(yo):
-        if yo._read_only:
-            return __name__ + ".Table('%s', read_only=True)" % yo._meta.filename
-        elif yo._meta_only:
-            return __name__ + ".Table('%s', meta_only=True)" % yo._meta.filename
+        return self._meta.header.record_count != 0
+    def __repr__(self):
+        if self._read_only:
+            return __name__ + ".Table('%s', read_only=True)" % self._meta.filename
+        elif self._meta_only:
+            return __name__ + ".Table('%s', meta_only=True)" % self._meta.filename
         else:
-            return __name__ + ".Table('%s')" % yo._meta.filename
-    def __str__(yo):
-        if yo._read_only:
+            return __name__ + ".Table('%s')" % self._meta.filename
+    def __str__(self):
+        if self._read_only:
             status = "read-only"
-        elif yo._meta_only:
+        elif self._meta_only:
             status = "meta-only"
         else:
             status = "read/write"
@@ -3176,82 +3169,82 @@ class DbfTable(object):
         Last updated:  %s
         Record count:  %d
         Field count:   %d
-        Record length: %d """ % (yo.filename, version_map.get(yo._meta.header.version, 
-            'unknown - ' + hex(ord(yo._meta.header.version))), yo.codepage, status, 
-            yo.last_update, len(yo), yo.field_count, yo.record_length)
+        Record length: %d """ % (self.filename, version_map.get(self._meta.header.version, 
+            'unknown - ' + hex(ord(self._meta.header.version))), self.codepage, status, 
+            self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
-        for i in range(len(yo.field_names)):
-            str += "%11d) %s\n" % (i, yo._fieldLayout(i))
+        for i in range(len(self.field_names)):
+            str += "%11d) %s\n" % (i, self._field_layout(i))
         return str
     @property
-    def codepage(yo):
+    def codepage(self):
         "code page used for text translation"
-        return "%s (%s)" % code_pages[yo._meta.header.codepage()]
+        return "%s (%s)" % code_pages[self._meta.header.codepage()]
     @codepage.setter
-    def codepage(yo, cp):
-        cp = code_pages[yo._meta.header.codepage(cp)][0]
-        yo._meta.decoder = codecs.getdecoder(cp) 
-        yo._meta.encoder = codecs.getencoder(cp)
-        yo._update_disk(headeronly=True)
+    def codepage(self, cp):
+        cp = code_pages[self._meta.header.codepage(cp)][0]
+        self._meta.decoder = codecs.getdecoder(cp) 
+        self._meta.encoder = codecs.getencoder(cp)
+        self._update_disk(headeronly=True)
     @property
-    def field_count(yo):
+    def field_count(self):
         "the number of user fields in the table"
-        return yo._meta.user_field_count
+        return self._meta.user_field_count
     @property
-    def field_names(yo):
+    def field_names(self):
         "a list of the user fields in the table"
-        return yo._meta.user_fields[:]
+        return self._meta.user_fields[:]
     @property
-    def filename(yo):
+    def filename(self):
         "table's file name, including path (if specified on open)"
-        return yo._meta.filename
+        return self._meta.filename
     @property
-    def last_update(yo):
+    def last_update(self):
         "date of last update"
-        return yo._meta.header.update
+        return self._meta.header.update
     @property
-    def memoname(yo):
+    def memoname(self):
         "table's memo name (if path included in filename on open)"
-        return yo._meta.memoname
+        return self._meta.memoname
     @property
-    def record_length(yo):
+    def record_length(self):
         "number of bytes in a record (including deleted flag and null field size"
-        return yo._meta.header.record_length
+        return self._meta.header.record_length
     @property
-    def record_number(yo):
+    def record_number(self):
         "offset of record in table"
-        return yo._meta.current
+        return self._meta.current
     @property
-    def supported_tables(yo):
+    def supported_tables(self):
         "allowable table types"
-        return yo._supported_tables
+        return self._supported_tables
     @property
-    def use_deleted(yo):
+    def use_deleted(self):
         "process or ignore deleted records"
-        return yo._use_deleted
+        return self._use_deleted
     @use_deleted.setter
-    def use_deleted(yo, new_setting):
-        yo._use_deleted = new_setting
+    def use_deleted(self, new_setting):
+        self._use_deleted = new_setting
     @property
-    def version(yo):
+    def version(self):
         "returns the dbf type of the table"
-        return yo._version
-    def add_fields(yo, field_specs):
+        return self._version
+    def add_fields(self, field_specs):
         """adds field(s) to the table layout; format is Name Type(Length,Decimals)[; Name Type(Length,Decimals)[...]]
         backup table is created with _backup appended to name
         then zaps table, recreates current structure, and copies records back from the backup"""
-        meta = yo._meta
+        meta = self._meta
         header = meta.header
-        fields = yo.structure() + yo._list_fields(field_specs, sep=';')
+        fields = self.structure() + self._list_fields(field_specs, sep=';')
         if len(fields) > meta.max_fields:
             raise DbfError(
                     "Adding %d more field%s would exceed the limit of %d" 
                     % (len(fields), ('','s')[len(fields)==1], meta.max_fields)
                     )
         old_table = None
-        if yo:
-            old_table = yo.create_backup()
-            yo.zap(YES_I_AM_SURE)
+        if self:
+            old_table = self.create_backup()
+            self.zap(YES_I_AM_SURE)
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
             meta.mfd = None
@@ -3288,8 +3281,8 @@ class DbfTable(object):
                 raise DbfError("Maximum field name length is 10.  '%s' is %d characters long." % (name, len(name)))
             if not field_type in meta.fieldtypes.keys():
                 raise DbfError("Unknown field type:  %s" % field_type)
-            init = yo._meta.fieldtypes[field_type]['Init']
-            flags = yo._meta.fieldtypes[field_type]['flags']
+            init = self._meta.fieldtypes[field_type]['Init']
+            flags = self._meta.fieldtypes[field_type]['flags']
             length, decimals, flags = init(pieces, flags)
             start = offset
             end = offset + length
@@ -3307,33 +3300,33 @@ class DbfTable(object):
                     cls,
                     empty,
                     )
-        yo._buildHeaderFields()
-        yo._update_disk()
+        self._build_header_fields()
+        self._update_disk()
         if old_table is not None:
             old_table.open()
             for record in old_table:
-                yo.append(record.scatter_fields())
+                self.append(record.scatter_fields())
             old_table.close()
 
-    def allow_nulls(yo, fields):
+    def allow_nulls(self, fields):
         "set fields to allow null values"
-        if yo._versionabbr in ('db3', ):
-            raise DbfError("Nullable fields are not allowed in %s tables" % yo._version)
-        meta = yo._meta
+        if self._versionabbr in ('db3', ):
+            raise DbfError("Nullable fields are not allowed in %s tables" % self._version)
+        meta = self._meta
         header = meta.header
-        fields = yo._list_fields(fields)
-        missing = set(fields) - set(yo.field_names)
+        fields = self._list_fields(fields)
+        missing = set(fields) - set(self.field_names)
         if missing:
             raise FieldMissing(', '.join(missing))
-        if len(yo.field_names) + 1 > meta.max_fields:
+        if len(self.field_names) + 1 > meta.max_fields:
             raise DbfError(
                     "Adding the hidden _nullflags field would exceed the limit of %d fields for this table" 
                     % (meta.max_fields, )
                     )
         old_table = None
-        if yo:
-            old_table = yo.create_backup()
-            yo.zap(YES_I_AM_SURE)
+        if self:
+            old_table = self.create_backup()
+            self.zap(YES_I_AM_SURE)
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
             meta.mfd = None
@@ -3345,22 +3338,22 @@ class DbfTable(object):
             specs[FLAGS] |= NULLABLE
             meta[field] = tuple(specs)
         meta.blankrecord = None
-        yo._buildHeaderFields()
-        yo._update_disk()
+        self._build_header_fields()
+        self._update_disk()
         if old_table is not None:
             old_table.open()
             for record in old_table:
-                yo.append(record.scatter_fields())
+                self.append(record.scatter_fields())
             old_table.close()
 
-    def append(yo, kamikaze='', drop=False, multiple=1):
+    def append(self, kamikaze='', drop=False, multiple=1):
         "adds <multiple> blank records, and fills fields with dict/tuple values if present"
-        if not yo.field_count:
+        if not self.field_count:
             raise DbfError("No fields defined, cannot append")
-        empty_table = len(yo) == 0
+        empty_table = len(self) == 0
         dictdata = False
         tupledata = False
-        meta = yo._meta
+        meta = self._meta
         header = meta.header
         if not isinstance(kamikaze, _DbfRecord):
             if isinstance(kamikaze, dict):
@@ -3370,7 +3363,7 @@ class DbfTable(object):
                 tupledata = kamikaze
                 kamikaze = ''
         newrecord = _DbfRecord(recnum=header.record_count, layout=meta, kamikaze=kamikaze)
-        yo._table.append(newrecord)
+        self._table.append(newrecord)
         header.record_count += 1
         try:
             if dictdata:
@@ -3381,7 +3374,7 @@ class DbfTable(object):
                         newrecord[index] = item
                     except IndexError, exc:
                         raise DbfError("table %s has %d fields, incoming data has %d fields" %
-                            (yo.filename, len(newrecord), len(tupledata)))
+                            (self.filename, len(newrecord), len(tupledata)))
             elif kamikaze == str:
                 for field in meta.memofields:
                     newrecord[field] = ''
@@ -3390,9 +3383,9 @@ class DbfTable(object):
                     newrecord[field] = kamikaze[field]
             newrecord.write_record()
         except Exception:
-            yo._table.pop()     # discard failed record
+            self._table.pop()     # discard failed record
             header.record_count = header.record_count - 1
-            yo._update_disk()
+            self._update_disk()
             raise
         multiple -= 1
         if multiple:
@@ -3401,7 +3394,7 @@ class DbfTable(object):
             total = single + multiple
             while single < total:
                 multi_record = _DbfRecord(single, meta, kamikaze=data)
-                yo._table.append(multi_record)
+                self._table.append(multi_record)
                 for field in meta.memofields:
                     multi_record[field] = newrecord[field]
                 single += 1
@@ -3409,112 +3402,112 @@ class DbfTable(object):
             header.record_count = total   # += multiple
             meta.current = header.record_count - 1
             newrecord = multi_record
-        yo._update_disk(headeronly=True)
+        self._update_disk(headeronly=True)
         if empty_table:
             meta.current = 0
         return newrecord
-    def bof(yo, _move=False):
+    def bof(self, _move=False):
         "moves record pointer to previous usable record; returns True if no more usable records"
-        current = yo._meta.current
+        current = self._meta.current
         try:
-            while yo._meta.current > 0:
-                yo._meta.current -= 1
-                if yo.use_deleted or not yo.current().has_been_deleted:
+            while self._meta.current > 0:
+                self._meta.current -= 1
+                if self.use_deleted or not self.current().has_been_deleted:
                     break
             else:
-                yo._meta.current = -1
+                self._meta.current = -1
                 return True
             return False
         finally:
             if not _move:
-                yo._meta.current = current
-    def bottom(yo, get_record=False):
+                self._meta.current = current
+    def bottom(self, get_record=False):
         """sets record pointer to bottom of table (end of table)
         if get_record, seeks to and returns last (non-deleted) record
         DbfError if table is empty
         Bof if all records deleted and use_deleted is False"""
-        yo._meta.current = yo._meta.header.record_count
+        self._meta.current = self._meta.header.record_count
         if get_record:
             try:
-                return yo.prev()
+                return self.prev()
             except Bof:
-                yo._meta.current = yo._meta.header.record_count
+                self._meta.current = self._meta.header.record_count
                 raise Eof()
-    def close(yo, keep_table=False, keep_memos=False):
+    def close(self, keep_table=False, keep_memos=False):
         """closes disk files, flushing record data to disk
         ensures table data is available if keep_table
         ensures memo data is available if keep_memos"""
-        if not yo._meta.inmemory:
-            yo._table.flush()
-        yo._meta.inmemory = True
+        if not self._meta.inmemory:
+            self._table.flush()
+        self._meta.inmemory = True
         if keep_table:
             replacement_table = []
-            for record in yo._table:
+            for record in self._table:
                 replacement_table.append(record)
-            yo._table = replacement_table
+            self._table = replacement_table
         else:
-            if yo._meta.ondisk:
-                yo._meta_only = True
-        if yo._meta.mfd is not None:
+            if self._meta.ondisk:
+                self._meta_only = True
+        if self._meta.mfd is not None:
             if not keep_memos:
-                yo._meta.ignorememos = True
+                self._meta.ignorememos = True
             else:
                 memo_fields = []
-                for field in yo.field_names:
-                    if yo.is_memotype(field):
+                for field in self.field_names:
+                    if self.is_memotype(field):
                         memo_fields.append(field)
-                for record in yo:
+                for record in self:
                     for field in memo_fields:
                         record[field] = record[field]
-            yo._meta.mfd.close()
-            yo._meta.mfd = None
-        if yo._meta.ondisk:
-            yo._meta.dfd.close()
-            yo._meta.dfd = None
+            self._meta.mfd.close()
+            self._meta.mfd = None
+        if self._meta.ondisk:
+            self._meta.dfd.close()
+            self._meta.dfd = None
         if keep_table:
-            yo._read_only = True
-        yo._meta.ondisk = False
-    def create_backup(yo, new_name=None):
+            self._read_only = True
+        self._meta.ondisk = False
+    def create_backup(self, new_name=None):
         "creates a backup table"
-        if yo.filename[0] == yo.filename[-1] == ':' and new_name is None:
-            new_name = yo.filename[:-1] + '_backup:'
+        if self.filename[0] == self.filename[-1] == ':' and new_name is None:
+            new_name = self.filename[:-1] + '_backup:'
         if new_name is None:
-            upper = yo.filename.isupper()
-            name, ext = os.path.splitext(os.path.split(yo.filename)[1])
+            upper = self.filename.isupper()
+            name, ext = os.path.splitext(os.path.split(self.filename)[1])
             extra = ('_backup', '_BACKUP')[upper]
             new_name = os.path.join(temp_dir, name + extra + ext)
-        bkup = yo.__class__(new_name, yo.structure())
-        for record in yo:
+        bkup = self.__class__(new_name, self.structure())
+        for record in self:
             bkup.append(record)
         bkup.close()
-        yo.backup = new_name
+        self.backup = new_name
         return bkup
-    def create_index(yo, key):
+    def create_index(self, key):
         "creates an in-memory index using the function key"
-        return Index(yo, key)
-    def current(yo, index=False):
+        return Index(self, key)
+    def current(self, index=False):
         "returns current logical record, or its index"
-        if yo._meta.current < 0:
+        if self._meta.current < 0:
             raise Bof()
-        elif yo._meta.current >= yo._meta.header.record_count:
+        elif self._meta.current >= self._meta.header.record_count:
             raise Eof()
         if index:
-            return yo._meta.current
-        return yo._table[yo._meta.current]
-    def delete_fields(yo, doomed):
+            return self._meta.current
+        return self._table[self._meta.current]
+    def delete_fields(self, doomed):
         """removes field(s) from the table
         creates backup files with _backup appended to the file name,
         then modifies current structure"""
-        doomed = yo._list_fields(doomed)
-        meta = yo._meta
+        doomed = self._list_fields(doomed)
+        meta = self._meta
         header = meta.header
         for victim in doomed:
             if victim not in meta.user_fields:
                 raise DbfError("field %s not in table -- delete aborted" % victim)
         old_table = None
-        if yo:
-            old_table = yo.create_backup()
-            yo.zap(YES_I_AM_SURE)
+        if self:
+            old_table = self.create_backup()
+            self.zap(YES_I_AM_SURE)
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
             meta.mfd = None
@@ -3531,33 +3524,33 @@ class DbfTable(object):
             for field in meta.fields:
                 if meta[field][START] == end:
                     specs = list(meta[field])
-                    end = specs[END]                    #yo._meta[field][END]
-                    specs[START] = start                #yo._meta[field][START] = start
-                    specs[END] = start + specs[LENGTH]  #yo._meta[field][END] = start + yo._meta[field][LENGTH]
-                    start = specs[END]                  #yo._meta[field][END]
+                    end = specs[END]                    #self._meta[field][END]
+                    specs[START] = start                #self._meta[field][START] = start
+                    specs[END] = start + specs[LENGTH]  #self._meta[field][END] = start + self._meta[field][LENGTH]
+                    start = specs[END]                  #self._meta[field][END]
                     meta[field] =  tuple(specs)
-        yo._buildHeaderFields()
-        yo._update_disk()
+        self._build_header_fields()
+        self._update_disk()
         for name in list(meta):
             if name not in meta.fields:
                 del meta[name]
         if old_table is not None:
             old_table.open()
             for record in old_table:
-                yo.append(record.scatter_fields(), drop=True)
+                self.append(record.scatter_fields(), drop=True)
             old_table.close()
 
-    def disallow_nulls(yo, fields):
+    def disallow_nulls(self, fields):
         "set fields to not allow null values"
-        meta = yo._meta
-        fields = yo._list_fields(fields)
-        missing = set(fields) - set(yo.field_names)
+        meta = self._meta
+        fields = self._list_fields(fields)
+        missing = set(fields) - set(self.field_names)
         if missing:
             raise FieldMissing(', '.join(missing))
         old_table = None
-        if yo:
-            old_table = yo.create_backup()
-            yo.zap(YES_I_AM_SURE)
+        if self:
+            old_table = self.create_backup()
+            self.zap(YES_I_AM_SURE)
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
             meta.mfd = None
@@ -3569,40 +3562,40 @@ class DbfTable(object):
             specs[FLAGS] &= 0xff ^ NULLABLE
             meta[field] =  tuple(specs)
         meta.blankrecord = None
-        yo._buildHeaderFields()
-        yo._update_disk()
+        self._build_header_fields()
+        self._update_disk()
         if old_table is not None:
             old_table.open()
             for record in old_table:
-                yo.append(record.scatter_fields())
+                self.append(record.scatter_fields())
             old_table.close()
 
-    def eof(yo, _move=False):
+    def eof(self, _move=False):
         "moves record pointer to next usable record; returns True if no more usable records"
-        current = yo._meta.current
+        current = self._meta.current
         try:
-            while yo._meta.current < yo._meta.header.record_count - 1:
-                yo._meta.current += 1
-                if yo.use_deleted or not yo.current().has_been_deleted:
+            while self._meta.current < self._meta.header.record_count - 1:
+                self._meta.current += 1
+                if self.use_deleted or not self.current().has_been_deleted:
                     break
             else:
-                yo._meta.current = yo._meta.header.record_count
+                self._meta.current = self._meta.header.record_count
                 return True
             return False
         finally:
             if not _move:
-                yo._meta.current = current
-    def export(yo, records=None, filename=None, field_specs=None, format='csv', header=True):
+                self._meta.current = current
+    def export(self, records=None, filename=None, field_specs=None, format='csv', header=True):
         """writes the table using CSV or tab-delimited format, using the filename
         given if specified, otherwise the table name"""
         if filename is not None:
             path, filename = os.path.split(filename)
         else:
-            path, filename = os.path.split(yo.filename)
+            path, filename = os.path.split(self.filename)
         filename = os.path.join(path, filename)
-        field_specs = yo._list_fields(field_specs)
+        field_specs = self._list_fields(field_specs)
         if records is None:
-            records = yo
+            records = self
         format = format.lower()
         if format not in ('csv', 'tab', 'fixed'):
             raise DbfError("export format: csv, tab, or fixed -- not %s" % format)
@@ -3622,7 +3615,7 @@ class DbfTable(object):
                     for fieldname in field_specs:
                         data = record[fieldname]
                         if isinstance(data, (str, unicode)):
-                            fields.append(yo._meta.encoder(data)[0])
+                            fields.append(self._meta.encoder(data)[0])
                         else:
                             fields.append(data)
                     csvfile.writerow(fields)
@@ -3634,7 +3627,7 @@ class DbfTable(object):
                     for fieldname in field_specs:
                         data = record[fieldname]
                         if isinstance(data, (str, unicode)):
-                            fields.append(yo._meta.encoder(data)[0])
+                            fields.append(self._meta.encoder(data)[0])
                         else:
                             fields.append(str(data))
                     fd.write('\t'.join(fields) + '\n')
@@ -3644,7 +3637,7 @@ class DbfTable(object):
                 header.write("%-15s  ----\n" % ("-" * 15))
                 sizes = []
                 for field in field_specs:
-                    size = yo.size(field)[0]
+                    size = self.size(field)[0]
                     sizes.append(size)
                     header.write("%-15s  %3d\n" % (field, size))
                 header.write('\nTotal Records in file: %d\n' % len(records))
@@ -3654,7 +3647,7 @@ class DbfTable(object):
                     for i, fieldname in enumerate(field_specs):
                         data = record[fieldname]
                         if isinstance(data, (str, unicode)):
-                            fields.append("%-*s" % (sizes[i], yo._meta.encoder(data)[0]))
+                            fields.append("%-*s" % (sizes[i], self._meta.encoder(data)[0]))
                         else:
                             fields.append("%-*s" % (sizes[i], data))
                     fd.write(''.join(fields) + '\n')
@@ -3662,15 +3655,15 @@ class DbfTable(object):
             fd.close()
             fd = None
         return len(records)
-    def find(yo, command):
+    def find(self, command):
         "uses exec to perform queries on the table"
-        possible = List(desc="%s -->  %s" % (yo.filename, command), field_names=yo.field_names)
-        yo._dbflists.add(possible)
+        possible = List(desc="%s -->  %s" % (self.filename, command), field_names=self.field_names)
+        self._dbflists.add(possible)
         result = {}
         select = 'result["keep"] = %s' % command
         g = {}
-        use_deleted = yo.use_deleted
-        for record in yo:
+        use_deleted = self.use_deleted
+        for record in self:
             result['keep'] = False
             g['result'] = result
             exec select in g, record
@@ -3678,76 +3671,76 @@ class DbfTable(object):
                 possible.append(record)
             record.write_record()
         return possible
-    def get_record(yo, recno):
+    def get_record(self, recno):
         "returns record at physical_index[recno]"
-        return yo._table[recno]
-    def goto(yo, criteria):
+        return self._table[recno]
+    def goto(self, criteria):
         """changes the record pointer to the first matching (non-deleted) record
         criteria should be either a tuple of tuple(value, field, func) triples, 
         or an integer to go to"""
         if isinstance(criteria, int):
-            if not -yo._meta.header.record_count <= criteria < yo._meta.header.record_count:
+            if not -self._meta.header.record_count <= criteria < self._meta.header.record_count:
                 raise IndexError("Record %d does not exist" % criteria)
             if criteria < 0:
-                criteria += yo._meta.header.record_count
-            yo._meta.current = criteria
-            return yo.current()
+                criteria += self._meta.header.record_count
+            self._meta.current = criteria
+            return self.current()
         criteria = _normalize_tuples(tuples=criteria, length=3, filler=[_nop])
         specs = tuple([(field, func) for value, field, func in criteria])
         match = tuple([value for value, field, func in criteria])
-        current = yo.current(index=True)
+        current = self.current(index=True)
         matchlen = len(match)
-        while not yo.Eof():
-            record = yo.current()
+        while not self.Eof():
+            record = self.current()
             results = record(*specs)
             if results == match:
                 return record
-        return yo.goto(current)
-    def is_decimal(yo, name):
+        return self.goto(current)
+    def is_decimal(self, name):
         "returns True if name is a variable-length field type"
-        return yo._meta[name][TYPE] in yo._decimal_fields
-    def is_memotype(yo, name):
+        return self._meta[name][TYPE] in self._decimal_fields
+    def is_memotype(self, name):
         "returns True if name is a memo type field"
-        return yo._meta[name][TYPE] in yo._memotypes
-    def new(yo, filename, field_specs=None, codepage=None):
+        return self._meta[name][TYPE] in self._memotypes
+    def new(self, filename, field_specs=None, codepage=None):
         "returns a new table of the same type"
         if field_specs is None:
-            field_specs = yo.structure()
+            field_specs = self.structure()
         if not (filename[0] == filename[-1] == ':'):
             path, name = os.path.split(filename)
             if path == "":
-                filename = os.path.join(os.path.split(yo.filename)[0], filename)
+                filename = os.path.join(os.path.split(self.filename)[0], filename)
             elif name == "":
-                filename = os.path.join(path, os.path.split(yo.filename)[1])
+                filename = os.path.join(path, os.path.split(self.filename)[1])
         if codepage is None:
-            codepage = yo._meta.header.codepage()[0]
-        return yo.__class__(filename, field_specs, codepage=codepage)
-    def next(yo):
+            codepage = self._meta.header.codepage()[0]
+        return self.__class__(filename, field_specs, codepage=codepage)
+    def next(self):
         "set record pointer to next (non-deleted) record, and return it"
-        if yo.eof(_move=True):
+        if self.eof(_move=True):
             raise Eof()
-        return yo.current()
-    def nullable_field(yo, field):
+        return self.current()
+    def nullable_field(self, field):
         "returns True if field allows Nulls"
-        if field not in yo.field_names:
+        if field not in self.field_names:
             raise MissingField(field)
-        return bool(yo._meta[field][FLAGS] & NULLABLE)
-    def open(yo):
+        return bool(self._meta[field][FLAGS] & NULLABLE)
+    def open(self):
         "(re)opens disk table, (re)initializes data structures"
-        if yo.filename[0] == yo.filename[-1] == ':':
+        if self.filename[0] == self.filename[-1] == ':':
             return
-        meta = yo._meta
+        meta = self._meta
         meta.inmemory = False
         meta.ondisk = True
-        yo._read_only = False
-        yo._meta_only = False
-        if '_table' in dir(yo):
-            del yo._table
+        self._read_only = False
+        self._meta_only = False
+        if '_table' in dir(self):
+            del self._table
         dfd = meta.dfd = open(meta.filename, 'r+b')
         dfd.seek(0)
-        meta.header = yo._TableHeader(dfd.read(32), yo._packDate, yo._unpackDate)
+        meta.header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
         header = meta.header
-        if not header.version in yo._supported_tables:
+        if not header.version in self._supported_tables:
             dfd.close()
             dfd = None
             raise DbfError("Unsupported dbf type: %s [%x]" % (version_map.get(header.version, 'Unknown: %s' % header.version), ord(header.version)))
@@ -3765,25 +3758,25 @@ class DbfTable(object):
             raise DbfError("corrupt field structure in header")
         header.fields = fieldblock[:fieldend]
         header.extra = fieldblock[fieldend+1:]  # skip trailing \r
-        yo._meta.ignorememos = yo._meta.original_ignorememos
-        yo._initializeFields()
-        yo._checkMemoIntegrity()
+        self._meta.ignorememos = self._meta.original_ignorememos
+        self._initialize_fields()
+        self._check_memo_integrity()
         meta.current = -1
-        if len(yo) > 0:
+        if len(self) > 0:
             meta.current = 0
         dfd.seek(0)
 
-    def pack(yo):
+    def pack(self):
         "physically removes all deleted records"
-        for dbfindex in yo._indexen:
+        for dbfindex in self._indexen:
             dbfindex.clear()
         newtable = []
         index = 0
         offset = 0 # +1 for each purged record
-        for record in yo._table:
+        for record in self._table:
             found = False
             if record.has_been_deleted:
-                for dbflist in yo._dbflists:
+                for dbflist in self._dbflists:
                     if dbflist._purge(record, record.record_number - offset, 1):
                         found = True
                 record._recnum = -1
@@ -3794,129 +3787,129 @@ class DbfTable(object):
             if found:
                 offset += 1
                 found = False
-        yo._table.clear()
+        self._table.clear()
         for record in newtable:
-            yo._table.append(record)
-        yo._meta.header.record_count = index
-        yo._current = -1
-        yo._update_disk()
-        yo.reindex()
-    def prev(yo):
+            self._table.append(record)
+        self._meta.header.record_count = index
+        self._current = -1
+        self._update_disk()
+        self.reindex()
+    def prev(self):
         "set record pointer to previous (non-deleted) record, and return it"
-        if yo.bof(_move=True):
+        if self.bof(_move=True):
             raise Bof
-        return yo.current()
-    def query(yo, sql_command=None, python=None):
+        return self.current()
+    def query(self, sql_command=None, python=None):
         "deprecated: use .find or .sql"
         if sql_command:
-            return yo.sql(sql_command)
+            return self.sql(sql_command)
         elif python:
-            return yo.find(python)
+            return self.find(python)
         raise DbfError("query: python parameter must be specified")
-    def reindex(yo):
+    def reindex(self):
         "reprocess all indices for this table"
-        for dbfindex in yo._indexen:
+        for dbfindex in self._indexen:
             dbfindex.reindex()
-    def rename_field(yo, oldname, newname):
+    def rename_field(self, oldname, newname):
         "renames an existing field"
-        if yo:
-            yo.create_backup()
-        if not oldname in yo._meta.user_fields:
+        if self:
+            self.create_backup()
+        if not oldname in self._meta.user_fields:
             raise DbfError("field --%s-- does not exist -- cannot rename it." % oldname)
         if newname[0] == '_' or newname[0].isdigit() or not newname.replace('_','').isalnum():
             raise DbfError("field names cannot start with _ or digits, and can only contain the _, letters, and digits")
         newname = newname.lower()
-        if newname in yo._meta.fields:
+        if newname in self._meta.fields:
             raise DbfError("field --%s-- already exists" % newname)
         if len(newname) > 10:
             raise DbfError("maximum field name length is 10.  '%s' is %d characters long." % (newname, len(newname)))
-        yo._meta[newname] = yo._meta[oldname]
-        yo._meta.fields[yo._meta.fields.index(oldname)] = newname
-        yo._buildHeaderFields()
-        yo._update_disk(headeronly=True)
-    def resize_field(yo, doomed, new_size):
+        self._meta[newname] = self._meta[oldname]
+        self._meta.fields[self._meta.fields.index(oldname)] = newname
+        self._build_header_fields()
+        self._update_disk(headeronly=True)
+    def resize_field(self, doomed, new_size):
         """resizes field (C only at this time)
         creates backup file, then modifies current structure"""
         if not 0 < new_size < 256:
             raise DbfError("new_size must be between 1 and 255 (use delete_fields to remove a field)")
-        doomed = yo._list_fields(doomed)
+        doomed = self._list_fields(doomed)
         for victim in doomed:
-            if victim not in yo._meta.user_fields:
+            if victim not in self._meta.user_fields:
                 raise DbfError("field %s not in table -- resize aborted" % victim)
-        all_records = [record for record in yo]
-        yo.create_backup()
+        all_records = [record for record in self]
+        self.create_backup()
         for victim in doomed:
-            specs = list(yo._meta[victim])
-            delta = new_size - specs[LENGTH]                #yo._meta[victim]['length']
-            start = specs[START]                            #yo._meta[victim]['start']
-            end = specs[END]                                #yo._meta[victim]['end']
-            eff_end = min(specs[LENGTH], new_size)          #min(yo._meta[victim]['length'], new_size)
-            specs[LENGTH] = new_size                        #yo._meta[victim]['length'] = new_size
-            specs[END] = start + new_size                   #yo._meta[victim]['end'] = start + new_size
-            yo._meta[victim] = tuple(specs)
+            specs = list(self._meta[victim])
+            delta = new_size - specs[LENGTH]                #self._meta[victim]['length']
+            start = specs[START]                            #self._meta[victim]['start']
+            end = specs[END]                                #self._meta[victim]['end']
+            eff_end = min(specs[LENGTH], new_size)          #min(self._meta[victim]['length'], new_size)
+            specs[LENGTH] = new_size                        #self._meta[victim]['length'] = new_size
+            specs[END] = start + new_size                   #self._meta[victim]['end'] = start + new_size
+            self._meta[victim] = tuple(specs)
             blank = array('c', ' ' * new_size)
-            for record in yo:
+            for record in self:
                 new_data = blank[:]
                 new_data[:eff_end] = record._data[start:start+eff_end]
                 record._data = record._data[:start] + new_data + record._data[end:]
-            for field in yo._meta.fields:
-                if yo._meta[field][START] == end:
-                    specs = list(yo._meta[field])
-                    end = specs[END]                        #yo._meta[field]['end']
-                    specs[START] += delta                   #yo._meta[field]['start'] += delta
-                    specs[END] += delta                     #yo._meta[field]['end'] += delta #+ yo._meta[field]['length']
-                    start = specs[END]                      #yo._meta[field]['end']
-                    yo._meta[field] = tuple(specs)
-        yo._buildHeaderFields()
-        yo._update_disk()
-    def size(yo, field):
+            for field in self._meta.fields:
+                if self._meta[field][START] == end:
+                    specs = list(self._meta[field])
+                    end = specs[END]                        #self._meta[field]['end']
+                    specs[START] += delta                   #self._meta[field]['start'] += delta
+                    specs[END] += delta                     #self._meta[field]['end'] += delta #+ self._meta[field]['length']
+                    start = specs[END]                      #self._meta[field]['end']
+                    self._meta[field] = tuple(specs)
+        self._build_header_fields()
+        self._update_disk()
+    def size(self, field):
         "returns size of field as a tuple of (length, decimals)"
-        if field in yo:
-            return (yo._meta[field][LENGTH], yo._meta[field][DECIMALS])
-        raise DbfError("%s is not a field in %s" % (field, yo.filename))
-    def sql(yo, command):
+        if field in self:
+            return (self._meta[field][LENGTH], self._meta[field][DECIMALS])
+        raise DbfError("%s is not a field in %s" % (field, self.filename))
+    def sql(self, command):
         "passes calls through to module level sql function"
-        return sql(yo, command)
-    def structure(yo, fields=None):
+        return sql(self, command)
+    def structure(self, fields=None):
         """return list of fields suitable for creating same table layout
         @param fields: list of fields or None for all fields"""
         field_specs = []
-        fields = yo._list_fields(fields)
+        fields = self._list_fields(fields)
         try:
             for name in fields:
-                field_specs.append(yo._fieldLayout(yo.field_names.index(name)))
+                field_specs.append(self._field_layout(self.field_names.index(name)))
         except ValueError:
             raise DbfError("field %s does not exist" % name)
         return field_specs
-    def top(yo, get_record=False):
+    def top(self, get_record=False):
         """sets record pointer to top of table; if get_record, seeks to and returns first (non-deleted) record
         DbfError if table is empty
         Eof if all records are deleted and use_deleted is False"""
-        yo._meta.current = -1
+        self._meta.current = -1
         if get_record:
             try:
-                return yo.next()
+                return self.next()
             except Eof:
-                yo._meta.current = -1
+                self._meta.current = -1
                 raise Bof()
-    def type(yo, field):
+    def type(self, field):
         "returns (dbf type, class) of field"
-        if field in yo:
-            return FieldType(yo._meta[field][TYPE], yo._meta[field][CLASS])
-        raise DbfError("%s is not a field in %s" % (field, yo.filename))
-    def zap(yo, areyousure=False):
+        if field in self:
+            return FieldType(self._meta[field][TYPE], self._meta[field][CLASS])
+        raise DbfError("%s is not a field in %s" % (field, self.filename))
+    def zap(self, areyousure=False):
         """removes all records from table -- this cannot be undone!
         areyousure must be True, else error is raised"""
         if areyousure:
-            if yo._meta.inmemory:
-                yo._table = []
+            if self._meta.inmemory:
+                self._table = []
             else:
-                yo._table.clear()
-                if yo._meta.memo:
-                    yo._meta.memo._zap()
-            yo._meta.header.record_count = 0
-            yo._current = -1
-            yo._update_disk()
+                self._table.clear()
+                if self._meta.memo:
+                    self._meta.memo._zap()
+            self._meta.header.record_count = 0
+            self._current = -1
+            self._update_disk()
         else:
             raise DbfError("You must say you are sure to wipe the table")
 class Db3Table(DbfTable):
@@ -3924,26 +3917,30 @@ class Db3Table(DbfTable):
     _version = 'dBase III Plus'
     _versionabbr = 'db3'
     @MutableDefault
-    def _fieldtypes():
+    def _field_types():
         return {
             'C' : {
-                    'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter,
+                    'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':str, 'Init':add_character,
                     'Class':unicode, 'Empty':unicode, 'flags':tuple(),
                     },
             'D' : {
-                    'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate,
+                    'Type':'Date', 'Retrieve':retrieve_date, 'Update':update_date, 'Blank':Date, 'Init':add_date,
                     'Class':datetime.date, 'Empty':none, 'flags':tuple(),
                     },
+            'F' : {
+                    'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':int, 'Init':add_numeric,
+                    'Class':'default', 'Empty':none, 'flags':tuple(),
+                    },
             'L' : {
-                    'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical,
+                    'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':Logical, 'Init':add_logical,
                     'Class':bool, 'Empty':none, 'flags':tuple(),
                     },
             'M' : {
-                    'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo,
+                    'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':str, 'Init':add_memo,
                     'Class':unicode, 'Empty':unicode, 'flags':tuple(),
                     },
             'N' : {
-                    'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addNumeric,
+                    'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':int, 'Init':add_numeric,
                     'Class':'default', 'Empty':none, 'flags':tuple(),
                     } }
     _memoext = '.dbt'
@@ -3963,7 +3960,7 @@ class Db3Table(DbfTable):
     _logical_fields = ('L',)
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x03'         # version - dBase III w/o memo's
-    _dbfTableHeader[8:10] = array('c', packShortInt(33))
+    _dbfTableHeader[8:10] = array('c', pack_short_int(33))
     _dbfTableHeader[10] = '\x01'        # record length -- one for delete flag
     _dbfTableHeader[29] = '\x03'        # code page -- 437 US-MS DOS
     _dbfTableHeader = _dbfTableHeader.tostring()
@@ -3973,49 +3970,49 @@ class Db3Table(DbfTable):
     _meta_only = False
     _use_deleted = True
 
-    def _checkMemoIntegrity(yo):
+    def _check_memo_integrity(self):
         "dBase III specific"
-        if not yo._meta.ignorememos:
+        if not self._meta.ignorememos:
             memo_fields = False
-            for field in yo._meta.fields:
-                if yo._meta[field][TYPE] in yo._memotypes:
+            for field in self._meta.fields:
+                if self._meta[field][TYPE] in self._memotypes:
                     memo_fields = True
                     break
-            if memo_fields and yo._meta.header.version != '\x83':
-                yo._meta.dfd.close()
-                yo._meta.dfd = None
+            if memo_fields and self._meta.header.version != '\x83':
+                self._meta.dfd.close()
+                self._meta.dfd = None
                 raise DbfError("Table structure corrupt:  memo fields exist, header declares no memos")
-            elif memo_fields and not os.path.exists(yo._meta.memoname):
-                yo._meta.dfd.close()
-                yo._meta.dfd = None
+            elif memo_fields and not os.path.exists(self._meta.memoname):
+                self._meta.dfd.close()
+                self._meta.dfd = None
                 raise DbfError("Table structure corrupt:  memo fields exist without memo file")
             if memo_fields:
                 try:
-                    yo._meta.memo = yo._memoClass(yo._meta)
+                    self._meta.memo = self._memoClass(self._meta)
                 except Exception, exc:
-                    yo._meta.dfd.close()
-                    yo._meta.dfd = None
+                    self._meta.dfd.close()
+                    self._meta.dfd = None
                     raise DbfError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1])
 
-    def _initializeFields(yo):
+    def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions"
         old_fields = defaultdict(dict)
-        for name in yo._meta.fields:
-            old_fields[name]['type'] = yo._meta[name][TYPE]
-            old_fields[name]['empty'] = yo._meta[name][EMPTY]
-            old_fields[name]['class'] = yo._meta[name][CLASS]
-        yo._meta.fields[:] = []
+        for name in self._meta.fields:
+            old_fields[name]['type'] = self._meta[name][TYPE]
+            old_fields[name]['empty'] = self._meta[name][EMPTY]
+            old_fields[name]['class'] = self._meta[name][CLASS]
+        self._meta.fields[:] = []
         offset = 1
-        fieldsdef = yo._meta.header.fields
+        fieldsdef = self._meta.header.fields
         if len(fieldsdef) % 32 != 0:
             raise DbfError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
-        if len(fieldsdef) // 32 != yo._meta.header.field_count:
-            raise DbfError("Header shows %d fields, but field definition block has %d fields" % (yo._meta.header.field_count, len(fieldsdef)//32))
-        for i in range(yo._meta.header.field_count):
+        if len(fieldsdef) // 32 != self._meta.header.field_count:
+            raise DbfError("Header shows %d fields, but field definition block has %d fields" % (self._meta.header.field_count, len(fieldsdef)//32))
+        for i in range(self._meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = unpackStr(fieldblock[:11])
+            name = unpack_str(fieldblock[:11])
             type = fieldblock[11]
-            if not type in yo._meta.fieldtypes:
+            if not type in self._meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
             start = offset
             length = ord(fieldblock[16])
@@ -4023,16 +4020,16 @@ class Db3Table(DbfTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
-            if name in yo._meta.fields:
+            if name in self._meta.fields:
                 raise DbfError('Duplicate field name found: %s' % name)
-            yo._meta.fields.append(name)
+            self._meta.fields.append(name)
             if name in old_fields and old_fields[name]['type'] == type:
                 cls = old_fields[name]['class']
                 empty = old_fields[name]['empty']
             else:
-                cls = yo._meta.fieldtypes[type]['Class']
-                empty = yo._meta.fieldtypes[type]['Empty']
-            yo._meta[name] = (
+                cls = self._meta.fieldtypes[type]['Class']
+                empty = self._meta.fieldtypes[type]['Empty']
+            self._meta[name] = (
                     type,
                     start,
                     length,
@@ -4042,49 +4039,49 @@ class Db3Table(DbfTable):
                     cls,
                     empty,
                     )
-        yo._meta.user_fields = [f for f in yo._meta.fields if not yo._meta[f][FLAGS] & SYSTEM]
-        yo._meta.user_field_count = len(yo._meta.user_fields)
+        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
+        self._meta.user_field_count = len(self._meta.user_fields)
 class FpTable(DbfTable):
     'Provides an interface for working with FoxPro 2 tables'
     _version = 'Foxpro'
     _versionabbr = 'fp'
     @MutableDefault
-    def _fieldtypes():
+    def _field_types():
         return {
             'C' : {
-                    'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter,
+                    'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':str, 'Init':add_character,
                     'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ),
                     },
             'F' : {
-                    'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric,
+                    'Type':'Float', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':float, 'Init':add_vfp_numeric,
                     'Class':'default', 'Empty':none, 'flags':('null', ),
                     },
             'N' : {
-                    'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric,
+                    'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':int, 'Init':add_vfp_numeric,
                     'Class':'default', 'Empty':none, 'flags':('null', ),
                     },
             'L' : {
-                    'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical,
+                    'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':Logical, 'Init':add_logical,
                     'Class':bool, 'Empty':none, 'flags':('null', ),
                     },
             'D' : {
-                    'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate,
+                    'Type':'Date', 'Retrieve':retrieve_date, 'Update':update_date, 'Blank':Date, 'Init':add_date,
                     'Class':datetime.date, 'Empty':none, 'flags':('null', ),
                     },
             'M' : {
-                    'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':str, 'Init':add_vfp_memo,
                     'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ),
                     },
             'G' : {
-                    'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo,
+                    'Type':'General', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':str, 'Init':add_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             'P' : {
-                    'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo,
+                    'Type':'Picture', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':str, 'Init':add_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             '0' : {
-                    'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None,
+                    'Type':'_NullFlags', 'Retrieve':unsupported_type, 'Update':unsupported_type, 'Blank':int, 'Init':None,
                     'Class':none, 'Empty':none, 'flags':('binary','system', ),
                     } }
     _memoext = '.fpt'
@@ -4105,53 +4102,53 @@ class FpTable(DbfTable):
     _supported_tables = ('\x03', '\xf5')
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
-    _dbfTableHeader[8:10] = array('c', packShortInt(33+263))
+    _dbfTableHeader[8:10] = array('c', pack_short_int(33+263))
     _dbfTableHeader[10] = '\x01'        # record length -- one for delete flag
     _dbfTableHeader[29] = '\x03'        # code page -- 437 US-MS DOS
     _dbfTableHeader = _dbfTableHeader.tostring()
     _dbfTableHeaderExtra = '\x00' * 263
     _use_deleted = True
-    def _checkMemoIntegrity(yo):
-        if not yo._meta.ignorememos:
+    def _check_memo_integrity(self):
+        if not self._meta.ignorememos:
             memo_fields = False
-            for field in yo._meta.fields:
-                if yo._meta[field][TYPE] in yo._memotypes:
+            for field in self._meta.fields:
+                if self._meta[field][TYPE] in self._memotypes:
                     memo_fields = True
                     break
-            if memo_fields and (not os.path.exists(yo._meta.memoname) or not os.stat(yo._meta.memoname)[ST_SIZE]):
-                yo._meta.dfd.close()
-                yo._meta.dfd = None
+            if memo_fields and not os.path.exists(self._meta.memoname):
+                self._meta.dfd.close()
+                self._meta.dfd = None
                 raise DbfError("Table structure corrupt:  memo fields exist without memo file")
-            elif not memo_fields and os.path.exists(yo._meta.memoname):
-                yo._meta.dfd.close()
-                yo._meta.dfd = None
+            elif not memo_fields and os.path.exists(self._meta.memoname):
+                self._meta.dfd.close()
+                self._meta.dfd = None
                 raise DbfError("Table structure corrupt:  no memo fields exist but memo file does")
             if memo_fields:
                 try:
-                    yo._meta.memo = yo._memoClass(yo._meta)
+                    self._meta.memo = self._memoClass(self._meta)
                 except Exception, exc:
-                    yo._meta.dfd.close()
-                    yo._meta.dfd = None
+                    self._meta.dfd.close()
+                    self._meta.dfd = None
                     raise DbfError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1])
 
-    def _initializeFields(yo):
+    def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions"
         old_fields = defaultdict(dict)
-        for name in yo._meta.fields:
-            old_fields[name]['type'] = yo._meta[name][TYPE]
-            old_fields[name]['class'] = yo._meta[name][CLASS]
-        yo._meta.fields[:] = []
+        for name in self._meta.fields:
+            old_fields[name]['type'] = self._meta[name][TYPE]
+            old_fields[name]['class'] = self._meta[name][CLASS]
+        self._meta.fields[:] = []
         offset = 1
-        fieldsdef = yo._meta.header.fields
+        fieldsdef = self._meta.header.fields
         if len(fieldsdef) % 32 != 0:
             raise DbfError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
-        if len(fieldsdef) // 32 != yo._meta.header.field_count:
-            raise DbfError("Header shows %d fields, but field definition block has %d fields" % (yo._meta.header.field_count, len(fieldsdef)//32))
-        for i in range(yo._meta.header.field_count):
+        if len(fieldsdef) // 32 != self._meta.header.field_count:
+            raise DbfError("Header shows %d fields, but field definition block has %d fields" % (self._meta.header.field_count, len(fieldsdef)//32))
+        for i in range(self._meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = unpackStr(fieldblock[:11])
+            name = unpack_str(fieldblock[:11])
             type = fieldblock[11]
-            if not type in yo._meta.fieldtypes:
+            if not type in self._meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
             start = offset
             length = ord(fieldblock[16])
@@ -4159,16 +4156,16 @@ class FpTable(DbfTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
-            if name in yo._meta.fields:
+            if name in self._meta.fields:
                 raise DbfError('Duplicate field name found: %s' % name)
-            yo._meta.fields.append(name)
+            self._meta.fields.append(name)
             if name in old_fields and old_fields[name]['type'] == type:
                 cls = old_fields[name]['class']
                 empty = old_fields[name]['empty']
             else:
-                cls = yo._meta.fieldtypes[type]['Class']
-                empty = yo._meta.fieldtypes[type]['Empty']
-            yo._meta[name] = (
+                cls = self._meta.fieldtypes[type]['Class']
+                empty = self._meta.fieldtypes[type]['Empty']
+            self._meta[name] = (
                     type,
                     start,
                     length,
@@ -4178,14 +4175,14 @@ class FpTable(DbfTable):
                     cls,
                     empty,
                     )
-        yo._meta.user_fields = [f for f in yo._meta.fields if not yo._meta[f][FLAGS] & SYSTEM]
-        yo._meta.user_field_count = len(yo._meta.user_fields)
+        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
+        self._meta.user_field_count = len(self._meta.user_fields)
     @staticmethod
-    def _packDate(date):
+    def _pack_date(date):
             "Returns a group of three bytes, in integer form, of the date"
             return "%c%c%c" % (date.year-2000, date.month, date.day)
     @staticmethod
-    def _unpackDate(bytestr):
+    def _unpack_date(bytestr):
             "Returns a Date() of the packed three-byte date passed in"
             year, month, day = struct.unpack('<BBB', bytestr)
             year += 2000
@@ -4196,58 +4193,58 @@ class VfpTable(FpTable):
     _version = 'Visual Foxpro'
     _versionabbr = 'vfp'
     @MutableDefault
-    def _fieldtypes():
+    def _field_types():
         return {
             'C' : {
-                    'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter,
+                    'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':str, 'Init':add_character,
                     'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ), 
                     },
             'Y' : {
-                    'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency,
+                    'Type':'Currency', 'Retrieve':retrieve_currency, 'Update':update_currency, 'Blank':Decimal, 'Init':add_vfp_currency,
                     'Class':Decimal, 'Empty':none, 'flags':('null', ),
                     },
             'B' : {
-                    'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble,
+                    'Type':'Double', 'Retrieve':retrieve_double, 'Update':update_double, 'Blank':float, 'Init':add_vfp_double,
                     'Class':float, 'Empty':none, 'flags':('null', ),
                     },
             'F' : {
-                    'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric,
+                    'Type':'Float', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':float, 'Init':add_vfp_numeric,
                     'Class':'default', 'Empty':none, 'flags':('null', ),
                     },
             'N' : {
-                    'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric,
+                    'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':int, 'Init':add_vfp_numeric,
                     'Class':'default', 'Empty':none, 'flags':('null', ),
                     },
             'I' : {
-                    'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger,
+                    'Type':'Integer', 'Retrieve':retrieve_integer, 'Update':update_integer, 'Blank':int, 'Init':add_vfp_integer,
                     'Class':int, 'Empty':none, 'flags':('null', ),
                     },
             'L' : {
-                    'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical,
+                    'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':Logical, 'Init':add_logical,
                     'Class':bool, 'Empty':none, 'flags':('null', ),
                     },
             'D' : {
-                    'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate,
+                    'Type':'Date', 'Retrieve':retrieve_date, 'Update':update_date, 'Blank':Date, 'Init':add_date,
                     'Class':datetime.date, 'Empty':none, 'flags':('null', ),
                     },
             'T' : {
-                    'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime,
+                    'Type':'DateTime', 'Retrieve':retrieve_vfp_datetime, 'Update':update_vfp_datetime, 'Blank':DateTime, 'Init':add_vfp_datetime,
                     'Class':datetime.datetime, 'Empty':none, 'flags':('null', ),
                     },
             'M' : {
-                    'Type':'Memo', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Type':'Memo', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':str, 'Init':add_vfp_memo,
                     'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ), 
                     },
             'G' : {
-                    'Type':'General', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Type':'General', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':str, 'Init':add_vfp_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             'P' : {
-                    'Type':'Picture', 'Retrieve':retrieveVfpMemo, 'Update':updateVfpMemo, 'Blank':str, 'Init':addVfpMemo,
+                    'Type':'Picture', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':str, 'Init':add_vfp_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             '0' : {
-                    'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':int,
+                    'Type':'_NullFlags', 'Retrieve':unsupported_type, 'Update':unsupported_type, 'Blank':int, 'Init':int,
                     'Class':none, 'Empty':none, 'flags':('binary','system',),
                     } }
     _memoext = '.fpt'
@@ -4268,45 +4265,45 @@ class VfpTable(FpTable):
     _supported_tables = ('\x30','\x31')
     _dbfTableHeader = array('c', '\x00' * 32)
     _dbfTableHeader[0] = '\x30'         # version - Foxpro 6  0011 0000
-    _dbfTableHeader[8:10] = array('c', packShortInt(33+263))
+    _dbfTableHeader[8:10] = array('c', pack_short_int(33+263))
     _dbfTableHeader[10] = '\x01'        # record length -- one for delete flag
     _dbfTableHeader[29] = '\x03'        # code page -- 437 US-MS DOS
     _dbfTableHeader = _dbfTableHeader.tostring()
     _dbfTableHeaderExtra = '\x00' * 263
     _use_deleted = True
-    def _initializeFields(yo):
+    def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions"
         old_fields = defaultdict(dict)
-        for name in yo._meta.fields:
-            old_fields[name]['type'] = yo._meta[name][TYPE]
-            old_fields[name]['class'] = yo._meta[name][CLASS]
-            old_fields[name]['empty'] = yo._meta[name][EMPTY]
-        yo._meta.fields[:] = []
+        for name in self._meta.fields:
+            old_fields[name]['type'] = self._meta[name][TYPE]
+            old_fields[name]['class'] = self._meta[name][CLASS]
+            old_fields[name]['empty'] = self._meta[name][EMPTY]
+        self._meta.fields[:] = []
         offset = 1
-        fieldsdef = yo._meta.header.fields
-        yo._meta.nullflags = None
-        for i in range(yo._meta.header.field_count):
+        fieldsdef = self._meta.header.fields
+        self._meta.nullflags = None
+        for i in range(self._meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = unpackStr(fieldblock[:11])
+            name = unpack_str(fieldblock[:11])
             type = fieldblock[11]
-            if not type in yo._meta.fieldtypes:
+            if not type in self._meta.fieldtypes:
                 raise DbfError("Unknown field type: %s" % type)
-            start = unpackLongInt(fieldblock[12:16])
+            start = unpack_long_int(fieldblock[12:16])
             length = ord(fieldblock[16])
             offset += length
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
-            if name in yo._meta.fields:
+            if name in self._meta.fields:
                 raise DbfError('Duplicate field name found: %s' % name)
-            yo._meta.fields.append(name)
+            self._meta.fields.append(name)
             if name in old_fields and old_fields[name]['type'] == type:
                 cls = old_fields[name]['class']
                 empty = old_fields[name]['empty']
             else:
-                cls = yo._meta.fieldtypes[type]['Class']
-                empty = yo._meta.fieldtypes[type]['Empty']
-            yo._meta[name] = (
+                cls = self._meta.fieldtypes[type]['Class']
+                empty = self._meta.fieldtypes[type]['Empty']
+            self._meta[name] = (
                     type,
                     start,
                     length,
@@ -4316,14 +4313,14 @@ class VfpTable(FpTable):
                     cls,
                     empty,
                     )
-        yo._meta.user_fields = [f for f in yo._meta.fields if not yo._meta[f][FLAGS] & SYSTEM]
-        yo._meta.user_field_count = len(yo._meta.user_fields)
+        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
+        self._meta.user_field_count = len(self._meta.user_fields)
     @staticmethod
-    def _packDate(date):
+    def _pack_date(date):
             "Returns a group of three bytes, in integer form, of the date"
             return "%c%c%c" % (date.year-2000, date.month, date.day)
     @staticmethod
-    def _unpackDate(bytestr):
+    def _unpack_date(bytestr):
             "Returns a Date() of the packed three-byte date passed in"
             year, month, day = struct.unpack('<BBB', bytestr)
             year += 2000
@@ -4332,39 +4329,39 @@ class VfpTable(FpTable):
 class List(object):
     "list of Dbf records, with set-like behavior"
     _desc = ''
-    def __init__(yo, new_records=None, desc=None, key=None, field_names=None):
-        yo.field_names = field_names
-        yo._list = []
-        yo._set = set()
+    def __init__(self, new_records=None, desc=None, key=None, field_names=None):
+        self.field_names = field_names
+        self._list = []
+        self._set = set()
         if key is not None:
-            yo.key = key
+            self.key = key
             if key.__doc__ is None:
                 key.__doc__ = 'unknown'
-        key = yo.key
-        yo._current = -1
-        if isinstance(new_records, yo.__class__) and key is new_records.key:
-                yo._list = new_records._list[:]
-                yo._set = new_records._set.copy()
-                yo._current = 0
+        key = self.key
+        self._current = -1
+        if isinstance(new_records, self.__class__) and key is new_records.key:
+                self._list = new_records._list[:]
+                self._set = new_records._set.copy()
+                self._current = 0
         elif new_records is not None:
             for record in new_records:
                 value = key(record)
                 item = (record.record_table, record.record_number, value)
-                if value not in yo._set:
-                    yo._set.add(value)
-                    yo._list.append(item)
-            yo._current = 0
+                if value not in self._set:
+                    self._set.add(value)
+                    self._list.append(item)
+            self._current = 0
         if desc is not None:
-            yo._desc = desc
-    def __add__(yo, other):
-        key = yo.key
+            self._desc = desc
+    def __add__(self, other):
+        key = self.key
         if isinstance(other, (DbfTable, list)):
-            other = yo.__class__(other, key=key)
-        if isinstance(other, yo.__class__):
-            result = yo.__class__()
-            result._set = yo._set.copy()
-            result._list[:] = yo._list[:]
-            result.key = yo.key
+            other = self.__class__(other, key=key)
+        if isinstance(other, self.__class__):
+            result = self.__class__()
+            result._set = self._set.copy()
+            result._list[:] = self._list[:]
+            result.key = self.key
             if key is other.key:   # same key?  just compare key values
                 for item in other._list:
                     if item[2] not in result._set:
@@ -4379,69 +4376,69 @@ class List(object):
             result._current = (-1, 0)[bool(result)]
             return result
         return NotImplemented
-    def __contains__(yo, record):
+    def __contains__(self, record):
         if not isinstance(record, _DbfRecord):
             raise ValueError("%r is not a record" % record)
-        item = yo.key(record)
+        item = self.key(record)
         if not isinstance(item, tuple):
             item = (item, )
-        return item in yo._set and yo._get_record(*item) is record
-    def __delitem__(yo, key):
+        return item in self._set and self._get_record(*item) is record
+    def __delitem__(self, key):
         if isinstance(key, int):
-            item = yo._list.pop[key]
-            yo._set.remove(item[2])
+            item = self._list.pop[key]
+            self._set.remove(item[2])
         elif isinstance(key, slice):
-            yo._set.difference_update([item[2] for item in yo._list[key]])
-            yo._list.__delitem__(key)
+            self._set.difference_update([item[2] for item in self._list[key]])
+            self._list.__delitem__(key)
         elif isinstance(key, _DbfRecord):
-            index = yo.index(key)
-            item = yo._list.pop[index]
-            yo._set.remove(item[2])
+            index = self.index(key)
+            item = self._list.pop[index]
+            self._set.remove(item[2])
         else:
             raise TypeError
-    def __getitem__(yo, key):
+    def __getitem__(self, key):
         if isinstance(key, int):
-            count = len(yo._list)
+            count = len(self._list)
             if not -count <= key < count:
                 raise IndexError("Record %d is not in list." % key)
-            return yo._get_record(*yo._list[key])
+            return self._get_record(*self._list[key])
         elif isinstance(key, slice):
-            result = yo.__class__()
-            result._list[:] = yo._list[key]
+            result = self.__class__()
+            result._list[:] = self._list[key]
             result._set = set(result._list)
-            result.key = yo.key
+            result.key = self.key
             result._current = (-1, 0)[bool(result)]
             return result
         elif isinstance(key, _DbfRecord):
-            index = yo.index(key)
-            return yo._get_record(*yo._list[index])
+            index = self.index(key)
+            return self._get_record(*self._list[index])
         else:
             raise TypeError('indices must be integers')
-    def __iter__(yo):
-        return (table.get_record(recno) for table, recno, value in yo._list)
-    def __len__(yo):
-        return len(yo._list)
-    def __nonzero__(yo):
-        return len(yo) > 0
-    def __radd__(yo, other):
-        return yo.__add__(other)
-    def __repr__(yo):
-        if yo._desc:
-            return "%s(key=%s - %s - %d records)" % (yo.__class__, yo.key.__doc__, yo._desc, len(yo._list))
+    def __iter__(self):
+        return (table.get_record(recno) for table, recno, value in self._list)
+    def __len__(self):
+        return len(self._list)
+    def __nonzero__(self):
+        return len(self) > 0
+    def __radd__(self, other):
+        return self.__add__(other)
+    def __repr__(self):
+        if self._desc:
+            return "%s(key=%s - %s - %d records)" % (self.__class__, self.key.__doc__, self._desc, len(self._list))
         else:
-            return "%s(key=%s - %d records)" % (yo.__class__, yo.key.__doc__, len(yo._list))
-    def __rsub__(yo, other):
-        key = yo.key
+            return "%s(key=%s - %d records)" % (self.__class__, self.key.__doc__, len(self._list))
+    def __rsub__(self, other):
+        key = self.key
         if isinstance(other, (DbfTable, list)):
-            other = yo.__class__(other, key=key)
-        if isinstance(other, yo.__class__):
-            result = yo.__class__()
+            other = self.__class__(other, key=key)
+        if isinstance(other, self.__class__):
+            result = self.__class__()
             result._list[:] = other._list[:]
             result._set = other._set.copy()
             result.key = key
             lost = set()
             if key is other.key:
-                for item in yo._list:
+                for item in self._list:
                     if item[2] in result._list:
                         result._set.remove(item[2])
                         lost.add(item)
@@ -4455,14 +4452,14 @@ class List(object):
             result._current = (-1, 0)[bool(result)]
             return result
         return NotImplemented
-    def __sub__(yo, other):
-        key = yo.key
+    def __sub__(self, other):
+        key = self.key
         if isinstance(other, (DbfTable, list)):
-            other = yo.__class__(other, key=key)
-        if isinstance(other, yo.__class__):
-            result = yo.__class__()
-            result._list[:] = yo._list[:]
-            result._set = yo._set.copy()
+            other = self.__class__(other, key=key)
+        if isinstance(other, self.__class__):
+            result = self.__class__()
+            result._list[:] = self._list[:]
+            result._set = self._set.copy()
             result.key = key
             lost = set()
             if key is other.key:
@@ -4480,17 +4477,17 @@ class List(object):
             result._current = (-1, 0)[bool(result)]
             return result
         return NotImplemented
-    def _maybe_add(yo, item):
-        if item[2] not in yo._set:
-            yo._set.add(item[2])
-            yo._list.append(item)
-    def _get_record(yo, table=None, rec_no=None, value=None):
+    def _maybe_add(self, item):
+        if item[2] not in self._set:
+            self._set.add(item[2])
+            self._list.append(item)
+    def _get_record(self, table=None, rec_no=None, value=None):
         if table is rec_no is None:
-            table, rec_no, value = yo._list[yo._current]
+            table, rec_no, value = self._list[self._current]
         return table.get_record(rec_no)
-    def _purge(yo, record, old_record_number, offset):
+    def _purge(self, record, old_record_number, offset):
         partial = record.record_table, old_record_number
-        records = sorted(yo._list, key=lambda item: (item[0], item[1]))
+        records = sorted(self._list, key=lambda item: (item[0], item[1]))
         for item in records:
             if partial == item[:2]:
                 found = True
@@ -4501,142 +4498,142 @@ class List(object):
         else:
             found = False
         if found:
-            yo._list.pop(yo._list.index(item))
-            yo._set.remove(item[2])
+            self._list.pop(self._list.index(item))
+            self._set.remove(item[2])
         start = records.index(item) + found
         for item in records[start:]:
             if item[0] is not partial[0]:       # into other table's records
                 break
-            i = yo._list.index(item)
-            yo._set.remove(item[2])
+            i = self._list.index(item)
+            self._set.remove(item[2])
             item = item[0], (item[1] - offset), item[2]
-            yo._list[i] = item
-            yo._set.add(item[2])
+            self._list[i] = item
+            self._set.add(item[2])
         return found
-    def append(yo, new_record):
-        yo._maybe_add((new_record.record_table, new_record.record_number, yo.key(new_record)))
-        if yo._current == -1 and yo._list:
-            yo._current = 0
-    def bottom(yo):
-        if yo._list:
-            yo._current = len(yo._list) - 1
-            return yo._get_record()
+    def append(self, new_record):
+        self._maybe_add((new_record.record_table, new_record.record_number, self.key(new_record)))
+        if self._current == -1 and self._list:
+            self._current = 0
+    def bottom(self):
+        if self._list:
+            self._current = len(self._list) - 1
+            return self._get_record()
         raise DbfError("dbf.List is empty")
-    def clear(yo):
-        yo._list = []
-        yo._set = set()
-        yo._current = -1
-    def current(yo):
-        if yo._current < 0:
+    def clear(self):
+        self._list = []
+        self._set = set()
+        self._current = -1
+    def current(self):
+        if self._current < 0:
             raise Bof()
-        elif yo._current == len(yo._list):
+        elif self._current == len(self._list):
             raise Eof()
-        return yo._get_record()
-    def extend(yo, new_records):
-        key = yo.key
-        if isinstance(new_records, yo.__class__):
+        return self._get_record()
+    def extend(self, new_records):
+        key = self.key
+        if isinstance(new_records, self.__class__):
             if key is new_records.key:   # same key?  just compare key values
                 for item in new_records._list:
-                    yo._maybe_add(item)
+                    self._maybe_add(item)
             else:                   # different keys, use this list's key on other's records
                 for rec in new_records:
                     value = key(rec)
-                    yo._maybe_add((rec.record_table, rec.record_number, value))
+                    self._maybe_add((rec.record_table, rec.record_number, value))
         else:
             for rec in new_records:
                 value = key(rec)
-                yo._maybe_add((rec.record_table, rec.record_number, value))
-        if yo._current == -1 and yo._list:
-            yo._current = 0
-    def goto(yo, index_number):
-        if yo._list:
-            if 0 <= index_number <= len(yo._list):
-                yo._current = index_number
-                return yo._get_record()
-            raise DbfError("index %d not in dbf.List of %d records" % (index_number, len(yo._list)))
+                self._maybe_add((rec.record_table, rec.record_number, value))
+        if self._current == -1 and self._list:
+            self._current = 0
+    def goto(self, index_number):
+        if self._list:
+            if 0 <= index_number <= len(self._list):
+                self._current = index_number
+                return self._get_record()
+            raise DbfError("index %d not in dbf.List of %d records" % (index_number, len(self._list)))
         raise DbfError("dbf.List is empty")
 
-    def index(yo, record, start=None, stop=None):
-        item = record.record_table, record.record_number, yo.key(record)
-        key = yo.key(record)
+    def index(self, record, start=None, stop=None):
+        item = record.record_table, record.record_number, self.key(record)
+        key = self.key(record)
         if start is None:
             start = 0
         if stop is None:
-            stop = len(yo._list)
+            stop = len(self._list)
         for i in range(start, stop):
-            if yo._list[i][2] == key:
+            if self._list[i][2] == key:
                 return i
         else:
             raise ValueError("dbf.List.index(x): <x=%r> not in list" % (key,))
-    def insert(yo, i, record):
-        item = record.record_table, record.record_number, yo.key(record)
-        if item not in yo._set:
-            yo._set.add(item[2])
-            yo._list.insert(i, item)
-    def key(yo, record):
+    def insert(self, i, record):
+        item = record.record_table, record.record_number, self.key(record)
+        if item not in self._set:
+            self._set.add(item[2])
+            self._list.insert(i, item)
+    def key(self, record):
         "table_name, record_number"
         return record.record_table, record.record_number
-    def next(yo):
-        if yo._current < len(yo._list):
-            yo._current += 1
-            if yo._current < len(yo._list):
-                return yo._get_record()
+    def next(self):
+        if self._current < len(self._list):
+            self._current += 1
+            if self._current < len(self._list):
+                return self._get_record()
         raise Eof()
-    def pop(yo, index=None):
+    def pop(self, index=None):
         if index is None:
-            table, recno, value = yo._list.pop()
+            table, recno, value = self._list.pop()
         else:
-            table, recno, value = yo._list.pop(index)
-        yo._set.remove(value)
-        return yo._get_record(table, recno, value)
-    def prev(yo):
-        if yo._current >= 0:
-            yo._current -= 1
-            if yo._current > -1:
-                return yo._get_record()
+            table, recno, value = self._list.pop(index)
+        self._set.remove(value)
+        return self._get_record(table, recno, value)
+    def prev(self):
+        if self._current >= 0:
+            self._current -= 1
+            if self._current > -1:
+                return self._get_record()
         raise Bof()
-    def remove(yo, record):
-        item = record.record_table, record.record_number, yo.key(record)
-        yo._list.remove(item)
-        yo._set.remove(item[2])
-    def reverse(yo):
-        return yo._list.reverse()
-    def top(yo):
-        if yo._list:
-            yo._current = 0
-            return yo._get_record()
+    def remove(self, record):
+        item = record.record_table, record.record_number, self.key(record)
+        self._list.remove(item)
+        self._set.remove(item[2])
+    def reverse(self):
+        return self._list.reverse()
+    def top(self):
+        if self._list:
+            self._current = 0
+            return self._get_record()
         raise DbfError("dbf.List is empty")
-    def sort(yo, key=None, reverse=False):
+    def sort(self, key=None, reverse=False):
         if key is None:
-            return yo._list.sort(reverse=reverse)
-        return yo._list.sort(key=lambda item: key(item[0].get_record(item[1])), reverse=reverse)
+            return self._list.sort(reverse=reverse)
+        return self._list.sort(key=lambda item: key(item[0].get_record(item[1])), reverse=reverse)
 
 class Index(object):
     class IndexIterator(object):
         "returns records using this index"
-        def __init__(yo, table, records):
-            yo.table = table
-            yo.records = records[:]
-            yo.index = 0
-        def __iter__(yo):
-            return yo
-        def next(yo):
-            while yo.index < len(yo.records):
-                record = yo.table.get_record(yo.records[yo.index])
-                yo.index += 1
-                if not yo.table.use_deleted and record.has_been_deleted:
+        def __init__(self, table, records):
+            self.table = table
+            self.records = records[:]
+            self.index = 0
+        def __iter__(self):
+            return self
+        def next(self):
+            while self.index < len(self.records):
+                record = self.table.get_record(self.records[self.index])
+                self.index += 1
+                if not self.table.use_deleted and record.has_been_deleted:
                     continue
                 return record
             else:
                 raise StopIteration
-    def __init__(yo, table, key, field_names=None):
-        yo._table = table
-        yo._values = []             # ordered list of values
-        yo._rec_by_val = []         # matching record numbers
-        yo._records = {}            # record numbers:values
-        yo.__doc__ = key.__doc__ or 'unknown'
-        yo.key = key
-        yo.field_names = field_names or table.field_names
+    def __init__(self, table, key, field_names=None):
+        self._table = table
+        self._values = []             # ordered list of values
+        self._rec_by_val = []         # matching record numbers
+        self._records = {}            # record numbers:values
+        self.__doc__ = key.__doc__ or 'unknown'
+        self.key = key
+        self.field_names = field_names or table.field_names
         for record in table:
             value = key(record)
             if value is DoNotIndex:
@@ -4644,165 +4641,165 @@ class Index(object):
             rec_num = record.record_number
             if not isinstance(value, tuple):
                 value = (value, )
-            vindex = bisect_right(yo._values, value)
-            yo._values.insert(vindex, value)
-            yo._rec_by_val.insert(vindex, rec_num)
-            yo._records[rec_num] = value
-        table._indexen.add(yo)
-    def __call__(yo, record):
+            vindex = bisect_right(self._values, value)
+            self._values.insert(vindex, value)
+            self._rec_by_val.insert(vindex, rec_num)
+            self._records[rec_num] = value
+        table._indexen.add(self)
+    def __call__(self, record):
         rec_num = record.record_number
-        key = yo.key(record)
+        key = self.key(record)
         if not isinstance(key, tuple):
             key = (key, )
-        if rec_num in yo._records:
-            if yo._records[rec_num] == key:
+        if rec_num in self._records:
+            if self._records[rec_num] == key:
                 return
-            key = yo._records[rec_num]
-            vindex = bisect_left(yo._values, key)
-            yo._values.pop(vindex)
-            yo._rec_by_val.pop(vindex)
-        key = yo.key(record)
+            key = self._records[rec_num]
+            vindex = bisect_left(self._values, key)
+            self._values.pop(vindex)
+            self._rec_by_val.pop(vindex)
+        key = self.key(record)
         if key is DoNotIndex:
             return
         if not isinstance(key, tuple):
             key = (key, )
-        vindex = bisect_right(yo._values, key)
-        yo._values.insert(vindex, key)
-        yo._rec_by_val.insert(vindex, rec_num)
-        yo._records[rec_num] = key
-    def __contains__(yo, record):
+        vindex = bisect_right(self._values, key)
+        self._values.insert(vindex, key)
+        self._rec_by_val.insert(vindex, rec_num)
+        self._records[rec_num] = key
+    def __contains__(self, record):
         if not isinstance(record, _DbfRecord):
             raise ValueError("%r is not a record" % record)
-        if record.record_table is yo._table:
-            return record.record_number in yo._records
-        raise ValueError("record is from table %r, not %r" % (record.table, yo._table))
-    def __getitem__(yo, key):
+        if record.record_table is self._table:
+            return record.record_number in self._records
+        raise ValueError("record is from table %r, not %r" % (record.table, self._table))
+    def __getitem__(self, key):
         if isinstance(key, int):
-            count = len(yo._values)
+            count = len(self._values)
             if not -count <= key < count:
                 raise IndexError("Record %d is not in list." % key)
-            rec_num = yo._rec_by_val[key]
-            return yo._table.get_record(rec_num)
+            rec_num = self._rec_by_val[key]
+            return self._table.get_record(rec_num)
         elif isinstance(key, slice):
-            result = List(field_names=yo._table.field_names)
-            yo._table._dbflists.add(result)
+            result = List(field_names=self._table.field_names)
+            self._table._dbflists.add(result)
             start, stop, step = key.start, key.stop, key.step
             if start is None: start = 0
-            if stop is None: stop = len(yo._rec_by_val)
+            if stop is None: stop = len(self._rec_by_val)
             if step is None: step = 1
             if step < 0:
                 start, stop = stop - 1, -(stop - start + 1)
             for loc in range(start, stop, step):
-                record = yo._table.get_record(yo._rec_by_val[loc])
-                result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))
+                record = self._table.get_record(self._rec_by_val[loc])
+                result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
             result._current = (-1, 0)[bool(result)]
             return result
         elif isinstance (key, (str, unicode, tuple, _DbfRecord)):
             if isinstance(key, _DbfRecord):
-                key = yo.key(key)
+                key = self.key(key)
             elif not isinstance(key, tuple):
                 key = (key, )
-            loc = yo.find(key)
+            loc = self.find(key)
             if loc == -1:
                 raise KeyError(key)
-            return yo._table.get_record(yo._rec_by_val[loc])
+            return self._table.get_record(self._rec_by_val[loc])
         else:
             raise TypeError('indices must be integers, match objects must by strings or tuples')
-    def __enter__(yo):
-        return yo
-    def __exit__(yo, *exc_info):
-        yo._table.close()
-        yo._values[:] = []
-        yo._rec_by_val[:] = []
-        yo._records.clear()
+    def __enter__(self):
+        return self
+    def __exit__(self, *exc_info):
+        self._table.close()
+        self._values[:] = []
+        self._rec_by_val[:] = []
+        self._records.clear()
         return False
-    def __iter__(yo):
-        return yo.IndexIterator(yo._table, yo._rec_by_val)
-    def __len__(yo):
-        return len(yo._records)
-    def _partial_match(yo, target, match):
+    def __iter__(self):
+        return self.IndexIterator(self._table, self._rec_by_val)
+    def __len__(self):
+        return len(self._records)
+    def _partial_match(self, target, match):
         target = target[:len(match)]
         if isinstance(match[-1], (str, unicode)):
             target = list(target)
             target[-1] = target[-1][:len(match[-1])]
             target = tuple(target)
         return target == match
-    def _purge(yo, rec_num):
-        value = yo._records.get(rec_num)
+    def _purge(self, rec_num):
+        value = self._records.get(rec_num)
         if value is not None:
-            vindex = bisect_left(yo._values, value)
-            del yo._records[rec_num]
-            yo._values.pop(vindex)
-            yo._rec_by_val.pop(vindex)
-    def _search(yo, match, lo=0, hi=None):
+            vindex = bisect_left(self._values, value)
+            del self._records[rec_num]
+            self._values.pop(vindex)
+            self._rec_by_val.pop(vindex)
+    def _search(self, match, lo=0, hi=None):
         if hi is None:
-            hi = len(yo._values)
-        return bisect_left(yo._values, match, lo, hi)
-    def clear(yo):
+            hi = len(self._values)
+        return bisect_left(self._values, match, lo, hi)
+    def clear(self):
         "removes all entries from index"
-        yo._values[:] = []
-        yo._rec_by_val[:] = []
-        yo._records.clear()
-    def close(yo):
-        yo._table.close()
-    def find(yo, match, partial=False):
+        self._values[:] = []
+        self._rec_by_val[:] = []
+        self._records.clear()
+    def close(self):
+        self._table.close()
+    def find(self, match, partial=False):
         "returns numeric index of (partial) match, or -1"
         if isinstance(match, _DbfRecord):
-            if match.record_number in yo._records:
-                return yo._values.index(yo._records[match.record_number])
+            if match.record_number in self._records:
+                return self._values.index(self._records[match.record_number])
             else:
                 return -1
         if not isinstance(match, tuple):
             match = (match, )
-        loc = yo._search(match)
-        while loc < len(yo._values) and yo._values[loc] == match:
-            if not yo._table.use_deleted and yo._table.get_record(yo._rec_by_val[loc]).has_been_deleted:
+        loc = self._search(match)
+        while loc < len(self._values) and self._values[loc] == match:
+            if not self._table.use_deleted and self._table.get_record(self._rec_by_val[loc]).has_been_deleted:
                 loc += 1
                 continue
             return loc
         if partial:
-            while loc < len(yo._values) and yo._partial_match(yo._values[loc], match):
-                if not yo._table.use_deleted and yo._table.get_record(yo._rec_by_val[loc]).has_been_deleted:
+            while loc < len(self._values) and self._partial_match(self._values[loc], match):
+                if not self._table.use_deleted and self._table.get_record(self._rec_by_val[loc]).has_been_deleted:
                     loc += 1
                     continue
                 return loc
         return -1
-    def find_index(yo, match):
+    def find_index(self, match):
         "returns numeric index of either (partial) match, or position of where match would be"
         if isinstance(match, _DbfRecord):
-            if match.record_number in yo._records:
-                return yo._values.index(yo._records[match.record_number])
+            if match.record_number in self._records:
+                return self._values.index(self._records[match.record_number])
             else:
-                match = yo.key(match)
+                match = self.key(match)
         if not isinstance(match, tuple):
             match = (match, )
-        loc = yo._search(match)
+        loc = self._search(match)
         return loc
-    def index(yo, match, partial=False):
+    def index(self, match, partial=False):
         "returns numeric index of (partial) match, or raises IndexError"
-        loc = yo.find(match, partial)
+        loc = self.find(match, partial)
         if loc == -1:
             if isinstance(match, _DbfRecord):
-                raise IndexError("table <%s> record [%d] not in index <%s>" % (yo._table.filename, match.record_number, yo.__doc__))
+                raise IndexError("table <%s> record [%d] not in index <%s>" % (self._table.filename, match.record_number, self.__doc__))
             else:
                 raise IndexError("match criteria <%s> not in index" % (match, ))
         return loc
-    def reindex(yo):
+    def reindex(self):
         "reindexes all records"
-        for record in yo._table:
-            yo(record)
-    def query(yo, sql_command=None, python=None):
+        for record in self._table:
+            self(record)
+    def query(self, sql_command=None, python=None):
         """recognized sql commands are SELECT, UPDATE, REPLACE, INSERT, DELETE, and RECALL"""
         if sql_command:
-            return sql(yo, sql_command)
+            return sql(self, sql_command)
         elif python is None:
             raise DbfError("query: python parameter must be specified")
-        possible = List(desc="%s -->  %s" % (yo._table.filename, python), field_names=yo._table.field_names)
-        yo._table._dbflists.add(possible)
+        possible = List(desc="%s -->  %s" % (self._table.filename, python), field_names=self._table.field_names)
+        self._table._dbflists.add(possible)
         query_result = {}
         select = 'query_result["keep"] = %s' % python
         g = {}
-        for record in yo:
+        for record in self:
             query_result['keep'] = False
             g['query_result'] = query_result
             exec select in g, record
@@ -4810,29 +4807,29 @@ class Index(object):
                 possible.append(record)
             record.write_record()
         return possible
-    def search(yo, match, partial=False):
+    def search(self, match, partial=False):
         "returns dbf.List of all (partially) matching records"
-        result = List(field_names=yo._table.field_names)
-        yo._table._dbflists.add(result)
+        result = List(field_names=self._table.field_names)
+        self._table._dbflists.add(result)
         if not isinstance(match, tuple):
             match = (match, )
-        loc = yo._search(match)
-        if loc == len(yo._values):
+        loc = self._search(match)
+        if loc == len(self._values):
             return result
-        while loc < len(yo._values) and yo._values[loc] == match:
-            record = yo._table.get_record(yo._rec_by_val[loc])
-            if not yo._table.use_deleted and record.has_been_deleted:
+        while loc < len(self._values) and self._values[loc] == match:
+            record = self._table.get_record(self._rec_by_val[loc])
+            if not self._table.use_deleted and record.has_been_deleted:
                 loc += 1
                 continue
-            result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))
+            result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
             loc += 1
         if partial:
-            while loc < len(yo._values) and yo._partial_match(yo._values[loc], match):
-                record = yo._table.get_record(yo._rec_by_val[loc])
-                if not yo._table.use_deleted and record.has_been_deleted:
+            while loc < len(self._values) and self._partial_match(self._values[loc], match):
+                record = self._table.get_record(self._rec_by_val[loc])
+                if not self._table.use_deleted and record.has_been_deleted:
                     loc += 1
                     continue
-                result._maybe_add(item=(yo._table, yo._rec_by_val[loc], result.key(record)))
+                result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
                 loc += 1
         return result
 
@@ -5166,21 +5163,21 @@ class _Db4Table(DbfTable):
     version = 'dBase IV w/memos (non-functional)'
     _versionabbr = 'db4'
     @MutableDefault
-    def _fieldtypes():
+    def _field_types():
         return {
-            'C' : {'Type':'Character', 'Retrieve':retrieveCharacter, 'Update':updateCharacter, 'Blank':str, 'Init':addCharacter},
-            'Y' : {'Type':'Currency', 'Retrieve':retrieveCurrency, 'Update':updateCurrency, 'Blank':Decimal, 'Init':addVfpCurrency},
-            'B' : {'Type':'Double', 'Retrieve':retrieveDouble, 'Update':updateDouble, 'Blank':float, 'Init':addVfpDouble},
-            'F' : {'Type':'Float', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':float, 'Init':addVfpNumeric},
-            'N' : {'Type':'Numeric', 'Retrieve':retrieveNumeric, 'Update':updateNumeric, 'Blank':int, 'Init':addVfpNumeric},
-            'I' : {'Type':'Integer', 'Retrieve':retrieveInteger, 'Update':updateInteger, 'Blank':int, 'Init':addVfpInteger},
-            'L' : {'Type':'Logical', 'Retrieve':retrieveLogical, 'Update':updateLogical, 'Blank':Logical, 'Init':addLogical},
-            'D' : {'Type':'Date', 'Retrieve':retrieveDate, 'Update':updateDate, 'Blank':Date, 'Init':addDate},
-            'T' : {'Type':'DateTime', 'Retrieve':retrieveVfpDateTime, 'Update':updateVfpDateTime, 'Blank':DateTime, 'Init':addVfpDateTime},
-            'M' : {'Type':'Memo', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
-            'G' : {'Type':'General', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
-            'P' : {'Type':'Picture', 'Retrieve':retrieveMemo, 'Update':updateMemo, 'Blank':str, 'Init':addMemo},
-            '0' : {'Type':'_NullFlags', 'Retrieve':unsupportedType, 'Update':unsupportedType, 'Blank':int, 'Init':None} }
+            'C' : {'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':str, 'Init':add_character},
+            'Y' : {'Type':'Currency', 'Retrieve':retrieve_currency, 'Update':update_currency, 'Blank':Decimal, 'Init':add_vfp_currency},
+            'B' : {'Type':'Double', 'Retrieve':retrieve_double, 'Update':update_double, 'Blank':float, 'Init':add_vfp_double},
+            'F' : {'Type':'Float', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':float, 'Init':add_vfp_numeric},
+            'N' : {'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':int, 'Init':add_vfp_numeric},
+            'I' : {'Type':'Integer', 'Retrieve':retrieve_integer, 'Update':update_integer, 'Blank':int, 'Init':add_vfp_integer},
+            'L' : {'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':Logical, 'Init':add_logical},
+            'D' : {'Type':'Date', 'Retrieve':retrieve_date, 'Update':update_date, 'Blank':Date, 'Init':add_date},
+            'T' : {'Type':'DateTime', 'Retrieve':retrieve_vfp_datetime, 'Update':update_vfp_datetime, 'Blank':DateTime, 'Init':add_vfp_datetime},
+            'M' : {'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':str, 'Init':add_memo},
+            'G' : {'Type':'General', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':str, 'Init':add_memo},
+            'P' : {'Type':'Picture', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':str, 'Init':add_memo},
+            '0' : {'Type':'_NullFlags', 'Retrieve':unsupported_type, 'Update':unsupported_type, 'Blank':int, 'Init':None} }
     _memoext = '.dbt'
     _memotypes = ('G','M','P')
     _memoClass = _VfpMemo
@@ -5201,25 +5198,25 @@ class _Db4Table(DbfTable):
     _dbfTableHeader = ''.join(_dbfTableHeader)
     _dbfTableHeaderExtra = ''
     _use_deleted = True
-    def _checkMemoIntegrity(yo):
+    def _check_memo_integrity(self):
         "dBase III specific"
-        if yo._meta.header.version == '\x8b':
+        if self._meta.header.version == '\x8b':
             try:
-                yo._meta.memo = yo._memoClass(yo._meta)
+                self._meta.memo = self._memoClass(self._meta)
             except:
-                yo._meta.dfd.close()
-                yo._meta.dfd = None
+                self._meta.dfd.close()
+                self._meta.dfd = None
                 raise
-        if not yo._meta.ignorememos:
-            for field in yo._meta.fields:
-                if yo._meta[field][TYPE] in yo._memotypes:
-                    if yo._meta.header.version != '\x8b':
-                        yo._meta.dfd.close()
-                        yo._meta.dfd = None
+        if not self._meta.ignorememos:
+            for field in self._meta.fields:
+                if self._meta[field][TYPE] in self._memotypes:
+                    if self._meta.header.version != '\x8b':
+                        self._meta.dfd.close()
+                        self._meta.dfd = None
                         raise DbfError("Table structure corrupt:  memo fields exist, header declares no memos")
-                    elif not os.path.exists(yo._meta.memoname):
-                        yo._meta.dfd.close()
-                        yo._meta.dfd = None
+                    elif not os.path.exists(self._meta.memoname):
+                        self._meta.dfd.close()
+                        self._meta.dfd = None
                         raise DbfError("Table structure corrupt:  memo fields exist without memo file")
                     break
 

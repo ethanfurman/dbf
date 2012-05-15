@@ -9,7 +9,7 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 93, 0):
+if dbf.version != (0, 93, 10):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -2525,7 +2525,7 @@ class Test_Dbf_Creation(unittest.TestCase):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', fieldlist, dbf_type='db3')
                 actualFields = table.structure()
-                table.close()
+                #table.close()
                 self.assertEqual(fieldlist, actualFields)
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
     def test_dbf_disk_tables(self):
@@ -2534,10 +2534,10 @@ class Test_Dbf_Creation(unittest.TestCase):
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3')
-                table.close()
+                #table.close()
                 table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
                 actualFields = table.structure()
-                table.close()
+                #table.close()
                 self.assertEqual(fieldlist, actualFields)
                 last_byte = open(table.filename, 'rb').read()[-1]
                 self.assertEqual(last_byte, '\x1a')
@@ -2549,7 +2549,7 @@ class Test_Dbf_Creation(unittest.TestCase):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
                 actualFields = table.structure()
-                table.close()
+                #table.close()
                 self.assertEqual(fieldlist, actualFields)
     def test_fp_disk_tables(self):
         "fp tables on disk"
@@ -2558,10 +2558,10 @@ class Test_Dbf_Creation(unittest.TestCase):
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'tempfp'), ';'.join(fieldlist), dbf_type='vfp')
-                table.close()
+                #table.close()
                 table = Table(os.path.join(tempdir, 'tempfp'), dbf_type='vfp')
                 actualFields = table.structure()
-                table.close()
+                #table.close()
                 self.assertEqual(fieldlist, actualFields)
     def test_vfp_memory_tables(self):
         "vfp tables in memory"
@@ -2573,7 +2573,7 @@ class Test_Dbf_Creation(unittest.TestCase):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
                 actualFields = table.structure()
-                table.close()
+                #table.close()
                 fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
     def test_vfp_disk_tables(self):
@@ -2585,10 +2585,10 @@ class Test_Dbf_Creation(unittest.TestCase):
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'tempvfp'), ';'.join(fieldlist), dbf_type='vfp')
-                table.close()
+                #table.close()
                 table = Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
                 actualFields = table.structure()
-                table.close()
+                #table.close()
                 fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
 
@@ -2615,6 +2615,7 @@ class Test_Dbf_Records(unittest.TestCase):
     def test_dbf_adding_records(self):
         "dbf table:  adding records"
         table = self.dbf_table
+        table.open()
         namelist = []
         paidlist = []
         qtylist = []
@@ -2653,6 +2654,7 @@ class Test_Dbf_Records(unittest.TestCase):
         last_byte = open(table.filename, 'rb').read()[-1]
         self.assertEqual(last_byte, '\x1a')
         table = Table(table.filename, dbf_type='db3')
+        table.open()
         self.assertEqual(len(table), len(floats)+1)
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
@@ -2687,6 +2689,7 @@ class Test_Dbf_Records(unittest.TestCase):
     def test_vfp_adding_records(self):
         "vfp table:  adding records"
         table = self.vfp_table
+        table.open()
         namelist = []
         paidlist = []
         qtylist = []
@@ -2753,6 +2756,7 @@ class Test_Dbf_Records(unittest.TestCase):
         table.append()
         table.close()
         table = Table(table.filename, dbf_type='vfp')
+        table.open()
         self.assertEqual(len(table), len(floats)+1)
         i = 0
         for record in table[:-1]:
@@ -2985,25 +2989,30 @@ class Test_Dbf_Records(unittest.TestCase):
     def test_nonascii_text_cptrans(self):
         "check non-ascii text to unicode"
         table = Table('main')
+        table.open()
         for record in table:
             record.scatter_fields()
+        table.close()
 
     def test_nonascii_text_no_cptrans(self):
         "check non-ascii text to bytes"
         table = Table(':memory:', 'bindata C(50) binary; binmemo M binary', codepage='cp1252', dbf_type='vfp')
+        table.open()
         high_ascii = ''.join(chr(c) for c in range(128, 128+50))
         table.append(dict(bindata=high_ascii, binmemo=high_ascii))
         self.assertEqual(table[0].bindata, ''.join(chr(c) for c in range(128, 128+50)))
         self.assertEqual(table[0].binmemo, ''.join(chr(c) for c in range(128, 128+50)))
+        table.close()
 
     def test_add_null_field(self):
         "adding a null field to an existing table"
-        self.vfp_table.close()
+        #self.vfp_table.close()
         table = Table(
             self.vfp_table.filename,
             'name C(50); age N(3,0)',
             dbf_type='vfp',
             )
+        table.open()
         def _50(text):
             return text + ' ' * (50 - len(text))
         data = ( (_50('Ethan'), 29), (_50('Joseph'), 33), (_50('Michael'), 54), )
@@ -3021,19 +3030,21 @@ class Test_Dbf_Records(unittest.TestCase):
         self.assertTrue(datum[2] is recordnum[2])
         table.close()
         table = Table(table.filename)
+        table.open()
         for datum, recordnum in zip(data, table):
             self.assertEqual(datum[0:2], tuple(recordnum)[:2])
         self.assertTrue(datum[2] is recordnum[2])
-
+        table.close()
 
     def test_remove_null_field(self):
         "removing null fields from an existing table"
-        self.vfp_table.close()
+        #self.vfp_table.close()
         table = Table(
             self.vfp_table.filename,
             'name C(50); age N(3,0); fired D null',
             dbf_type='vfp',
             )
+        table.open()
         def _50(text):
             return text + ' ' * (50 - len(text))
         data = ( (_50('Ethan'), 29, Null), (_50('Joseph'), 33, Null), (_50('Michael'), 54, Date(2010, 5, 3)))
@@ -3051,12 +3062,15 @@ class Test_Dbf_Records(unittest.TestCase):
             self.assertEqual(datum[:2], tuple(recordnum))
         table.close()
         table = Table(table.filename)
+        table.open()
         for datum, recordnum in zip(data, table):
             self.assertEqual(datum[:2], tuple(recordnum))
+        table.close()
 
     def test_change_null_field(self):
         "making an existing field nullable (or not)"
         table = self.vfp_table
+        table.open()
         namelist = []
         paidlist = []
         qtylist = []
@@ -3102,16 +3116,17 @@ class Test_Dbf_Records(unittest.TestCase):
         table.disallow_nulls('name')
         for field in table.field_names:
             self.assertEqual(table.nullable_field(field), False)
-
+        table.close()
 
     def test_add_field_to_null(self):
         "adding a normal field to a table with null fields"
-        self.vfp_table.close()
+        #self.vfp_table.close()
         table = Table(
             self.vfp_table.filename,
             'name C(50); age N(3,0); fired D null',
             dbf_type='vfp',
             )
+        table.open()
         def _50(text):
             return text + ' ' * (50 - len(text))
         data = ( (_50('Ethan'), 29, Null), (_50('Joseph'), 33, Null), (_50('Michael'), 54, Date(2010, 7, 4)), )
@@ -3133,22 +3148,24 @@ class Test_Dbf_Records(unittest.TestCase):
         self.assertEqual(datum[3], recordnum[3])
         table.close()
         table = Table(table.filename)
+        table.open()
         for datum, recordnum in zip(data, table):
             self.assertEqual(datum[:2], tuple(recordnum)[:2])
             self.assertTrue(datum[2] is recordnum[2] or datum[2] == recordnum[2])
         self.assertEqual(datum[3], recordnum[3])
-
+        table.close()
 
     def test_remove_field_from_null(self):
         "removing a normal field from a table with null fields"
         mfd = self.vfp_table._meta.mfd
-        self.vfp_table.close()
+        #self.vfp_table.close()
         mfd = None
         table = Table(
             self.vfp_table.filename,
             'name C(50); age N(3,0); fired D null',
             dbf_type='vfp',
             )
+        table.open()
         def _50(text):
             return text + ' ' * (50 - len(text))
         data = ( (_50('Ethan'), 29, Null), (_50('Joseph'), 33, Null), (_50('Michael'), 54, Date(2010, 7, 4)), )
@@ -3169,10 +3186,11 @@ class Test_Dbf_Records(unittest.TestCase):
             self.assertTrue(datum[-1] is recordnum[1] or datum[-1] == recordnum[1])
         table.close()
         table = Table(table.filename)
+        table.open()
         for datum, recordnum in zip(data, table):
             self.assertEqual(datum[0], recordnum[0])
             self.assertTrue(datum[-1] is recordnum[-1] or datum[-1] == recordnum[-1], "name = %s; datum[-1] = %r;  recordnum[-1] = %r" % (datum[0], datum[-1], recordnum[-1]))
-
+        table.close()
 
 class Test_Dbf_Functions(unittest.TestCase):
     def setUp(self):
@@ -3181,6 +3199,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             os.path.join(tempdir, 'temptable'),
             'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
             )
+        table.open()
         namelist = self.dbf_namelist = []
         paidlist = self.dbf_paidlist = []
         qtylist = self.dbf_qtylist = []
@@ -3198,6 +3217,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             orderlist.append(orderdate)
             desclist.append(desc)
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
+        table.close()
 
         self.vfp_table = table = Table(
                 os.path.join(tempdir, 'tempvfp'),
@@ -3205,6 +3225,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                 ' weight F(18,3); age I; meeting T; misc G; photo P',
                 dbf_type='vfp',
                 )
+        table.open()
         namelist = self.vfp_namelist = []
         paidlist = self.vfp_paidlist = []
         qtylist = self.vfp_qtylist = []
@@ -3254,6 +3275,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             photo = ' '.join(words[i:i+50:7])
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
+        table.close()
     def tearDown(self):
         self.dbf_table.close()
         self.vfp_table.close()
@@ -3261,6 +3283,7 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_add_fields_to_dbf_table(self):
         "dbf table:  adding and deleting fields"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3269,6 +3292,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.delete_fields('name')
         table.close()
         table = Table(table.filename, dbf_type='db3')
+        table.open()
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
         i = 0
@@ -3336,6 +3360,7 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_add_fields_to_vfp_table(self):
         "vfp table:  adding and deleting fields"
         table = self.vfp_table
+        table.open()
         namelist = self.vfp_namelist
         paidlist = self.vfp_paidlist
         qtylist = self.vfp_qtylist
@@ -3466,6 +3491,7 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_len_contains_iter(self):
         "basic function tests - len, contains & iterators"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3481,17 +3507,21 @@ class Test_Dbf_Functions(unittest.TestCase):
         for record in table:
             self.assertEqual(record, table[i])
             i += 1
+        table.close()
 
     def test_top_bottom_etc(self):
         "basic function tests - top, bottom, next, prev, current, goto, delete, undelete"
         table = Table(':memory:', 'name C(10)', dbf_type='db3')
+        table.open()
         self.assertRaises(Bof, table.current)
         table.append()
         self.assertEqual(table.current(), table[0])
         table = Table(':memory:', 'name C(10)', dbf_type='db3')
+        table.open()
         table.append(multiple=10)
         self.assertEqual(table.current(), table[0])
         table = self.dbf_table              # Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table.open()
         total = len(table)
         table.bottom()
         self.assertEqual(table.record_number, total)
@@ -3538,6 +3568,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         # check that deletes were saved to disk..
         table.close()
         table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table.open()
         i = 0
         for record in table:
             self.assertEqual(record.has_been_deleted, i%3==0)
@@ -3613,11 +3644,12 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(record.record_number, i)
             i += 1
         self.assertEqual(i, len(table))
-
+        table.close()
 
     def test_finding_ordering_searching(self):
         "finding, ordering, searching"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3694,12 +3726,14 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_scatter_gather_new(self):
         "scattering and gathering fields, and new()"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
         desclist = self.dbf_desclist
         table2 = table.new(os.path.join(tempdir, 'temptable2'))
+        table2.open()
         for record in table:
             newrecord = table2.append()
             testdict = record.scatter_fields()
@@ -3712,6 +3746,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table2.close()
         table2 = None
         table2 = Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
+        table2.open()
         for i in range(len(table)):
             dict1 = table[i].scatter_fields()
             dict2 = table2[i].scatter_fields()
@@ -3719,21 +3754,28 @@ class Test_Dbf_Functions(unittest.TestCase):
                 self.assertEqual(dict1[key], dict2[key])
             for key in dict2.keys():
                 self.assertEqual(dict1[key], dict2[key])
+        table2.close()
         table3 = table.new(':memory:')
+        table3.open()
         for record in table:
             newrecord = table3.append(record)
         table4 = self.vfp_table
+        table4.open()
         table5 = table4.new(':memory:')
+        table5.open()
         for record in table4:
             #print record.desc
             #print record.misc
             #print record.
             newrecord = table5.append(record)
         table.close()
-        table2.close()
+        table3.close()
+        table4.close()
+        table5.close()
     def test_rename_contains_has_key(self):
         "renaming fields, __contains__, has_key"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3746,6 +3788,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual('newfield' in table, True)
             table.close()
             table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+            table.open()
             self.assertEqual(oldfield in table, False)
             self.assertEqual('newfield' in table, True)
             table.rename_field('newfield', oldfield)
@@ -3756,12 +3799,14 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_dbf_record_kamikaze(self):
         "kamikaze"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
         desclist = self.dbf_desclist
         table2 = table.new(os.path.join(tempdir, 'temptable2'))
+        table2.open()
         for record in table:
             newrecord = table2.append(kamikaze=record)
             for key in table.field_names:
@@ -3772,6 +3817,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                     self.assertEqual(newrecord[field], record[field])
         table2.close()
         table2 = Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
+        table2.open()
         for i in range(len(table)):
             dict1 = table[i].scatter_fields()
             dict2 = table2[i].scatter_fields()
@@ -3787,12 +3833,14 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_multiple_append(self):
         "multiple append"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
         desclist = self.dbf_desclist
         table2 = table.new(os.path.join(tempdir, 'temptable2'))
+        table2.open()
         record = table.next()
         table2.append(record.scatter_fields(), multiple=100)
         for samerecord in table2:
@@ -3800,11 +3848,13 @@ class Test_Dbf_Functions(unittest.TestCase):
                 self.assertEqual(record[field], samerecord[field])
         table2.close()
         table2 = Table(os.path.join(tempdir, 'temptable2'), dbf_type='db3')
+        table2.open()
         for samerecord in table2:
             for field in record.field_names:
                 self.assertEqual(record[field], samerecord[field])
-        table2.close
+        table2.close()
         table3 = table.new(os.path.join(tempdir, 'temptable3'))
+        table3.open()
         record = table.current()
         table3.append(kamikaze=record, multiple=100)
         for samerecord in table3:
@@ -3815,6 +3865,7 @@ class Test_Dbf_Functions(unittest.TestCase):
                     self.assertEqual(record[field], samerecord[field])
         table3.close()
         table3 = Table(os.path.join(tempdir, 'temptable3'), dbf_type='db3')
+        table3.open()
         for samerecord in table3:
             for field in record.field_names:
                 #if table3.is_memotype(field):
@@ -3826,6 +3877,7 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_slices(self):
         "slices"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3845,9 +3897,11 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(slice6, list(table[:9:2]))
         slice7 = [table[-1], table[-2], table[-3]]
         self.assertEqual(slice7, list(table[-1:-4:-1]))
+        table.close()
     def test_record_reset(self):
         "reset record"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3859,43 +3913,52 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(table[0].name, table[1].name)
         table[0].write_record(name='Python rocks!')
         self.assertNotEqual(table[0].name, table[1].name)
+        table.close()
     def test_adding_memos(self):
         "adding memos to existing records"
         table = Table(':memory:', 'name C(50); age N(3,0)', dbf_type='db3')
+        table.open()
         table.append(('user', 0))
         table.add_fields('motto M')
         table[0].write_record(motto='Are we there yet??')
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
         table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='db3')
+        table.open()
         table.append(('user', 0))
         table.close()
         table.open()
         table.close()
         table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
+        table.open()
         table.add_fields('motto M')
         table[0].write_record(motto='Are we there yet??')
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
         table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='db3')
+        table.open()
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
         table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='vfp')
+        table.open()
         table.append(('user', 0))
         table.close()
         table.open()
         table.close()
         table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
+        table.open()
         table.add_fields('motto M')
         table[0].write_record(motto='Are we there yet??')
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
         table = Table(os.path.join(tempdir, 'temptable4'), dbf_type='vfp')
+        table.open()
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
     def test_from_csv(self):
         "from_csv"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3903,34 +3966,49 @@ class Test_Dbf_Functions(unittest.TestCase):
         desclist = self.dbf_desclist
         table.export(header=False)
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'))
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]), csvtable[i][j])
+        csvtable.close()
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
+        csvtable.close()
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'])
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]), csvtable[i][j])
+        csvtable.close()
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
+        csvtable.close()
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'])
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]), csvtable[i][j])
+        csvtable.close()
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
+        csvtable.close()
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'))
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]), csvtable[i][j])
+        csvtable.close()
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
+        csvtable.open()
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
@@ -3938,6 +4016,7 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_resize(self):
         "resize"
         table = self.dbf_table
+        table.open()
         namelist = self.dbf_namelist 
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
@@ -3948,15 +4027,18 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.resize_field('name', 40)
         new_record = table[5].scatter_fields()
         self.assertEqual(test_record['orderdate'], new_record['orderdate'])
+        table.close()
     def test_memos_after_close(self):
         "memos available after close/open"
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
+        table.open()
         table.append(('Author','dashing, debonair, delightful'))
         table.close()
         table.open()
         self.assertEqual(tuple(table[0]), ('Author','dashing, debonair, delightful'))
         table.close()
         table2 = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3')
+        table2.open()
         table2.append(('Benedict', 'brilliant, bombastic, bothered'))
         table2.close()
         table.open()
@@ -3970,21 +4052,28 @@ class Test_Dbf_Functions(unittest.TestCase):
     def test_field_type(self):
         "table.type(field) == ('C', Char)"
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
+        table.open()
         self.assertEqual(table.type('name'), ('C', Char))
         self.assertEqual(table.type('name').type, 'C')
         self.assertEqual(table.type('name').cls, Char)
+        table.close()
 
     def test_memo_after_backup(self):
         "memo fields accessible after .backup()"
         table = self.dbf_table
+        table.open()
         table.create_backup()
         backup = dbf.Table(table.backup)
+        backup.open()
         desclist = self.dbf_desclist
         for i in range(len(desclist)):
             self.assertEqual(desclist[i], backup[i].desc)
+        backup.close()
+        table.close()
     def test_write_loop(self):
         "Write loop commits changes"
         table = self.dbf_table
+        table.open()
         for record in Write(table):
             record.name = '!BRAND NEW NAME!'
         for record in table:
@@ -3992,6 +4081,11 @@ class Test_Dbf_Functions(unittest.TestCase):
             record.name = '-old boring name-'
         for record in table:
             self.assertEqual(record.name, '!BRAND NEW NAME!         ')
+        table.close()
+    def test_export(self):
+        for table in self.dbf_table, self.vfp_table:
+            table.open()
+            table.export(filename='test_export.csv')
 
 class TestWhatever(unittest.TestCase):
     "move tests here to run one at a time while debugging"
@@ -4085,6 +4179,7 @@ class Test_Dbf_Lists(unittest.TestCase):
             os.path.join(tempdir, 'temptable'),
             'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
             )
+        table.open()
         for i in range(len(floats)):
             name = words[i]
             paid = len(words[i]) % 3 == 0
@@ -4092,11 +4187,13 @@ class Test_Dbf_Lists(unittest.TestCase):
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
             record = table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
+        table.close()
     def tearDown(self):
         self.dbf_table.close()
     def test_add_subtract(self):
         "addition and subtraction"
         table1 = self.dbf_table
+        table1.open()
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -4115,6 +4212,7 @@ class Test_Dbf_Lists(unittest.TestCase):
     def test_append_extend(self):
         "appending and extending"
         table1 = self.dbf_table
+        table1.open()
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -4130,6 +4228,7 @@ class Test_Dbf_Lists(unittest.TestCase):
     def test_index(self):
         "indexing"
         table1 = self.dbf_table
+        table1.open()
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -4141,6 +4240,7 @@ class Test_Dbf_Lists(unittest.TestCase):
     def test_sort(self):
         "sorting"
         table1 = self.dbf_table
+        table1.open()
         list1 = table1[::2]
         list2 = table1[::3]
         list3 = table1[:] - list1 - list2
@@ -4153,6 +4253,7 @@ class Test_Dbf_Lists(unittest.TestCase):
     def test_keys(self):
         "keys"
         table1 = self.dbf_table
+        table1.open()
         field = table1.field_names[0]
         list1 = List(table1, key=lambda rec: rec[field])
         unique = set()
@@ -4160,6 +4261,8 @@ class Test_Dbf_Lists(unittest.TestCase):
             unique.add(rec[field])
             self.assertEqual(rec[field], list1[rec][field])
         self.assertEqual(len(unique), len(list1))
+        table1.close()
+
 # main
 if __name__ == '__main__':
     tempdir = tempfile.mkdtemp()

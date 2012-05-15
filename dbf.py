@@ -155,7 +155,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 93, 0)
+version = (0, 93, 10)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -1636,7 +1636,6 @@ class _DbfRecord(object):
             blank[:len(bytes)] = bytes[:]
             self._data[start:end] = blank[:]
         self._dirty = True
-        self._layout._dirty = True
     def _update_disk(self, location='', data=None):
         layout = self._layout
         if not layout.inmemory:
@@ -2222,7 +2221,7 @@ def update_memo(string, fielddef, memo, decoder, encoder):
     return "%*s" % (fielddef[LENGTH], block)
 def retrieve_numeric(bytes, fielddef, *ignore):
     "Returns the number stored in bytes as integer if field spec for decimals is 0, float otherwise"
-    string = bytes.tostring().strip()
+    string = bytes.tostring().replace('\x00','').strip()
     cls = fielddef[CLASS]
     if not string or string[0:1] == '*':  # value too big to store (Visual FoxPro idiocy)
         cls = fielddef[EMPTY]
@@ -2513,11 +2512,11 @@ class DbfTable(object):
     _yesMemoMask = ''
     _noMemoMask = ''
     _fixed_fields = ('M','D','L')           # always same length in table
-    _variable_fields = ('C', 'N')           # variable length in table
+    _variable_fields = ('C', 'N', 'F')      # variable length in table
     _binary_fields = tuple()                # as in non-unicode character
     _character_fields = ('C', 'M')          # field representing character data
-    _decimal_fields = ('N', )               # text-based numeric fields
-    _numeric_fields = ('N', )               # fields representing a number
+    _decimal_fields = ('N', 'F')            # text-based numeric fields
+    _numeric_fields = ('N', 'F')            # fields representing a number
     _currency_fields = tuple()
     _date_fields = ('D', )
     _datetime_fields = tuple()
@@ -2578,7 +2577,6 @@ class DbfTable(object):
         nulls = None            # non-None when Nullable fields present
         user_fields = None      # not counting SYSTEM fields
         user_field_count = 0    # also not counting SYSTEM fields
-        _dirty = False          # updates last_update field on close if True
     class _TableHeader(object):
         "represents the data block that defines a tables type and layout"
         def __init__(self, data, pack_date, unpack_date):
@@ -3047,7 +3045,6 @@ class DbfTable(object):
         meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
         meta.header = header = self._TableHeader(self._dbfTableHeader, self._pack_date, self._unpack_date)
         header.extra = self._dbfTableHeaderExtra
-        #header.data        #force update of date
         for field, types in default_data_types.items():
             if not isinstance(types, tuple):
                 types = (types, )
@@ -3058,6 +3055,7 @@ class DbfTable(object):
             meta.ondisk = False
             meta.inmemory = True
             meta.memoname = filename
+            meta.header.data
         else:
             base, ext = os.path.splitext(filename)
             if ext == '':
@@ -3136,7 +3134,7 @@ class DbfTable(object):
                     ):
                 classes.append(result_type)
             meta[field] = meta[field][:-2] + tuple(classes)
-
+        self.close()
         
     def __iter__(self):
         "iterates over the table's records"
@@ -3348,6 +3346,8 @@ class DbfTable(object):
 
     def append(self, kamikaze='', drop=False, multiple=1):
         "adds <multiple> blank records, and fills fields with dict/tuple values if present"
+        if self._read_only or self._meta_only:
+            raise DbfError('table not in read/write mode, unable to append records')
         if not self.field_count:
             raise DbfError("No fields defined, cannot append")
         empty_table = len(self) == 0
@@ -3477,6 +3477,7 @@ class DbfTable(object):
             extra = ('_backup', '_BACKUP')[upper]
             new_name = os.path.join(temp_dir, name + extra + ext)
         bkup = self.__class__(new_name, self.structure())
+        bkup.open()
         for record in self:
             bkup.append(record)
         bkup.close()
@@ -3593,6 +3594,8 @@ class DbfTable(object):
         else:
             path, filename = os.path.split(self.filename)
         filename = os.path.join(path, filename)
+        if field_specs is None:
+            field_specs = self.field_names        
         field_specs = self._list_fields(field_specs)
         if records is None:
             records = self
@@ -5298,6 +5301,7 @@ def table_type(filename):
 def add_fields(table_name, field_specs):
     "adds fields to an existing table"
     table = Table(table_name)
+    table.open()
     try:
         table.add_fields(field_specs)
     finally:
@@ -5305,6 +5309,7 @@ def add_fields(table_name, field_specs):
 def delete_fields(table_name, field_names):
     "deletes fields from an existing table"
     table = Table(table_name)
+    table.open()
     try:
         table.delete_fields(field_names)
     finally:
@@ -5314,6 +5319,7 @@ def export(table_name, filename='', fields='', format='csv', header=True):
     if fields is None:
         fields = []
     table = Table(table_name)
+    table.open()
     try:
         table.export(filename=filename, field_specs=fields, format=format, header=header)
     finally:
@@ -5321,6 +5327,7 @@ def export(table_name, filename='', fields='', format='csv', header=True):
 def first_record(table_name):
     "prints the first record of a table"
     table = Table(table_name)
+    table.open()
     try:
         print str(table[0])
     finally:
@@ -5368,8 +5375,10 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
         if extra_fields:
             fielddef.extend(extra_fields)
         csvtable = Table(filename, fielddef, dbf_type=dbf_type)
+        csvtable.open()
         for record in mtable:
             csvtable.append(record.scatter_fields())
+        csvtable.close()
         return csvtable
     return mtable
 def get_fields(table_name):

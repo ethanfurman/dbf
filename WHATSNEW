@@ -1,0 +1,30 @@
+What's New
+==========
+
+0.93.010
+--------
+    Table now returns a closed database; .open() must now be called before
+    accessing the records.
+    Note: fields, number of records, table type, and other metadata is
+    available on closed tables.
+
+    Finished adding support for 'F' (aka 'N') field types in dBase III tables;
+    this is a practicality beats purity issue as the F type is not part of the
+    db3 standard, but is exactly the same as N and other programs will use it
+    instead of N when creating db3 tables.
+
+0.93.000
+--------
+    PEP 8 changes (yo --> self, someMethod --> some_method)
+
+0.92.002
+--------
+    added more support for the Null type in the other custome data types
+
+0.91.001
+--------
+    Removed __del__ from dbf records; consequently they no longer autosave when
+    going out of scope.  Either call .write_record() explicitly, or use the new
+    Write iterator which will call .write_record for you.
+
+    Finished adding Null support (not supported in db3 tables)

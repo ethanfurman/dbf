@@ -1,6 +1,13 @@
 What's New
 ==========
 
+0.93.011
+--------
+    `with` will work now.  Really.
+
+    Started making changes so dbf will work with the non-CPython
+    implementations (at this point it is not reliable).
+
 0.93.010
 --------
     Table now returns a closed database; .open() must now be called before

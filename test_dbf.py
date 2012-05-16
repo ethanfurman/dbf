@@ -9,7 +9,7 @@ from dbf.api import *
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 93, 10):
+if dbf.version != (0, 93, 11):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -3705,7 +3705,7 @@ class Test_Dbf_Functions(unittest.TestCase):
             self.assertEqual(len(records), ucount)
 
         for record in table[::2]:
-            record.qty = -record.qty
+            record.write_record(qty=-record.qty)
         unordered = []
         for record in table:
             unordered.append(record.qty)

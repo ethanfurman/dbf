@@ -155,7 +155,7 @@ Field Types  -->  Python data types
   Note: if any of the above are empty (nothing ever stored in that field) None is returned
 
 """
-version = (0, 93, 10)
+version = (0, 93, 11)
 
 __all__ = (
         'Table', 'List', 'Date', 'DateTime', 'Time',
@@ -364,7 +364,7 @@ FIELD_FLAGS = {
         #AUTOINC:'autoinc',
         }
 
-YES_I_AM_SURE = 42      # any true value will do
+YES_I_AM_SURE = 42          # any true value will do
 
 # warnings and errors
 class DbfError(Exception):
@@ -2026,6 +2026,11 @@ class DbfCsv(csv.Dialect):
     skipinitialspace = True
     quoting = csv.QUOTE_NONNUMERIC
 csv.register_dialect('dbf', DbfCsv)
+class _DeadObject(object):
+    "used because you cannot weakref None"
+    def __nonzero__(self):
+        return False
+_DeadObject = _DeadObject()
 
 # Routines for saving, retrieving, and creating fields
 
@@ -2703,10 +2708,10 @@ class DbfTable(object):
         "implements the weakref table for records"
         def __init__(self, count, meta):
             self._meta = meta
-            self._weakref_list = [weakref.ref(lambda x: None)] * count
+            self._weakref_list = [weakref.ref(_DeadObject)] * count
         def __getitem__(self, index):
             maybe = self._weakref_list[index]()
-            if maybe is None:
+            if not maybe:
                 meta = self._meta
                 header = meta.header
                 if index < 0:
@@ -2729,7 +2734,7 @@ class DbfTable(object):
         def flush(self):
             for maybe in self._weakref_list:
                 maybe = maybe()
-                if maybe is not None and maybe._dirty:
+                if maybe and maybe._dirty:
                     maybe.write_record()            
         def pop(self):
             return self._weakref_list.pop()
@@ -2955,8 +2960,8 @@ class DbfTable(object):
         eof = header.start + header.record_count * header.record_length
         if not headeronly:
             for record in self:
-                if record._update_disk():
-                    fd.flush()
+                record._update_disk()
+            fd.flush()
             fd.truncate(eof)
         if 'db3' in self._versionabbr:
             fd.seek(0, SEEK_END)
@@ -2968,6 +2973,7 @@ class DbfTable(object):
         "field name based"
         return key in self.field_names or key in ['record_number','delete_flag']
     def __enter__(self):
+        self.open()
         return self
     def __exit__(self, *exc_info):
         self.close()

@@ -1,6 +1,98 @@
 What's New
 ==========
 
+0.94.000
+--------
+
+Massive backwards incompatible changes.
+
+All non-underscore methods removed from the record class and made into
+normal functions::
+
+    - delete_record --> delete
+    - field_names --> field_names
+    - gather_records --> gather
+    - has_been_deleted --> is_deleted
+    - record_number --> recno
+    - reset_record --> reset
+    - scatter_records --> scatter
+    - undelete_record --> undelete
+    - write_record --> write
+
+Transaction methods removed entirely.
+
+Can use strings as start/stop of slices: `record['name':'age']`
+
+Record templates now exist, and are much like records except that it is
+not directly tied to a table and can be freely modified.  They can be created
+by either the dbf.create_template function or the table.create_template method.
+
+0.93.020
+--------
+    Finished changes so other Python implementations should work (PyPy
+    definitely does).
+
+    Table signature changed -- `read_only`, `meta_only`, and `keep_memos`
+    dropped.
+
+    tables now have a `status` attribute which will be one of `closed`,
+    'read_only`, or `read_write`
+
+    `.append` no longer returns the newly added record (use table[-1] if you need it)
+    `.find` method removed (use `.query` instead);
+    `.sql` method removed (use `.query` instead);
+    `.size` renamed to `.field_size`;
+    `.type` renamed to `.field_type` (which returns a FieldType named tuple);
+
+    the way to change records has changed:
+
+        to update any/all fields at once:
+            record.write_record(field1=..., field2=...)
+
+            or
+
+            record.gather_fields(dict)
+
+        to update one field at a time:
+            2.6, 2.7 (2.5 using `from __future__ import with_statement`)
+            with record:
+                record.field1 = ...
+                record.field2 = ...
+
+            or
+
+            for record in dbf.Process(table | records):
+                record.field1 = ...
+                record.field2 = ...
+
+    attempting to change a field outside of these two methods will raise a
+    `DbfError`.
+
+    Changing behavior based on a transaction:
+
+        record.gather_fields()
+
+            if a transaction is not running this will write to disk
+            (no changes made if error occurs, exception reraised)
+
+            if a transaction is running, and an error occurs, the calling code
+            is responsible for calling .rollback_transaction() or otherwise
+            handling the problem (exception is reraised)
+
+        record.reset_record()
+
+            if a transaction is not running the changes are written to disk
+
+            if a transaction is running the changes are not written to disk
+
+    `xxx in table` and `xxx in record` used to be a field-name check - it is
+    now a record / value check; use `xxx in table.field_names` and
+    `xxx in record.field_names` to do the field-name check.
+
+    added equality/inequality check for records, which can be compared against
+    other records / dicts / tuples (field/key order does not matter for
+    record-record nor record-dict checks).
+
 0.93.011
 --------
     `with` will work now.  Really.

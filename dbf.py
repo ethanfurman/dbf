@@ -31,17 +31,17 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 94, 0)
+version = (0, 94, 1)
 
 __all__ = (
-        'Table', 'List', 'Index', 'Iter', 'Date', 'DateTime', 'Time',
+        'Table', 'Record', 'List', 'Index', 'Iter', 'Date', 'DateTime', 'Time',
         'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
         'recno', 'source_table', 'reset', 'scatter', 'undelete',
         'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
         'InvalidFieldSpecError', 'NonUnicodeError', 'NotFoundError',
         'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
         'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
-        'NullDate', 'NullDateTime', 'NullTime', 
+        'NullDate', 'NullDateTime', 'NullTime', 'Vapor',
         'Process',
         'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal',
         'guess_table_type', 'table_type',
@@ -85,7 +85,7 @@ _Template_Records = dict()  # signature:_meta of template records
 #class Context(object):
 #    "used to hold user-configurable settings"
 #    def __init__(
-#            record_type=_DbfRecord,
+#            record_type=Record,
 #            auto_write_on_deletion=True,
 #            auto_write_in_loops=True,
 #            logical_unknown_is_None=True,
@@ -359,13 +359,13 @@ class NullType(object):
 NullType.null = object.__new__(NullType)
 Null = NullType()
 
-class _Vapor(object):
+class Vapor(object):
     "used in Vapor Records -- compares unequal with everything"
     def __eq__(self, other):
         return False
     def __ne__(self, other):
         return True
-_Vapor = _Vapor()
+Vapor = Vapor()
 
 class Char(unicode):
     "strips trailing whitespace, and ignores trailing whitespace for comparisons"
@@ -1533,9 +1533,9 @@ class _Navigation(object):
         self._nav_check()
         index = self._index
         if index < 0:
-            return _DbfRecordVaporWare('bof', self)
+            return RecordVaporWare('bof', self)
         elif index >= len(self):
-            return _DbfRecordVaporWare('eof', self)
+            return RecordVaporWare('eof', self)
         return self[index]
     @property
     def current(self):
@@ -1556,7 +1556,7 @@ class _Navigation(object):
         if -1 < index < len(self):
             return self[index]
         else:
-            return _DbfRecordVaporWare('bof', self)
+            return RecordVaporWare('bof', self)
     def goto(self, where):
         """changes the record pointer to the first matching (deleted) record
         where should be either an integer, or 'top' or 'bottom'. 
@@ -1583,7 +1583,7 @@ class _Navigation(object):
         if -1 < index < len(self):
             return self[index]
         else:
-            return _DbfRecordVaporWare('bof', self)
+            return RecordVaporWare('bof', self)
     @property
     def next_record(self):
         "returns next available record (does not move index)"
@@ -1592,7 +1592,7 @@ class _Navigation(object):
         if -1 < index < len(self):
             return self[index]
         else:
-            return _DbfRecordVaporWare('eof', self)
+            return RecordVaporWare('eof', self)
     @property
     def prev_record(self):
         "returns previous available record (does not move index)"
@@ -1601,7 +1601,7 @@ class _Navigation(object):
         if -1 < index < len(self):
             return self[index]
         else:
-            return _DbfRecordVaporWare('bof', self)
+            return RecordVaporWare('bof', self)
     def skip(self, n=1):
         "move index to the next nth available record"
         self._nav_check()
@@ -1623,7 +1623,7 @@ class _Navigation(object):
         self._index = -1
         return self._index
 
-class _DbfRecord(object):
+class Record(object):
     """Provides routines to extract and save data within the fields of a dbf record."""
     __slots__ = ('_recnum', '_meta', '_data', '_old_data', '_dirty', '_memos', '_write_to_disk', '__weakref__')
     def __new__(cls, recnum, layout, kamikaze='', _fromdisk=False):
@@ -1667,9 +1667,9 @@ class _DbfRecord(object):
         self._start_flux()
         return self
     def __eq__(self, other):
-        if not isinstance(other, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(other, (Record, RecordTemplate, dict, tuple)):
             return NotImplemented
-        if isinstance(other, (_DbfRecord, _DbfRecordTemplate)):
+        if isinstance(other, (Record, RecordTemplate)):
             if field_names(self) != field_names(other):
                 return False
             for field in self._meta.user_fields:
@@ -1743,7 +1743,7 @@ class _DbfRecord(object):
     def __len__(self):
         return self._meta.user_field_count
     def __ne__(self, other):
-        if not isinstance(other, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(other, (Record, RecordTemplate, dict, tuple)):
             return NotImplemented
         return not self == other
     def __setattr__(self, name, value):
@@ -1960,7 +1960,7 @@ class _DbfRecord(object):
             index = self._meta.fields.index(field)
             self._update_field_value(index, field, value)
         self._update_disk()
-class _DbfRecordTemplate(object):
+class RecordTemplate(object):
     """Provides routines to mimic a dbf record."""
     __slots__ = ('_meta', '_data', '_old_data', '_memos', '__weakref__')
     def _retrieve_field_value(self, index, name):
@@ -2015,7 +2015,7 @@ class _DbfRecordTemplate(object):
             end = start + size
             blank[:len(bytes)] = bytes[:]
             self._data[start:end] = blank[:]
-    def __new__(cls, layout, original_record=None, **defaults):
+    def __new__(cls, layout, original_record=None, defaults=None):
         """record = ascii array of entire record; layout=record specification"""
         sig = layout.record_sig
         if sig not in _Template_Records:
@@ -2034,16 +2034,16 @@ class _DbfRecordTemplate(object):
             record._data = original_record._data[:]
             for name in layout.memofields:
                 record._memos[name] = original_record[name]
-        for field, value in defaults.items():
-            record[field] = value
+        for field in field_names(defaults or {}):
+            record[field] = defaults[field]
         record._old_data = record._data[:]
         return record
     def __contains__(self, key):
         return key in self._meta.user_fields
     def __eq__(self, other):
-        if not isinstance(other, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(other, (Record, RecordTemplate, dict, tuple)):
             return NotImplemented
-        if isinstance(other, (_DbfRecord, _DbfRecordTemplate)):
+        if isinstance(other, (Record, RecordTemplate)):
             if field_names(self) != field_names(other):
                 return False
             for field in self._meta.user_fields:
@@ -2111,7 +2111,7 @@ class _DbfRecordTemplate(object):
     def __len__(self):
         return self._meta.user_field_count
     def __ne__(self, other):
-        if not isinstance(other, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(other, (Record, RecordTemplate, dict, tuple)):
             return NotImplemented
         return not self == other
     def __setattr__(self, name, value):
@@ -2155,7 +2155,7 @@ class _DbfRecordTemplate(object):
         for seq, field in enumerate(field_names(self)):
             result.append("%3d - %-10s: %r" % (seq, field, self[field]))
         return '\n'.join(result)
-class _DbfRecordVaporWare(object):
+class RecordVaporWare(object):
     """Provides routines to mimic a dbf record, but all values are non-existent."""
     __slots__ = ('_recno', '_sequence')
     def __new__(cls, position, sequence):
@@ -2169,7 +2169,7 @@ class _DbfRecordVaporWare(object):
     def __contains__(self, key):
         return False
     def __eq__(self, other):
-        if not isinstance(other, (_DbfRecord, _DbfRecordTemplate, _DbfRecordVaporWare, dict, tuple)):
+        if not isinstance(other, (Record, RecordTemplate, RecordVaporWare, dict, tuple)):
             return NotImplemented
         return False
 
@@ -2177,10 +2177,10 @@ class _DbfRecordVaporWare(object):
         if name[0:2] == '__' and name[-2:] == '__':
             raise AttributeError, 'Method %s is not implemented.' % name
         else:
-            return _Vapor
+            return Vapor
     def __getitem__(self, item):
         if isinstance(item, (int, long)):
-            return _Vapor
+            return Vapor
         elif isinstance(item, slice):
             raise TypeError('slice notation not allowed on Vapor records')
         elif isinstance(item, (str, unicode)):
@@ -2190,7 +2190,7 @@ class _DbfRecordVaporWare(object):
     def __len__(self):
         raise TypeError("Vapor records have no length")
     def __ne__(self, other):
-        if not isinstance(other, (_DbfRecord, _DbfRecordTemplate, _DbfRecordVaporWare, dict, tuple)):
+        if not isinstance(other, (Record, RecordTemplate, RecordVaporWare, dict, tuple)):
             return NotImplemented
         return True
     def __nonzero__(self):
@@ -2209,7 +2209,7 @@ class _DbfRecordVaporWare(object):
         else:
             raise TypeError("%s is not a field name" % name)
     def __repr__(self):
-        return "_DbfRecordVaporWare(position=%r, sequence=%r)" % (('bof','eof')[recno(self) is None], self._sequence)
+        return "RecordVaporWare(position=%r, sequence=%r)" % (('bof','eof')[recno(self) is None], self._sequence)
     def __str__(self):
         return 'VaporRecord(%r)' % recno(self)
     @property
@@ -2691,8 +2691,6 @@ def add_character(format, flags):
     length = int(format[0][1:-1])
     if not 0 < length < 255:
         raise InvalidFieldSpecError("Character fields must be between 1 and 255")
-    #decimals = length // 256  for future Clipper compatibility
-    #length = length % 256
     decimals = 0
     flag = 0
     for f in format[1:]:
@@ -2738,6 +2736,17 @@ def add_numeric(format, flags):
         raise InvalidFieldSpecError("Numeric fields must be between 1 and 17 digits, not %d" % length)
     if decimals and not 0 < decimals <= length - 2:
         raise InvalidFieldSpecError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
+    return length, decimals, flag
+def add_clp_character(format, flags):
+    if format[0][0] != '(' or format[0][-1] != ')' or any([f not in flags for f in format[1:]]):
+        raise InvalidFieldSpecError("Format for Character field creation is 'C(n)%s', not 'C%s'" % field_spec_error_text(format, flags))
+    length = int(format[0][1:-1])
+    if not 0 < length < 65519:
+        raise InvalidFieldSpecError("Character fields must be between 1 and 65,519")
+    decimals = 0
+    flag = 0
+    for f in format[1:]:
+        flag |= FIELD_FLAGS[f]
     return length, decimals, flag
 def add_vfp_character(format, flags):
     if format[0][0] != '(' or format[0][-1] != ')' or any([f not in flags for f in format[1:]]):
@@ -2794,6 +2803,8 @@ def add_vfp_memo(format, flags):
     flag = 0
     for f in format:
         flag |= FIELD_FLAGS[f]
+    if 'binary' not in flags:   # general or picture -- binary is implied
+        flag |= FIELD_FLAGS['binary']
     return length, decimals, flag
 def add_vfp_numeric(format, flags):
     if format[0][0] != '(' or format[0][-1] != ')' or any(f not in flags for f in format[1:]):
@@ -2880,16 +2891,12 @@ class CodePage(tuple):
         return self[2]
 class Iter(_Navigation):
     "cycles through records in table"
-    def __init__(self, table, include_vapor=False, delete_flag_source=None):
+    def __init__(self, table, include_vapor=False):
         "if include_vapor is True a Vapor record is included as the last record"
         self._table = table
         self._record = None
         self._include_vapor = include_vapor
         self._exhausted = False
-        if delete_flag_source is None:
-            self._delete = self
-        else:
-            self._delete = delete_flag_source
     def __iter__(self):
         return self
     def next(self):
@@ -2899,14 +2906,14 @@ class Iter(_Navigation):
             if self._index >= (len(self._table) - 1):
                 self._index = max(self._index, len(self._table))
                 if self._include_vapor:
-                    return _DbfRecordVaporWare('eof', self._table)
+                    return RecordVaporWare('eof', self._table)
                 break
             self._index += 1
             record = self._table[self._index]
             return record
         self._exhausted = True
         raise StopIteration
-class DbfTable(_Navigation):
+class Table(_Navigation):
     """Provides a framework for dbf style tables."""
     _version = 'basic memory table'
     _versionabbr = 'dbf'
@@ -3100,6 +3107,10 @@ class DbfTable(_Navigation):
         def record_length(self):
             "length of a record (read_only) (max of 65,535)"
             return unpack_short_int(self._data[10:12].tostring())
+        @record_length.setter
+        def record_length(self, length):
+            "to support Clipper large Character fields"
+            self._data[10:12] = array('c', pack_short_int(length))
         @property
         def start(self):
             "starting position of first record in file (must be within first 64K)"
@@ -3140,7 +3151,7 @@ class DbfTable(_Navigation):
                 bytes = meta.dfd.read(size)
                 if not bytes:
                     raise ValueError("unable to read record data from %s at location %d" % (meta.filename, location))
-                maybe = _DbfRecord(recnum=index, layout=meta, kamikaze=bytes, _fromdisk=True)
+                maybe = Record(recnum=index, layout=meta, kamikaze=bytes, _fromdisk=True)
                 self._weakref_list[index] = weakref.ref(maybe)
             return maybe
         def append(self, record):
@@ -3218,62 +3229,14 @@ class DbfTable(_Navigation):
         header.fields = fieldblock.tostring()
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
-        _DbfRecord._create_blank_data(meta)
+        Record._create_blank_data(meta)
 
     def _check_memo_integrity(self):
-        "memory memos are simple dicts"
-        pass
+        "checks memo file for problems"
+        raise NotImplementedError("_check_memo_integrity must be implemented by subclass")
     def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions from the disk file"
-        old_fields = defaultdict(dict)
-        missing = object()
-        meta = self._meta
-        for name in meta.fields:
-            old_fields[name]['type'] = meta[name][TYPE]
-            old_fields[name]['class'] = meta[name][CLASS]
-            old_fields[name]['empty'] = meta[name][EMPTY]
-        meta.fields[:] = []
-        offset = 1
-        fieldsdef = meta.header.fields
-        if len(fieldsdef) % 32 != 0:
-            raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
-        if len(fieldsdef) // 32 != self._meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields" % (self._meta.header.field_count, len(fieldsdef)//32))
-        for i in range(self._meta.header.field_count):
-            fieldblock = meta.decoder(fieldsdef[i*32:(i+1)*32])
-            name = unpack_str(fieldblock[:11])
-            type = fieldblock[11]
-            if not type in meta.fieldtypes:
-                raise BadDataError("Unknown field type: %s" % type)
-            start = offset
-            length = ord(fieldblock[16])
-            offset += length
-            end = start + length
-            decimals = ord(fieldblock[17])
-            flags = ord(fieldblock[18])
-            if name in meta.fields:
-                raise BadDataError('Duplicate field name found: %s' % name)
-            meta.fields.append(name)
-            if name in old_fields and old_fields[name]['type'] == type:
-                cls = old_fields[name]['class']
-                empty = old_fields[name]['empty']
-            else:
-                cls = meta.fieldtypes[type]['Class']
-                empty = meta.fieldtypes[type]['Empty']
-            meta[name] = (
-                    type,
-                    start,
-                    length,
-                    end,
-                    decimals,
-                    flags,
-                    cls,
-                    empty,
-                    )
-        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
-        self._meta.user_field_count = len(self._meta.user_fields)
-        _DbfRecord._create_blank_data(meta)
-
+        raise NotImplementedError("_initialize_fields must be implemented by subclass")
     def _field_layout(self, i):
         "Returns field information Name Type(Length[,Decimals])"
         name = self._meta.fields[i]
@@ -3283,7 +3246,11 @@ class DbfTable(_Navigation):
         decimals = fielddef[DECIMALS]
         set_flags = fielddef[FLAGS]
         flags = []
-        for flg in BINARY, NULLABLE, SYSTEM:
+        if type in ('G','P'):
+            printable_flags = NULLABLE, SYSTEM
+        else:
+            printable_flags = BINARY, NULLABLE, SYSTEM
+        for flg in printable_flags:
             if flg & set_flags == flg:
                 flags.append(FIELD_FLAGS[flg])
                 set_flags &= 255 ^ flg
@@ -3337,15 +3304,15 @@ class DbfTable(_Navigation):
                 record._update_disk()
             fd.flush()
             fd.truncate(eof)
-        if 'db3' in self._versionabbr:
+        if self._versionabbr in ('db3', 'clp'):
             fd.seek(0, SEEK_END)
-            fd.write('\x1a')        # required for dBase III
+            fd.write('\x1a')        # required for dBase III compatibility
             fd.flush()
             fd.truncate(eof + 1)
 
     def __contains__(self, data):
         "data can be a record, template, dict, or tuple"
-        if not isinstance(data, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(data, (Record, RecordTemplate, dict, tuple)):
             raise TypeError("x should be a record, template, dict, or tuple, not %r" % type(data))
         for record in Iter(self):
             if data == record:
@@ -3393,6 +3360,7 @@ class DbfTable(_Navigation):
             raise TypeError('type <%s> not valid for indexing' % type(value))
     def __init__(self, filename, field_specs=None, memo_size=128, ignore_memos=False, 
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
+                 dbf_type=None,
                  ):
         """open/create dbf file
         filename should include path if needed
@@ -3406,8 +3374,6 @@ class DbfTable(_Navigation):
         if filename[0] == filename[-1] == ':':
             if field_specs is None:
                 raise DbfError("field list must be specified for memory tables")
-        elif type(self) is DbfTable:
-            raise DbfError("only memory tables supported")
         self._indexen = self._Indexen()
         self._meta = meta = self._MetaData()
         meta.max_fields = self._max_fields
@@ -3454,6 +3420,7 @@ class DbfTable(_Navigation):
             meta.memoname = base + self._memoext
             meta.location = ON_DISK
         if codepage is not None:
+            header.codepage(codepage)
             cp, sd, ld = _codepage_lookup(codepage)
             self._meta.decoder = codecs.getdecoder(sd) 
             self._meta.encoder = codecs.getencoder(sd)
@@ -3496,7 +3463,9 @@ class DbfTable(_Navigation):
                 raise BadDataError("corrupt field structure in header")
             if len(fieldblock[:fieldend]) % 32 != 0:
                 raise BadDataError("corrupt field structure in header")
+            old_length = header.data[10:12]
             header.fields = fieldblock[:fieldend]
+            header.data = header.data[:10] + old_length + header.data[12:]    # restore original for testing
             header.extra = fieldblock[fieldend+1:]  # skip trailing \r
             self._initialize_fields()
             self._check_memo_integrity()
@@ -3523,10 +3492,37 @@ class DbfTable(_Navigation):
         
     def __iter__(self):
         "iterates over the table's records"
-        return Iter(self, delete_flag_source=self)
+        return Iter(self)
     def __len__(self):
         "returns number of records in table"
         return self._meta.header.record_count
+    def __new__(cls, filename, field_specs=None, memo_size=128, ignore_memos=False, 
+                 codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
+                 dbf_type=None,
+                 ):
+        if dbf_type is None and isinstance(filename, Table):
+            return filename
+        if field_specs and dbf_type is None:
+            dbf_type = default_type
+        if dbf_type is not None:
+            dbf_type = dbf_type.lower()
+            table = table_types.get(dbf_type)
+            if table is None:
+                raise DbfError("Unknown table type: %s" % dbf_type)
+            return object.__new__(table)
+        else:
+            possibles = guess_table_type(filename)
+            if len(possibles) == 1:
+                return object.__new__(possibles[0][2])
+            else:
+                for type, desc, cls in possibles:
+                    if type == default_type:
+                        return object.__new__(cls)
+                else:
+                    types = ', '.join(["%s" % item[1] for item in possibles])
+                    abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'
+                    raise DbfError("Table could be any of %s.  Please specify %s when opening" % (types, abbrs))
+
     def __nonzero__(self):
         "True if table has any records"
         return self._meta.header.record_count != 0
@@ -3731,7 +3727,7 @@ class DbfTable(_Navigation):
         kamikaze = ''
         if header.record_count == meta.max_records:
             raise DbfError("table %r is full; unable to add any more records" % self)
-        if isinstance(data, (_DbfRecord, _DbfRecordTemplate)):
+        if isinstance(data, (Record, RecordTemplate)):
             if data._meta.record_sig == self._meta.record_sig:
                 kamikaze = data._data
         else:
@@ -3745,7 +3741,7 @@ class DbfTable(_Navigation):
                 data = ''
             elif data:
                 raise TypeError("data to append must be a tuple, dict, record, or template; not a %r" % type(data))
-        newrecord = _DbfRecord(recnum=header.record_count, layout=meta, kamikaze=kamikaze)
+        newrecord = Record(recnum=header.record_count, layout=meta, kamikaze=kamikaze)
         if kamikaze and meta.memofields:
             newrecord._start_flux()
             for field in meta.memofields:
@@ -3785,7 +3781,7 @@ class DbfTable(_Navigation):
             single = header.record_count
             total = single + multiple
             while single < total:
-                multi_record = _DbfRecord(single, meta, kamikaze=data)
+                multi_record = Record(single, meta, kamikaze=data)
                 multi_record._start_flux()
                 self._table.append(multi_record)
                 for field in meta.memofields:
@@ -3820,7 +3816,7 @@ class DbfTable(_Navigation):
             name, ext = os.path.splitext(os.path.split(self.filename)[1])
             extra = ('_backup', '_BACKUP')[upper]
             new_name = os.path.join(temp_dir, name + extra + ext)
-        bkup = self.__class__(new_name, self.structure())
+        bkup = Table(new_name, self.structure(), codepage=self.codepage.name, dbf_type=self._versionabbr)
         bkup.open()
         for record in self:
             bkup.append(record)
@@ -3835,9 +3831,9 @@ class DbfTable(_Navigation):
         if meta.status == CLOSED:
             raise DbfError('%s is closed' % meta.filename)
         return Index(self, key)
-    def create_template(self, record=None, **defaults):
+    def create_template(self, record=None, defaults=None):
         "returns a record template that can be used like a record"
-        return _DbfRecordTemplate(self._meta, original_record=record, **defaults)
+        return RecordTemplate(self._meta, original_record=record, defaults=defaults)
     def delete_fields(self, doomed):
         """removes field(s) from the table
         creates backup files with _backup appended to the file name,
@@ -3927,7 +3923,7 @@ class DbfTable(_Navigation):
     def index(self, record, start=None, stop=None):
         """returns the index of record between start and stop
         start and stop default to the first and last record"""
-        if not isinstance(record, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(record, (Record, RecordTemplate, dict, tuple)):
             raise TypeError("x should be a record, template, dict, or tuple, not %r" % type(record))
         meta = self._meta
         if meta.status == CLOSED:
@@ -3962,7 +3958,7 @@ class DbfTable(_Navigation):
             default_data_types = self._default_data_types
         if field_data_types is None:
             field_data_types = self._field_data_types
-        return self.__class__(filename, field_specs, memo_size, ignore_memos, codepage, default_data_types, field_data_types)
+        return Table(filename, field_specs, memo_size, ignore_memos, codepage, default_data_types, field_data_types, dbf_type=self._versionabbr)
     def nullable_field(self, field):
         "returns True if field allows Nulls"
         if field not in self.field_names:
@@ -4128,7 +4124,7 @@ class DbfTable(_Navigation):
         meta.header.record_count = 0
         self._index = -1
         self._update_disk()
-class Db3Table(DbfTable):
+class Db3Table(Table):
     """Provides an interface for working with dBase III tables."""
     _version = 'dBase III Plus'
     _versionabbr = 'db3'
@@ -4184,7 +4180,7 @@ class Db3Table(DbfTable):
     _supported_tables = ['\x03', '\x83']
 
     def _check_memo_integrity(self):
-        "dBase III specific"
+        "dBase III and Clipper"
         if not self._meta.ignorememos:
             memo_fields = False
             for field in self._meta.fields:
@@ -4210,22 +4206,24 @@ class Db3Table(DbfTable):
     def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions"
         old_fields = defaultdict(dict)
-        for name in self._meta.fields:
-            old_fields[name]['type'] = self._meta[name][TYPE]
-            old_fields[name]['empty'] = self._meta[name][EMPTY]
-            old_fields[name]['class'] = self._meta[name][CLASS]
-        self._meta.fields[:] = []
+        meta = self._meta
+        for name in meta.fields:
+            old_fields[name]['type'] = meta[name][TYPE]
+            old_fields[name]['empty'] = meta[name][EMPTY]
+            old_fields[name]['class'] = meta[name][CLASS]
+        meta.fields[:] = []
         offset = 1
-        fieldsdef = self._meta.header.fields
+        fieldsdef = meta.header.fields
         if len(fieldsdef) % 32 != 0:
             raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
-        if len(fieldsdef) // 32 != self._meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields" % (self._meta.header.field_count, len(fieldsdef)//32))
-        for i in range(self._meta.header.field_count):
+        if len(fieldsdef) // 32 != meta.header.field_count:
+            raise BadDataError("Header shows %d fields, but field definition block has %d fields" % (meta.header.field_count, len(fieldsdef)//32))
+        total_length = meta.header.record_length
+        for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
             name = unpack_str(fieldblock[:11])
             type = fieldblock[11]
-            if not type in self._meta.fieldtypes:
+            if not type in meta.fieldtypes:
                 raise BadDataError("Unknown field type: %s" % type)
             start = offset
             length = ord(fieldblock[16])
@@ -4233,16 +4231,16 @@ class Db3Table(DbfTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
-            if name in self._meta.fields:
+            if name in meta.fields:
                 raise BadDataError('Duplicate field name found: %s' % name)
-            self._meta.fields.append(name)
+            meta.fields.append(name)
             if name in old_fields and old_fields[name]['type'] == type:
                 cls = old_fields[name]['class']
                 empty = old_fields[name]['empty']
             else:
-                cls = self._meta.fieldtypes[type]['Class']
-                empty = self._meta.fieldtypes[type]['Empty']
-            self._meta[name] = (
+                cls = meta.fieldtypes[type]['Class']
+                empty = meta.fieldtypes[type]['Empty']
+            meta[name] = (
                     type,
                     start,
                     length,
@@ -4252,10 +4250,194 @@ class Db3Table(DbfTable):
                     cls,
                     empty,
                     )
-        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
-        self._meta.user_field_count = len(self._meta.user_fields)
-        _DbfRecord._create_blank_data(self._meta)
-class FpTable(DbfTable):
+        if offset != total_length:
+            raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
+        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_field_count = len(meta.user_fields)
+        Record._create_blank_data(meta)
+class ClpTable(Db3Table):
+    """Provides an interface for working with Clipper tables."""
+    _version = 'Clipper 5'
+    _versionabbr = 'clp'
+    @MutableDefault
+    def _field_types():
+        return {
+            'C' : {
+                    'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':lambda x: ' '*x, 'Init':add_clp_character,
+                    'Class':unicode, 'Empty':unicode, 'flags':tuple(),
+                    },
+            'D' : {
+                    'Type':'Date', 'Retrieve':retrieve_date, 'Update':update_date, 'Blank':lambda x: '        ', 'Init':add_date,
+                    'Class':datetime.date, 'Empty':none, 'flags':tuple(),
+                    },
+            'F' : {
+                    'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: ' '*x, 'Init':add_numeric,
+                    'Class':'default', 'Empty':none, 'flags':tuple(),
+                    },
+            'L' : {
+                    'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':lambda x: '?', 'Init':add_logical,
+                    'Class':bool, 'Empty':none, 'flags':tuple(),
+                    },
+            'M' : {
+                    'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '          ', 'Init':add_memo,
+                    'Class':unicode, 'Empty':unicode, 'flags':tuple(),
+                    },
+            'N' : {
+                    'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: ' '*x, 'Init':add_numeric,
+                    'Class':'default', 'Empty':none, 'flags':tuple(),
+                    } }
+    _memoext = '.dbt'
+    _memoClass = _Db3Memo
+    _yesMemoMask = '\x80'
+    _noMemoMask = '\x7f'
+    _binary_types = ()
+    _character_types = ('C','M') 
+    _currency_types = tuple()
+    _date_types = ('D',)
+    _datetime_types = tuple()
+    _decimal_types = ('N', 'F')
+    _fixed_types = ('D','L','M')
+    _logical_types = ('L',)
+    _memo_types = ('M',)
+    _numeric_types = ('N', 'F')
+    _variable_types = ('C','N')
+    _dbfTableHeader = array('c', '\x00' * 32)
+    _dbfTableHeader[0] = '\x03'         # version - dBase III w/o memo's
+    _dbfTableHeader[8:10] = array('c', pack_short_int(33))
+    _dbfTableHeader[10] = '\x01'        # record length -- one for delete flag
+    _dbfTableHeader[29] = '\x03'        # code page -- 437 US-MS DOS
+    _dbfTableHeader = _dbfTableHeader.tostring()
+    _dbfTableHeaderExtra = ''
+    _supported_tables = ['\x03', '\x83']
+
+    def _build_header_fields(self):
+        "constructs fieldblock for disk table"
+        fieldblock = array('c', '')
+        memo = False
+        nulls = False
+        meta = self._meta
+        header = meta.header
+        header.version = chr(ord(header.version) & ord(self._noMemoMask))
+        meta.fields = [f for f in meta.fields if f != '_nullflags']
+        total_length = 1    # delete flag
+        for field in meta.fields:
+            layout = meta[field]
+            if meta.fields.count(field) > 1:
+                raise BadDataError("corrupted field structure (noticed in _build_header_fields)")
+            fielddef = array('c', '\x00' * 32)
+            fielddef[:11] = array('c', pack_str(meta.encoder(field)[0]))
+            fielddef[11] = layout[TYPE]
+            fielddef[12:16] = array('c', pack_long_int(layout[START]))
+            total_length += layout[LENGTH]
+            if layout[TYPE] == 'C':     # long character field
+                fielddef[16] = chr(layout[LENGTH] % 256)
+                fielddef[17] = chr(layout[LENGTH] // 256)
+            else:
+                fielddef[16] = chr(layout[LENGTH])
+                fielddef[17] = chr(layout[DECIMALS])
+            fielddef[18] = chr(layout[FLAGS])
+            fieldblock.extend(fielddef)
+            if layout[TYPE] in meta.memo_types:
+                memo = True
+            if layout[FLAGS] & NULLABLE:
+                nulls = True
+        if memo:
+            header.version = chr(ord(header.version) | ord(self._yesMemoMask))
+            if meta.memo is None:
+                meta.memo = self._memoClass(meta)
+        else:
+            if os.path.exists(meta.memoname):
+                if meta.mfd is not None:
+                    meta.mfd.close()
+
+                os.remove(meta.memoname)
+            meta.memo = None
+        if nulls:
+            start = layout[START] + layout[LENGTH]
+            length, one_more = divmod(len(meta.fields), 8)
+            if one_more:
+                length += 1
+            fielddef = array('c', '\x00' * 32)
+            fielddef[:11] = array('c', pack_str('_nullflags'))
+            fielddef[11] = '0'
+            fielddef[12:16] = array('c', pack_long_int(start))
+            fielddef[16] = chr(length)
+            fielddef[17] = chr(0)
+            fielddef[18] = chr(BINARY | SYSTEM)
+            fieldblock.extend(fielddef)
+            meta.fields.append('_nullflags')
+            nullflags = (
+                    '0',                # type
+                    start,              # start
+                    length,             # length
+                    start + length,     # end
+                    0,                  # decimals
+                    BINARY | SYSTEM,    # flags
+                    none,               # class
+                    none,               # empty
+                    )
+            meta['_nullflags'] = nullflags
+        header.fields = fieldblock.tostring()
+        header.record_length = total_length
+        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_field_count = len(meta.user_fields)
+        Record._create_blank_data(meta)
+
+    def _initialize_fields(self):
+        "builds the FieldList of names, types, and descriptions"
+        meta = self._meta
+        old_fields = defaultdict(dict)
+        for name in meta.fields:
+            old_fields[name]['type'] = meta[name][TYPE]
+            old_fields[name]['empty'] = meta[name][EMPTY]
+            old_fields[name]['class'] = meta[name][CLASS]
+        meta.fields[:] = []
+        offset = 1
+        fieldsdef = meta.header.fields
+        if len(fieldsdef) % 32 != 0:
+            raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
+        if len(fieldsdef) // 32 != meta.header.field_count:
+            raise BadDataError("Header shows %d fields, but field definition block has %d fields" % (meta.header.field_count, len(fieldsdef)//32))
+        total_length = meta.header.record_length
+        for i in range(meta.header.field_count):
+            fieldblock = fieldsdef[i*32:(i+1)*32]
+            name = unpack_str(fieldblock[:11])
+            type = fieldblock[11]
+            if not type in meta.fieldtypes:
+                raise BadDataError("Unknown field type: %s" % type)
+            start = offset
+            length = ord(fieldblock[16])
+            decimals = ord(fieldblock[17])
+            if type == 'C':
+                length += decimals * 256
+            offset += length
+            end = start + length
+            flags = ord(fieldblock[18])
+            if name in meta.fields:
+                raise BadDataError('Duplicate field name found: %s' % name)
+            meta.fields.append(name)
+            if name in old_fields and old_fields[name]['type'] == type:
+                cls = old_fields[name]['class']
+                empty = old_fields[name]['empty']
+            else:
+                cls = meta.fieldtypes[type]['Class']
+                empty = meta.fieldtypes[type]['Empty']
+            meta[name] = (
+                    type,
+                    start,
+                    length,
+                    end,
+                    decimals,
+                    flags,
+                    cls,
+                    empty,
+                    )
+        if offset != total_length:
+            raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
+        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_field_count = len(meta.user_fields)
+        Record._create_blank_data(meta)
+class FpTable(Table):
     'Provides an interface for working with FoxPro 2 tables'
     _version = 'Foxpro'
     _versionabbr = 'fp'
@@ -4287,11 +4469,11 @@ class FpTable(DbfTable):
                     'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ),
                     },
             'G' : {
-                    'Type':'General', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_memo,
+                    'Type':'General', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_vfp_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             'P' : {
-                    'Type':'Picture', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_memo,
+                    'Type':'Picture', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_vfp_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             '0' : {
@@ -4346,22 +4528,24 @@ class FpTable(DbfTable):
 
     def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions"
+        meta = self._meta
         old_fields = defaultdict(dict)
-        for name in self._meta.fields:
-            old_fields[name]['type'] = self._meta[name][TYPE]
-            old_fields[name]['class'] = self._meta[name][CLASS]
-        self._meta.fields[:] = []
+        for name in meta.fields:
+            old_fields[name]['type'] = meta[name][TYPE]
+            old_fields[name]['class'] = meta[name][CLASS]
+        meta.fields[:] = []
         offset = 1
-        fieldsdef = self._meta.header.fields
+        fieldsdef = meta.header.fields
         if len(fieldsdef) % 32 != 0:
             raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
-        if len(fieldsdef) // 32 != self._meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields" % (self._meta.header.field_count, len(fieldsdef)//32))
-        for i in range(self._meta.header.field_count):
+        if len(fieldsdef) // 32 != meta.header.field_count:
+            raise BadDataError("Header shows %d fields, but field definition block has %d fields" % (meta.header.field_count, len(fieldsdef)//32))
+        total_length = meta.header.record_length
+        for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
             name = unpack_str(fieldblock[:11])
             type = fieldblock[11]
-            if not type in self._meta.fieldtypes:
+            if not type in meta.fieldtypes:
                 raise BadDataError("Unknown field type: %s" % type)
             start = offset
             length = ord(fieldblock[16])
@@ -4369,16 +4553,16 @@ class FpTable(DbfTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
-            if name in self._meta.fields:
+            if name in meta.fields:
                 raise BadDataError('Duplicate field name found: %s' % name)
-            self._meta.fields.append(name)
+            meta.fields.append(name)
             if name in old_fields and old_fields[name]['type'] == type:
                 cls = old_fields[name]['class']
                 empty = old_fields[name]['empty']
             else:
-                cls = self._meta.fieldtypes[type]['Class']
-                empty = self._meta.fieldtypes[type]['Empty']
-            self._meta[name] = (
+                cls = meta.fieldtypes[type]['Class']
+                empty = meta.fieldtypes[type]['Empty']
+            meta[name] = (
                     type,
                     start,
                     length,
@@ -4388,9 +4572,11 @@ class FpTable(DbfTable):
                     cls,
                     empty,
                     )
-        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
-        self._meta.user_field_count = len(self._meta.user_fields)
-        _DbfRecord._create_blank_data(self._meta)
+        if offset != total_length:
+            raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
+        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_field_count = len(meta.user_fields)
+        Record._create_blank_data(meta)
     @staticmethod
     def _pack_date(date):
             "Returns a group of three bytes, in integer form, of the date"
@@ -4485,20 +4671,22 @@ class VfpTable(FpTable):
     _dbfTableHeaderExtra = '\x00' * 263
     def _initialize_fields(self):
         "builds the FieldList of names, types, and descriptions"
+        meta = self._meta
         old_fields = defaultdict(dict)
-        for name in self._meta.fields:
-            old_fields[name]['type'] = self._meta[name][TYPE]
-            old_fields[name]['class'] = self._meta[name][CLASS]
-            old_fields[name]['empty'] = self._meta[name][EMPTY]
-        self._meta.fields[:] = []
+        for name in meta.fields:
+            old_fields[name]['type'] = meta[name][TYPE]
+            old_fields[name]['class'] = meta[name][CLASS]
+            old_fields[name]['empty'] = meta[name][EMPTY]
+        meta.fields[:] = []
         offset = 1
-        fieldsdef = self._meta.header.fields
-        self._meta.nullflags = None
-        for i in range(self._meta.header.field_count):
+        fieldsdef = meta.header.fields
+        meta.nullflags = None
+        total_length = meta.header.record_length
+        for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
             name = unpack_str(fieldblock[:11])
             type = fieldblock[11]
-            if not type in self._meta.fieldtypes:
+            if not type in meta.fieldtypes:
                 raise BadDataError("Unknown field type: %s" % type)
             start = unpack_long_int(fieldblock[12:16])
             length = ord(fieldblock[16])
@@ -4506,16 +4694,16 @@ class VfpTable(FpTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
-            if name in self._meta.fields:
+            if name in meta.fields:
                 raise BadDataError('Duplicate field name found: %s' % name)
-            self._meta.fields.append(name)
+            meta.fields.append(name)
             if name in old_fields and old_fields[name]['type'] == type:
                 cls = old_fields[name]['class']
                 empty = old_fields[name]['empty']
             else:
-                cls = self._meta.fieldtypes[type]['Class']
-                empty = self._meta.fieldtypes[type]['Empty']
-            self._meta[name] = (
+                cls = meta.fieldtypes[type]['Class']
+                empty = meta.fieldtypes[type]['Empty']
+            meta[name] = (
                     type,
                     start,
                     length,
@@ -4525,19 +4713,11 @@ class VfpTable(FpTable):
                     cls,
                     empty,
                     )
-        self._meta.user_fields = [f for f in self._meta.fields if not self._meta[f][FLAGS] & SYSTEM]
-        self._meta.user_field_count = len(self._meta.user_fields)
-        _DbfRecord._create_blank_data(self._meta)
-    @staticmethod
-    def _pack_date(date):
-            "Returns a group of three bytes, in integer form, of the date"
-            return "%c%c%c" % (date.year-2000, date.month, date.day)
-    @staticmethod
-    def _unpack_date(bytestr):
-            "Returns a Date() of the packed three-byte date passed in"
-            year, month, day = struct.unpack('<BBB', bytestr)
-            year += 2000
-            return Date(year, month, day)
+        if offset != total_length:
+            raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
+        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_field_count = len(meta.user_fields)
+        Record._create_blank_data(meta)
                     
 class List(_Navigation):
     "list of Dbf records, with set-like behavior"
@@ -4569,7 +4749,7 @@ class List(_Navigation):
     def __add__(self, other):
         self._still_valid_check()
         key = self.key
-        if isinstance(other, (DbfTable, list)):
+        if isinstance(other, (Table, list)):
             other = self.__class__(other, key=key)
         if isinstance(other, self.__class__):
             other._still_valid_check()
@@ -4589,7 +4769,7 @@ class List(_Navigation):
         return NotImplemented
     def __contains__(self, data):
         self._still_valid_check()
-        if not isinstance(data, (_DbfRecord, _DbfRecordTemplate, tuple, dict)):
+        if not isinstance(data, (Record, RecordTemplate, tuple, dict)):
             raise TypeError("%r is not a record, templace, tuple, nor dict" % (data, ))
         try:    # attempt quick method
             item = self.key(data)
@@ -4610,7 +4790,7 @@ class List(_Navigation):
         elif isinstance(key, slice):
             self._set.difference_update([item[2] for item in self._list[key]])
             self._list.__delitem__(key)
-        elif isinstance(key, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        elif isinstance(key, (Record, RecordTemplate, dict, tuple)):
             index = self.index(key)
             item = self._list.pop[index]
             self._set.remove(item[2])
@@ -4629,7 +4809,7 @@ class List(_Navigation):
             result._set = set(result._list)
             result.key = self.key
             return result
-        elif isinstance(key, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        elif isinstance(key, (Record, RecordTemplate, dict, tuple)):
             index = self.index(key)
             return self._get_record(*self._list[index])
         else:
@@ -4647,7 +4827,7 @@ class List(_Navigation):
     def __radd__(self, other):
         self._still_valid_check()
         key = self.key
-        if isinstance(other, (DbfTable, list)):
+        if isinstance(other, (Table, list)):
             other = self.__class__(other, key=key)
         if isinstance(other, self.__class__):
             other._still_valid_check()
@@ -4674,7 +4854,7 @@ class List(_Navigation):
     def __rsub__(self, other):
         self._still_valid_check()
         key = self.key
-        if isinstance(other, (DbfTable, list)):
+        if isinstance(other, (Table, list)):
             other = self.__class__(other, key=key)
         if isinstance(other, self.__class__):
             other._still_valid_check()
@@ -4710,7 +4890,7 @@ class List(_Navigation):
     def __sub__(self, other):
         self._still_valid_check()
         key = self.key
-        if isinstance(other, (DbfTable, list)):
+        if isinstance(other, (Table, list)):
             other = self.__class__(other, key=key)
         if isinstance(other, self.__class__):
             other._still_valid_check()
@@ -4810,7 +4990,7 @@ class List(_Navigation):
     def index(self, record, start=None, stop=None):
         """returns the index of record between start and stop
         start and stop default to the first and last record"""
-        if not isinstance(record, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(record, (Record, RecordTemplate, dict, tuple)):
             raise TypeError("x should be a record, template, dict, or tuple, not %r" % type(record))
         self._still_valid_check()
         if start is None:
@@ -4846,7 +5026,7 @@ class List(_Navigation):
 
     def remove(self, data):
         self._still_valid_check()
-        if not isinstance(data, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(data, (Record, RecordTemplate, dict, tuple)):
             raise TypeError("%r(%r) is not a record, template, tuple, nor dict" % (type(data), data))
         index = self.index(data)
         record = self[index]
@@ -4903,9 +5083,9 @@ class Index(_Navigation):
         self._rec_by_val.insert(vindex, rec_num)
         self._records[rec_num] = key
     def __contains__(self, data):
-        if not isinstance(data,(_DbfRecord, _DbfRecordTemplate, tuple, dict)):
+        if not isinstance(data,(Record, RecordTemplate, tuple, dict)):
             raise TypeError("%r is not a record, templace, tuple, nor dict" % (data, ))
-        if isinstance(data, _DbfRecord) and source_table(data) is self._table:
+        if isinstance(data, Record) and source_table(data) is self._table:
             return recno(data) in self._records
         else:
             try:
@@ -4935,8 +5115,8 @@ class Index(_Navigation):
                 record = self._table[self._rec_by_val[loc]]
                 result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
             return result
-        elif isinstance (key, (str, unicode, tuple, _DbfRecord)):
-            if isinstance(key, _DbfRecord):
+        elif isinstance (key, (str, unicode, tuple, Record)):
+            if isinstance(key, Record):
                 key = self.key(key)
             elif not isinstance(key, tuple):
                 key = (key, )
@@ -4993,7 +5173,7 @@ class Index(_Navigation):
     def index(self, record, start=None, stop=None):
         """returns the index of record between start and stop
         start and stop default to the first and last record"""
-        if not isinstance(record, (_DbfRecord, _DbfRecordTemplate, dict, tuple)):
+        if not isinstance(record, (Record, RecordTemplate, dict, tuple)):
             raise TypeError("x should be a record, template, dict, or tuple, not %r" % type(record))
         self._still_valid_check()
         if start is None:
@@ -5030,9 +5210,9 @@ class Index(_Navigation):
 # table meta
 table_types = {
     'db3' : Db3Table,
+    'clp' : ClpTable,
     'fp'  : FpTable,
     'vfp' : VfpTable,
-    'dbf' : DbfTable,
     }
 
 version_map = {
@@ -5115,7 +5295,7 @@ code_pages = {
         '\x97' : ('mac_latin2', 'Macintosh EE'),
         '\x98' : ('mac_greek', 'Greek Macintosh') }
 
-default_codepage = code_pages.get(default_codepage, code_pages.get('ascii'))
+default_codepage = code_pages.get(default_codepage, code_pages.get('\x00'))[0]
 
 # SQL functions
 def pql_select(records, chosen_fields, condition, field_names):
@@ -5247,7 +5427,7 @@ def pql_cmd(command, field_names):
         if _tmp != _rec:
             dbf.gather(_rec, _tmp)
             _changed += 1
-    return changed"""
+    return _changed"""
     fields = []
     for field in field_names:
         if field in command:
@@ -5352,7 +5532,7 @@ def encoding(cp=None):
     cp, sd, ld = _codepage_lookup(cp or input_decoding)
     default_codepage = sd
     return "%s (LDID: 0x%02x - %s)" % (sd, ord(cp), ld)
-class _Db4Table(DbfTable):
+class _Db4Table(Table):
     version = 'dBase IV w/memos (non-functional)'
     _versionabbr = 'db4'
     @MutableDefault
@@ -5413,11 +5593,11 @@ class _Db4Table(DbfTable):
                     break
 
 # utility functions
-def create_template(table_or_record, **defaults):
-    if isinstance(table_or_record, DbfTable):
-        return _DbfRecordTemplate(table_or_record._meta, **defaults)
+def create_template(table_or_record, defaults=None):
+    if isinstance(table_or_record, Table):
+        return RecordTemplate(table_or_record._meta, defaults)
     else:
-        return _DbfRecordTemplate(table_or_record._meta, table_or_record, **defaults)
+        return RecordTemplate(table_or_record._meta, table_or_record, defaults)
 def delete(record):
     "marks record as deleted"
     if record._meta.status == CLOSED:
@@ -5515,7 +5695,7 @@ def field_names(thing):
     "fields in table/record, keys in dict"
     if isinstance(thing, dict):
         return thing.keys()
-    elif isinstance(thing, (DbfTable, _DbfRecord, _DbfRecordTemplate)):
+    elif isinstance(thing, (Table, Record, RecordTemplate)):
         return thing._meta.user_fields[:]
     elif isinstance(thing, Index):
         return thing._table._meta.user_fields[:]
@@ -5538,7 +5718,7 @@ def source_table(record):
 def reset(record, keep_fields=None):
     "sets record's fields back to original, except for fields in keep_fields"
     template = record_in_flux = False
-    if isinstance(record, _DbfRecordTemplate):
+    if isinstance(record, RecordTemplate):
         template = True
     else:
         record_in_flux = not record._write_to_disk
@@ -5593,42 +5773,7 @@ def Process(records):
             record._rollback_flux()
         else:
             record._commit_flux()
-def Table(
-        filename, 
-        field_specs='', 
-        memo_size=128,
-        ignore_memos=False, 
-        dbf_type=None, 
-        codepage=None,
-        default_data_types={},
-        field_data_types={},
-        ):
-    "returns an open table of the correct dbf_type, or creates it if field_specs is given"
-    if dbf_type is None and isinstance(filename, DbfTable):
-        return filename
-    if field_specs and dbf_type is None:
-        dbf_type = default_type
-    if dbf_type is not None:
-        dbf_type = dbf_type.lower()
-        table = table_types.get(dbf_type)
-        if table is None:
-            raise DbfError("Unknown table type: %s" % dbf_type)
-        return table(filename, field_specs, memo_size, ignore_memos, 
-                codepage, default_data_types, field_data_types)
-    else:
-        possibles = guess_table_type(filename)
-        if len(possibles) == 1:
-            return possibles[0][2](filename, field_specs, memo_size, ignore_memos, 
-                    codepage, default_data_types, field_data_types)
-        else:
-            for type, desc, cls in possibles:
-                if type == default_type:
-                    return cls(filename, field_specs, memo_size, ignore_memos,
-                            codepage, default_data_types, field_data_types)
-            else:
-                types = ', '.join(["%s" % item[1] for item in possibles])
-                abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'
-                raise DbfError("Table could be any of %s.  Please specify %s when opening" % (types, abbrs))
+
 def index(sequence):
     "returns integers 0 - len(sequence)"
     for i in xrange(len(sequence)):
@@ -5637,7 +5782,7 @@ def guess_table_type(filename):
     reported = table_type(filename)
     possibles = []
     version = reported[0]
-    for tabletype in (Db3Table, FpTable, VfpTable):
+    for tabletype in (Db3Table, ClpTable, FpTable, VfpTable):
         if version in tabletype._supported_tables:
             possibles.append((tabletype._versionabbr, tabletype._version, tabletype))
     if not possibles:
@@ -5690,13 +5835,13 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
     filename will be used if provided
     field_names default to f0, f1, f2, etc, unless specified (list)
     extra_fields can be used to add additional fields -- should be normal field specifiers (list)"""
-    reader = csv.reader(codecs.open(csvfile, encoding=encoding, errors=errors))
+    reader = csv.reader(codecs.open(csvfile, 'r', encoding=encoding, errors=errors))
     if field_names:
         if ' ' not in field_names[0]:
             field_names = ['%s M' % fn for fn in field_names]
     else:
         field_names = ['f0 M']
-    mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size)
+    mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
     mtable.open()
     fields_so_far = 1
     for row in reader:
@@ -5727,7 +5872,7 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
                 fielddef.append('%s M' % (fields[i]))
         if extra_fields:
             fielddef.extend(extra_fields)
-        csvtable = Table(filename, fielddef, dbf_type=dbf_type)
+        csvtable = Table(filename, fielddef, dbf_type=dbf_type, codepage=encoding)
         csvtable.open()
         for record in mtable:
             csvtable.append(scatter(record))
@@ -5837,10 +5982,10 @@ class fake_module(object):
         sys.modules["%s.%s" % (__name__, self.name)] = self
 
 fake_module('api',
-    'Table', 'List', 'Index',  'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
+    'Table', 'Record', 'List', 'Index',  'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
     'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
     'recno', 'source_table', 'reset', 'scatter', 'undelete',
-    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 
+    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor',
     'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
     'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
     'InvalidFieldSpecError', 'NonUnicodeError', 'NotFoundError',

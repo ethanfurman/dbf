@@ -11,7 +11,7 @@ import traceback
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 94, 0):
+if dbf.version != (0, 94, 1):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -2571,6 +2571,9 @@ class Test_Exceptions(unittest.TestCase):
         table = Table(':ahhh:', 'name C(10)')
         table.open(mode=dbf.READ_ONLY)
         self.assertRaises(DbfError, table.append, dict(name='uh uh!'))
+    def test_clipper(self):
+        table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
+        self.assertRaises(BadDataError, Table, os.path.join(tempdir, 'temptable'))
 
 class Test_Dbf_Creation(unittest.TestCase):
     "Testing table creation..."
@@ -2590,6 +2593,32 @@ class Test_Dbf_Creation(unittest.TestCase):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3')
                 table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+                actualFields = table.structure()
+                self.assertEqual(fieldlist, actualFields)
+                table = open(table.filename, 'rb')
+                try:
+                    last_byte = table.read()[-1]
+                finally:
+                    table.close()
+                self.assertEqual(last_byte, '\x1a')
+    def test_clp_memory_tables(self):
+        "clp tables in memory"
+        fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
+        for i in range(1, len(fields)+1):
+            for fieldlist in combinate(fields, i):
+                table = Table(':memory:', fieldlist, dbf_type='clp')
+                actualFields = table.structure()
+                self.assertEqual(fieldlist, actualFields)
+                self.assertTrue(all([type(x) is unicode for x in table.field_names]))
+    def test_clp_disk_tables(self):
+        "clp table on disk"
+        table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
+        self.assertEqual(table.record_length, 20557)
+        fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
+        for i in range(1, len(fields)+1):
+            for fieldlist in combinate(fields, i):
+                table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='clp')
+                table = Table(os.path.join(tempdir, 'temptable'), dbf_type='clp')
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
                 table = open(table.filename, 'rb')
@@ -2642,6 +2671,19 @@ class Test_Dbf_Creation(unittest.TestCase):
                 actualFields = table.structure()
                 fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
+    def test_codepage(self):
+        table = Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); male L; fired D null', dbf_type='vfp')
+        self.assertEqual(dbf.default_codepage, 'ascii')
+        self.assertEqual(table.codepage, dbf.CodePage('ascii'))
+        table = Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); male L; fired D null', dbf_type='vfp', codepage='cp850')
+        self.assertEqual(table.codepage, dbf.CodePage('cp850'))
+        newtable = table.new('tempvfp2', codepage='cp437')
+        self.assertEqual(newtable.codepage, dbf.CodePage('cp437'))
+        newtable.open()
+        newtable.create_backup()
+        newtable.close()
+        bckup = Table(os.path.join(tempdir, newtable.backup))
+        self.assertEqual(bckup.codepage, newtable.codepage)
 
 class Test_Dbf_Records(unittest.TestCase):
     "Testing records"
@@ -4407,15 +4449,15 @@ class Test_Dbf_Navigation(unittest.TestCase):
         table.top()
         list.top()
         index.top()
-        self.assertTrue(isinstance(table.prev_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(list.prev_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(index.prev_record, dbf._DbfRecordVaporWare))
+        self.assertTrue(isinstance(table.prev_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(list.prev_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(index.prev_record, dbf.RecordVaporWare))
         table.skip()
         list.skip()
         index.skip()
-        self.assertTrue(isinstance(table.prev_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(list.prev_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(index.prev_record, dbf._DbfRecordVaporWare))
+        self.assertTrue(isinstance(table.prev_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(list.prev_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(index.prev_record, dbf.RecordVaporWare))
         table.skip()
         list.skip()
         index.skip()
@@ -4435,15 +4477,15 @@ class Test_Dbf_Navigation(unittest.TestCase):
         table.top()
         list.top()
         index.top()
-        self.assertTrue(isinstance(table.current_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(list.current_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(index.current_record, dbf._DbfRecordVaporWare))
+        self.assertTrue(isinstance(table.current_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(list.current_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(index.current_record, dbf.RecordVaporWare))
         table.bottom()
         list.bottom()
         index.bottom()
-        self.assertTrue(isinstance(table.current_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(list.current_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(index.current_record, dbf._DbfRecordVaporWare))
+        self.assertTrue(isinstance(table.current_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(list.current_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(index.current_record, dbf.RecordVaporWare))
         table.goto(mid)
         list.goto(mid)
         index.goto(mid)
@@ -4465,15 +4507,15 @@ class Test_Dbf_Navigation(unittest.TestCase):
         table.bottom()
         list.bottom()
         index.bottom()
-        self.assertTrue(isinstance(table.next_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(list.next_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(index.next_record, dbf._DbfRecordVaporWare))
+        self.assertTrue(isinstance(table.next_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(list.next_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(index.next_record, dbf.RecordVaporWare))
         table.skip(-1)
         list.skip(-1)
         index.skip(-1)
-        self.assertTrue(isinstance(table.next_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(list.next_record, dbf._DbfRecordVaporWare))
-        self.assertTrue(isinstance(index.next_record, dbf._DbfRecordVaporWare))
+        self.assertTrue(isinstance(table.next_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(list.next_record, dbf.RecordVaporWare))
+        self.assertTrue(isinstance(index.next_record, dbf.RecordVaporWare))
         table.skip(-1)
         list.skip(-1)
         index.skip(-1)

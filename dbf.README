@@ -1,8 +1,8 @@
-dbf v0.94.001
+dbf v0.94.003
 =============
 
 dbf (also known as python dbase) is a module for reading/writing
-dBase III, FP, VFP, and soon Clipper, .dbf database files.  It's
+dBase III, FP, VFP, and Clipper .dbf database files.  It's
 an ancient format that still finds lots of use (the most common
 I'm aware of is retrieving legacy data so it can be stored in a
 newer database system; other uses include GIS, stand-alone programs

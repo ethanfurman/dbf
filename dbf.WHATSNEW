@@ -1,6 +1,11 @@
 What's New
 ==========
 
+0.94.002
+--------
+
+Minor bug fixes, more documentation.
+
 0.94.001
 --------
 
@@ -15,6 +20,8 @@ More code clean-up and slight breakage::
 --------
 
 Massive backwards incompatible changes.
+
+export() method removed from Tables and made into a normal function.
 
 All non-underscore methods removed from the record class and made into
 normal functions::
@@ -36,6 +43,9 @@ Can use strings as start/stop of slices: `record['name':'age']`
 Record templates now exist, and are much like records except that they are
 not directly tied to a table and can be freely modified.  They can be created
 by either the `dbf.create_template` function or the `table.create_template` method.
+
+scatter() now returns a RecordTemplate instead of a dict, but the as_type parameter
+can be used to get dicts (or tuples, lists, whatever)
 
 0.93.020
 --------

@@ -31,7 +31,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 94, 1)
+version = (0, 94, 3)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Iter', 'Date', 'DateTime', 'Time',
@@ -51,6 +51,7 @@ __all__ = (
 
 
 import codecs
+import collections
 import csv
 import datetime
 import locale
@@ -65,6 +66,7 @@ from bisect import bisect_left, bisect_right
 import decimal
 from decimal import Decimal
 from math import floor
+import types
 from types import NoneType
 
 py_ver = sys.version_info[:2]
@@ -81,16 +83,6 @@ pql_user_functions = {}     # user-defined pql functions  (pql == primitive quer
                             # it is not real sql and won't be for a long time (if ever)
 
 _Template_Records = dict()  # signature:_meta of template records
-
-#class Context(object):
-#    "used to hold user-configurable settings"
-#    def __init__(
-#            record_type=Record,
-#            auto_write_on_deletion=True,
-#            auto_write_in_loops=True,
-#            logical_unknown_is_None=True,
-#            ):
-#        pass
 
 # 2.7 constructs
 if sys.version_info[:2] < (2, 7):
@@ -3343,7 +3335,6 @@ class Table(_Navigation):
                     self._table = self._Table(len(self), self._meta)
                 else:
                     self._table = []
-                    #self._load_table()
         return object.__getattribute__(self, name)
     def __getitem__(self, value):
         if isinstance(value, (int, long)):
@@ -4817,7 +4808,6 @@ class List(_Navigation):
     def __iter__(self):
         self._still_valid_check()
         return Iter(self)
-        #return (table[recno] for table, recno, value in self._list)
     def __len__(self):
         self._still_valid_check()
         return len(self._list)
@@ -5136,7 +5126,6 @@ class Index(_Navigation):
         return False
     def __iter__(self):
         return Iter(self)
-        #return self.IndexIterator(self._table, self._rec_by_val)
     def __len__(self):
         return len(self._records)
     def _clear(self):
@@ -5207,7 +5196,6 @@ class Index(_Navigation):
                 loc += 1
         return result
 
-# table meta
 table_types = {
     'db3' : Db3Table,
     'clp' : ClpTable,
@@ -5404,8 +5392,6 @@ def pql_criteria(records, criteria):
     fields = '\n        '.join(['%s = _rec.%s' % (field, field) for field in fields])
     g = dict()
     g['dbf'] = dbf
-    #for item in dbf.__all__:
-    #    g[item] = getattr(dbf, item)
     g.update(pql_user_functions)
     function %= (criteria, fields, criteria)
     exec function in g
@@ -5709,12 +5695,6 @@ def is_deleted(record):
 def recno(record):
     "physical record number"
     return record._recnum
-def source_table(record):
-    "table associated with record"
-    table = record._meta.table()
-    if table is None:
-        raise DbfError("table is no longer available")
-    return table
 def reset(record, keep_fields=None):
     "sets record's fields back to original, except for fields in keep_fields"
     template = record_in_flux = False
@@ -5737,6 +5717,12 @@ def reset(record, keep_fields=None):
             record._write()
         else:
             record._dirty = True
+def source_table(record):
+    "table associated with record"
+    table = record._meta.table()
+    if table is None:
+        raise DbfError("table is no longer available")
+    return table
 def undelete(record):
     "marks record as active"
     if record._meta.status == CLOSED:
@@ -5951,22 +5937,13 @@ def scan(table, direction='forward', filter=lambda rec: True):
                 return True
     except no_more_records:
         return False
-def scatter(record, as_type=create_template):
+def scatter(record, as_type=create_template, _mappings=getattr(collections, 'Mapping', dict)):
     "returns as_type() of [fieldnames and] values."
-    import collections
-    if as_type is create_template:
-        return create_template(record)
-    elif issubclass(as_type, collections.Mapping):
+    if isinstance(as_type, types.FunctionType):
+        return as_type(record)
+    elif issubclass(as_type, _mappings):
         return as_type(zip(field_names(record), record))
-    return as_type(record)
-if py_ver < (2, 6):
-    def scatter(record, as_type=create_template):
-        "returns as_type() of [fieldnames and] values."
-        import collections
-        if as_type is create_template:
-            return create_template(record)
-        elif issubclass(as_type, dict):
-            return as_type(zip(field_names(record), record))
+    else:
         return as_type(record)
 
 # from dbf.api import *

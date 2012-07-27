@@ -34,7 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 version = (0, 94, 3)
 
 __all__ = (
-        'Table', 'Record', 'List', 'Index', 'Iter', 'Date', 'DateTime', 'Time',
+        'Table', 'Record', 'List', 'Index', 'Iter', 'Date', 'DateTime', 'Time', 'CodePage',
         'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
         'recno', 'source_table', 'reset', 'scatter', 'undelete',
         'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
@@ -1839,7 +1839,11 @@ class Record(object):
                 decimals = layout[name][DECIMALS]
                 signature[-1] = '_'.join([str(x) for x in (signature[-1], type, size, decimals)])
         layout.blankrecord = record._data[:]
-        layout.record_sig = '___'.join(signature)
+        data_types = []
+        for fieldtype, defs in sorted(layout.fieldtypes.items()):
+            if fieldtype != '0':    # ignore the nullflags field
+                data_types.append("%s_%s_%s" % (fieldtype, defs['Empty'], defs['Class']))
+        layout.record_sig = ('___'.join(signature), '___'.join(data_types))
     def _reindex_record(self):
         "rerun all indices with this record"
         if self._meta.status == CLOSED:
@@ -2011,7 +2015,12 @@ class RecordTemplate(object):
         """record = ascii array of entire record; layout=record specification"""
         sig = layout.record_sig
         if sig not in _Template_Records:
-            _Template_Records[sig] = layout.table().new(':%s:' % layout.filename)._meta
+            table = layout.table()
+            _Template_Records[sig] = table.new(
+                    ':%s:' % layout.filename,
+                    default_data_types=table._meta._default_data_types,
+                    field_data_types=table._meta._field_data_types,
+                    )._meta
         layout = _Template_Records[sig]
         record = object.__new__(cls)
         record._meta = layout
@@ -3390,10 +3399,10 @@ class Table(_Navigation):
         header.extra = self._dbfTableHeaderExtra
         if default_data_types is None:
             default_data_types = dict()
-        self._default_data_types = default_data_types
+        self._meta._default_data_types = default_data_types
         if field_data_types is None:
             field_data_types = dict()
-        self._field_data_types = field_data_types
+        self._meta._field_data_types = field_data_types
         for field, types in default_data_types.items():
             if not isinstance(types, tuple):
                 types = (types, )
@@ -3719,7 +3728,7 @@ class Table(_Navigation):
         if header.record_count == meta.max_records:
             raise DbfError("table %r is full; unable to add any more records" % self)
         if isinstance(data, (Record, RecordTemplate)):
-            if data._meta.record_sig == self._meta.record_sig:
+            if data._meta.record_sig[0] == self._meta.record_sig[0]:
                 kamikaze = data._data
         else:
             if isinstance(data, dict):
@@ -3946,9 +3955,9 @@ class Table(_Navigation):
         if codepage is None:
             codepage = self._meta.header.codepage()[0]
         if default_data_types is None:
-            default_data_types = self._default_data_types
+            default_data_types = self._meta._default_data_types
         if field_data_types is None:
-            field_data_types = self._field_data_types
+            field_data_types = self._meta._field_data_types
         return Table(filename, field_specs, memo_size, ignore_memos, codepage, default_data_types, field_data_types, dbf_type=self._versionabbr)
     def nullable_field(self, field):
         "returns True if field allows Nulls"
@@ -5117,12 +5126,10 @@ class Index(_Navigation):
         else:
             raise TypeError('indices must be integers, match objects must by strings or tuples')
     def __enter__(self):
+        self._table.open()
         return self
     def __exit__(self, *exc_info):
         self._table.close()
-        self._values[:] = []
-        self._rec_by_val[:] = []
-        self._records.clear()
         return False
     def __iter__(self):
         return Iter(self)
@@ -5195,6 +5202,9 @@ class Index(_Navigation):
                 result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
                 loc += 1
         return result
+
+class IndexFile(_Navigation):
+    pass
 
 table_types = {
     'db3' : Db3Table,
@@ -5283,7 +5293,9 @@ code_pages = {
         '\x97' : ('mac_latin2', 'Macintosh EE'),
         '\x98' : ('mac_greek', 'Greek Macintosh') }
 
+
 default_codepage = code_pages.get(default_codepage, code_pages.get('\x00'))[0]
+
 
 # SQL functions
 def pql_select(records, chosen_fields, condition, field_names):
@@ -5960,7 +5972,7 @@ class fake_module(object):
 
 fake_module('api',
     'Table', 'Record', 'List', 'Index',  'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
-    'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
+    'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
     'recno', 'source_table', 'reset', 'scatter', 'undelete',
     'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor',
     'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',

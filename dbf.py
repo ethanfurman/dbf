@@ -5206,6 +5206,7 @@ class Index(_Navigation):
 class IndexFile(_Navigation):
     pass
 
+# table meta
 table_types = {
     'db3' : Db3Table,
     'clp' : ClpTable,
@@ -5729,9 +5730,9 @@ def reset(record, keep_fields=None):
             record._write()
         else:
             record._dirty = True
-def source_table(record):
-    "table associated with record"
-    table = record._meta.table()
+def source_table(thingie):
+    "table associated with table | record | index"
+    table = thingie._meta.table()
     if table is None:
         raise DbfError("table is no longer available")
     return table

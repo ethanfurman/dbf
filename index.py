@@ -29,11 +29,13 @@ class IndexFile(object):
 
 class ContainedIndex(_Navigation):
     "an individual index in a .pdx (plentiful index) file"
-    def __init__(self, table, key_func, key_text, index_file, root_node):
+    def __init__(self, table, key_func, key_text, index_file, root_node, id):
         self.__doc__ = key_text
         self._meta = table._meta      # keep for other info functions
         self.key = key_func
-
+        self.file = index_file
+        self.root = root_node
+        self.id = id
 
 
 

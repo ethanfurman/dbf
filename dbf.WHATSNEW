@@ -4,9 +4,6 @@ What's New
 0.94.004
 --------
 
-Removed dbf.codepage() and dbf.encoding() as users can directly access
-dbf.default_codepage and dbf.input_decoding.
-
 Templates now use same (custom) data types as table they are created
 from.
 
@@ -21,7 +18,8 @@ the number represents a found match, and False if the number represents where a 
 should be (a False value will only be returned if nearest == True).
 
 Backwards-Compatibility Break: memory-only tables are now specified with on_disk=True
-instead of bracketing the filename with ':'.
+instead of bracketing the filename with ':'.  Removed dbf.codepage() and dbf.encoding()
+as users can directly access dbf.default_codepage and dbf.input_decoding.
 
 
 0.94.003

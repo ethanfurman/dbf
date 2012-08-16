@@ -11,7 +11,7 @@ import traceback
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 94, 3):
+if dbf.version != (0, 94, 4):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -2508,25 +2508,25 @@ class Test_Quantum(unittest.TestCase):
 
 class Test_Exceptions(unittest.TestCase):
     def test_bad_field_specs_on_creation(self):
-        self.assertRaises(InvalidFieldSpecError, Table, ':blah:', 'age N(3,2)')
-        self.assertRaises(InvalidFieldSpecError, Table, ':blah:', 'name C(300)')
-        self.assertRaises(InvalidFieldSpecError, Table, ':blah:', 'born L(9)')
-        self.assertRaises(InvalidFieldSpecError, Table, ':blah:', 'married D(12)')
-        self.assertRaises(InvalidFieldSpecError, Table, ':blah:', 'desc M(1)')
+        self.assertRaises(InvalidFieldSpecError, Table, 'blah', 'age N(3,2)', on_disk=False)
+        self.assertRaises(InvalidFieldSpecError, Table, 'blah', 'name C(300)', on_disk=False)
+        self.assertRaises(InvalidFieldSpecError, Table, 'blah', 'born L(9)', on_disk=False)
+        self.assertRaises(InvalidFieldSpecError, Table, 'blah', 'married D(12)', on_disk=False)
+        self.assertRaises(InvalidFieldSpecError, Table, 'blah', 'desc M(1)', on_disk=False)
 
     def test_too_many_fields_on_creation(self):
         fields = []
         for i in range(255):
             fields.append('a%03d C(10)' % i)
-        Table(':test:', ';'.join(fields))
+        Table(':test:', ';'.join(fields), on_disk=False)
         fields.append('a255 C(10)')
-        self.assertRaises(DbfError, Table, ':test:', ';'.join(fields))
+        self.assertRaises(DbfError, Table, ':test:', ';'.join(fields), on_disk=False)
 
     def test_adding_too_many_fields(self):
         fields = []
         for i in range(255):
             fields.append('a%03d C(10)' % i)
-        table = Table(':test:', ';'.join(fields))
+        table = Table(':test:', ';'.join(fields), on_disk=False)
         table.open()
         self.assertRaises(DbfError, table.add_fields, 'a255 C(10)')
 
@@ -2534,7 +2534,7 @@ class Test_Exceptions(unittest.TestCase):
         fields = []
         for i in range(254):
             fields.append('a%03d C(10) null' % i)
-        table = Table(':test:', ';'.join(fields), dbf_type='vfp')
+        table = Table(':test:', ';'.join(fields), dbf_type='vfp', on_disk=False)
         table.open()
         self.assertRaises(DbfError, table.add_fields, 'a255 C(10)')
 
@@ -2545,20 +2545,20 @@ class Test_Exceptions(unittest.TestCase):
         fields = []
         for i in range(255):
             fields.append('a%03d C(10)' % i)
-        table = Table(':test:', ';'.join(fields))
+        table = Table(':test:', ';'.join(fields), on_disk=False)
         table.open()
         self.assertRaises(DbfError, table.allow_nulls, 'a001')
 
     def test_adding_existing_field_to_table(self):
-        table = Table(':blah:', 'name C(50)')
+        table = Table(':blah:', 'name C(50)', on_disk=False)
         self.assertRaises(DbfError, table.add_fields, 'name C(10)')
 
     def test_deleting_non_existing_field_from_table(self):
-        table = Table(':bleh:', 'name C(25)')
+        table = Table(':bleh:', 'name C(25)', on_disk=False)
         self.assertRaises(DbfError, table.delete_fields, 'age')
 
     def test_modify_packed_record(self):
-        table = Table(':ummm:', 'name C(3); age N(3,0)')
+        table = Table(':ummm:', 'name C(3); age N(3,0)', on_disk=False)
         table.open()
         for person in (('me', 25), ('you', 35), ('her', 29)):
             table.append(person)
@@ -2568,12 +2568,20 @@ class Test_Exceptions(unittest.TestCase):
         self.assertEqual(('you', 35), record)
         self.assertRaises(DbfError, dbf.write, record, **{'age':33})
     def test_read_only(self):
-        table = Table(':ahhh:', 'name C(10)')
+        table = Table(':ahhh:', 'name C(10)', on_disk=False)
         table.open(mode=dbf.READ_ONLY)
         self.assertRaises(DbfError, table.append, dict(name='uh uh!'))
     def test_clipper(self):
         table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
         self.assertRaises(BadDataError, Table, os.path.join(tempdir, 'temptable'))
+
+class Test_IndexLocation(unittest.TestCase):
+    def test_false(self):
+        self.assertFalse(IndexLocation(0, False))
+        self.assertFalse(IndexLocation(42, False))
+    def test_true(self):
+        self.assertTrue(IndexLocation(0, True))
+        self.assertTrue(IndexLocation(42, True))
 
 class Test_Dbf_Creation(unittest.TestCase):
     "Testing table creation..."
@@ -2582,7 +2590,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(':memory:', fieldlist, dbf_type='db3')
+                table = Table(':memory:', fieldlist, dbf_type='db3', on_disk=False)
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
@@ -2606,7 +2614,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(':memory:', fieldlist, dbf_type='clp')
+                table = Table(':memory:', fieldlist, dbf_type='clp', on_disk=False)
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
@@ -2633,7 +2641,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                   'litres F(11,5)', 'blob G', 'graphic P']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
+                table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp', on_disk=False)
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
     def test_fp_disk_tables(self):
@@ -2654,7 +2662,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                   ]
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp')
+                table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp', on_disk=False)
                 actualFields = table.structure()
                 fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
@@ -2914,7 +2922,7 @@ class Test_Dbf_Records(unittest.TestCase):
 
     def test_char_memo_return_type(self):
         "check character fields return type"
-        table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp')
+        table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp', on_disk=False)
         table.open()
         table.append(('another one bites the dust', "and another one's gone, and another one's gone..."))
         table.append()
@@ -2923,7 +2931,7 @@ class Test_Dbf_Records(unittest.TestCase):
             self.assertTrue(type(record.memo) is unicode)
         
         table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp',
-            default_data_types=dict(C=Char, M=Char))
+            default_data_types=dict(C=Char, M=Char), on_disk=False)
         table.open()
         table.append(('another one bites the dust', "and another one's gone, and another one's gone..."))
         table.append()
@@ -2932,7 +2940,7 @@ class Test_Dbf_Records(unittest.TestCase):
             self.assertTrue(type(record.memo) is Char)
 
         table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp',
-            default_data_types=dict(C=(Char, NoneType), M=(Char, NoneType)))
+            default_data_types=dict(C=(Char, NoneType), M=(Char, NoneType)), on_disk=False)
         table.open()
         table.append(('another one bites the dust', "and another one's gone, and another one's gone..."))
         table.append()
@@ -2944,7 +2952,7 @@ class Test_Dbf_Records(unittest.TestCase):
         self.assertTrue(type(record.memo) is NoneType)
     def test_empty_is_none(self):
         "empty and None values"
-        table = Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp')
+        table = Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp', on_disk=False)
         table.open()
         table.append()
         record = table[-1]
@@ -2981,7 +2989,8 @@ class Test_Dbf_Records(unittest.TestCase):
             filename=':memory:',
             field_specs='name C(20); born L; married D; appt T; wisdom M',
             field_data_types=dict(name=Char, born=Logical, married=Date, appt=DateTime, wisdom=Char,),
-            dbf_type='vfp'
+            dbf_type='vfp',
+            on_disk=False,
             )
         table.open()
         table.append()
@@ -3025,7 +3034,8 @@ class Test_Dbf_Records(unittest.TestCase):
             filename=':memory:',
             field_specs='name C(20); born L; married D; wisdom M',
             field_data_types=dict(name=(str, NoneType), born=(bool, bool)),
-            dbf_type='db3'
+            dbf_type='db3',
+            on_disk=False,
             )
         table.open()
         table.append()
@@ -3060,6 +3070,7 @@ class Test_Dbf_Records(unittest.TestCase):
                     M=(Char, NoneType, NullType),
                     ),
             dbf_type='vfp',
+            on_disk=False,
             )
         table.open()
         table.append()
@@ -3111,7 +3122,7 @@ class Test_Dbf_Records(unittest.TestCase):
 
     def test_nonascii_text_cptrans(self):
         "check non-ascii text to unicode"
-        table = Table(':memory:', 'data C(50); memo M', codepage='cp437', dbf_type='vfp')
+        table = Table(':memory:', 'data C(50); memo M', codepage='cp437', dbf_type='vfp', on_disk=False)
         table.open()
         decoder = codecs.getdecoder('cp437')
         high_ascii = decoder(''.join(chr(c) for c in range(128, 128+50)))[0]
@@ -3122,7 +3133,7 @@ class Test_Dbf_Records(unittest.TestCase):
 
     def test_nonascii_text_no_cptrans(self):
         "check non-ascii text to bytes"
-        table = Table(':memory:', 'bindata C(50) binary; binmemo M binary', codepage='cp1252', dbf_type='vfp')
+        table = Table(':memory:', 'bindata C(50) binary; binmemo M binary', codepage='cp1252', dbf_type='vfp', on_disk=False)
         table.open()
         high_ascii = ''.join(chr(c) for c in range(128, 128+50))
         table.append(dict(bindata=high_ascii, binmemo=high_ascii))
@@ -3677,11 +3688,11 @@ class Test_Dbf_Functions(unittest.TestCase):
 
     def test_un_delete(self):
         "delete, undelete"
-        table = Table(':memory:', 'name C(10)', dbf_type='db3')
+        table = Table(':memory:', 'name C(10)', dbf_type='db3', on_disk=False)
         table.open()
         table.append()
         self.assertEqual(table.next_record, table[0])
-        table = Table(':memory:', 'name C(10)', dbf_type='db3')
+        table = Table(':memory:', 'name C(10)', dbf_type='db3', on_disk=False)
         table.open()
         table.append(multiple=10)
         self.assertEqual(table.next_record, table[0])
@@ -3900,13 +3911,13 @@ class Test_Dbf_Functions(unittest.TestCase):
             for key in field_names(temp2):
                 self.assertEqual(temp1[key], temp2[key])
         table2.close()
-        table3 = table.new(':memory:')
+        table3 = table.new(':memory:', on_disk=False)
         table3.open()
         for record in table:
             table3.append(record)
         table4 = self.vfp_table
         table4.open()
-        table5 = table4.new(':memory:')
+        table5 = table4.new(':memory:', on_disk=False)
         table5.open()
         for record in table4:
             table5.append(record)
@@ -4062,7 +4073,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table.close()
     def test_adding_memos(self):
         "adding memos to existing records"
-        table = Table(':memory:', 'name C(50); age N(3,0)', dbf_type='db3')
+        table = Table(':memory:', 'name C(50); age N(3,0)', dbf_type='db3', on_disk=False)
         table.open()
         table.append(('user', 0))
         table.add_fields('motto M')
@@ -4228,6 +4239,75 @@ class Test_Dbf_Functions(unittest.TestCase):
         for table in self.dbf_table, self.vfp_table:
             table.open()
             dbf.export(table, filename='test_export.csv')
+    def test_index_search(self):
+        table = Table("unordered", "icao C(20)", default_data_types=dict(C=Char), on_disk=False).open()
+        icao = ("kilo charlie echo golf papa hotel delta tango india sierra juliet lima zulu mike "
+                "bravo november alpha oscar quebec romeo uniform victor whiskey x-ray yankee foxtrot".split())
+        for alpha in icao:
+            table.append((alpha,))
+        sorted = table.create_index(lambda rec: rec.icao)
+        self.assertEqual(sorted.index_search('alpha'), 0)
+        self.assertEqual(sorted.index_search('bravo'), 1)
+        self.assertEqual(sorted.index_search('charlie'), 2)
+        self.assertEqual(sorted.index_search('delta'), 3)
+        self.assertEqual(sorted.index_search('echo'), 4)
+        self.assertEqual(sorted.index_search('foxtrot'), 5)
+        self.assertEqual(sorted.index_search('golf'), 6)
+        self.assertEqual(sorted.index_search('hotel'), 7)
+        self.assertEqual(sorted.index_search('india'), 8)
+        self.assertEqual(sorted.index_search('juliet'), 9)
+        self.assertEqual(sorted.index_search('kilo'), 10)
+        self.assertEqual(sorted.index_search('lima'), 11)
+        self.assertEqual(sorted.index_search('mike'), 12)
+        self.assertEqual(sorted.index_search('november'), 13)
+        self.assertEqual(sorted.index_search('oscar'), 14)
+        self.assertEqual(sorted.index_search('papa'), 15)
+        self.assertEqual(sorted.index_search('quebec'), 16)
+        self.assertEqual(sorted.index_search('romeo'), 17)
+        self.assertEqual(sorted.index_search('sierra'), 18)
+        self.assertEqual(sorted.index_search('tango'), 19)
+        self.assertEqual(sorted.index_search('uniform'), 20)
+        self.assertEqual(sorted.index_search('victor'), 21)
+        self.assertEqual(sorted.index_search('whiskey'), 22)
+        self.assertEqual(sorted.index_search('x-ray'), 23)
+        self.assertEqual(sorted.index_search('yankee'), 24)
+        self.assertEqual(sorted.index_search('zulu'), 25)
+        self.assertTrue(sorted.index_search('alpha'))
+        self.assertTrue(sorted.index_search('bravo'))
+        self.assertTrue(sorted.index_search('charlie'))
+        self.assertTrue(sorted.index_search('delta'))
+        self.assertTrue(sorted.index_search('echo'))
+        self.assertTrue(sorted.index_search('foxtrot'))
+        self.assertTrue(sorted.index_search('golf'))
+        self.assertTrue(sorted.index_search('hotel'))
+        self.assertTrue(sorted.index_search('india'))
+        self.assertTrue(sorted.index_search('juliet'))
+        self.assertTrue(sorted.index_search('kilo'))
+        self.assertTrue(sorted.index_search('lima'))
+        self.assertTrue(sorted.index_search('mike'))
+        self.assertTrue(sorted.index_search('november'))
+        self.assertTrue(sorted.index_search('oscar'))
+        self.assertTrue(sorted.index_search('papa'))
+        self.assertTrue(sorted.index_search('quebec'))
+        self.assertTrue(sorted.index_search('romeo'))
+        self.assertTrue(sorted.index_search('sierra'))
+        self.assertTrue(sorted.index_search('tango'))
+        self.assertTrue(sorted.index_search('uniform'))
+        self.assertTrue(sorted.index_search('victor'))
+        self.assertTrue(sorted.index_search('whiskey'))
+        self.assertTrue(sorted.index_search('x-ray'))
+        self.assertTrue(sorted.index_search('yankee'))
+        self.assertTrue(sorted.index_search('zulu'))
+        self.assertRaises(NotFoundError, sorted.index_search, 'john')
+        self.assertRaises(NotFoundError, sorted.index_search, 'john', partial=True)
+        self.assertEqual(sorted.index_search('able', nearest=True), 0)
+        self.assertFalse(sorted.index_search('able', nearest=True))
+        self.assertEqual(sorted.index_search('alp', partial=True), 0)
+        self.assertTrue(sorted.index_search('alp', partial=True))
+        self.assertEqual(sorted.index_search('john', nearest=True), 9)
+        self.assertFalse(sorted.index_search('john', nearest=True))
+        self.assertEqual(sorted.index_search('jul', partial=True), 9)
+        self.assertTrue(sorted.index_search('jul', partial=True))
 
 class Test_Dbf_Navigation(unittest.TestCase):
     def setUp(self):

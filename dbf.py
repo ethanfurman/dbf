@@ -6,7 +6,7 @@ Copyright
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.93.020 as of 21 May 2012
+    - Version: 0.94.004 as of 15 Aug 2012
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -31,7 +31,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 94, 3)
+version = (0, 94, 4)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Iter', 'Date', 'DateTime', 'Time', 'CodePage',
@@ -43,7 +43,7 @@ __all__ = (
         'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
         'NullDate', 'NullDateTime', 'NullTime', 'Vapor',
         'Process',
-        'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal',
+        'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal', 'IndexLocation',
         'guess_table_type', 'table_type',
         'add_fields', 'delete_fields', 'get_fields', 'rename_field',
         'export', 'first_record', 'from_csv', 'info', 'structure',
@@ -71,15 +71,15 @@ from types import NoneType
 
 py_ver = sys.version_info[:2]
 
-LOGICAL_BAD_IS_FALSE = True # if bad data in logical fields, return False? (else raise error)
+LOGICAL_BAD_IS_NONE = True # if bad data in logical fields, return None? (else raise error)
 
 input_decoding = 'ascii'        # treat non-unicode data as ...
 default_codepage = 'ascii'      # if no codepage specified on dbf creation, use this
+default_type = 'db3'        # default format if none specified
 
 temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TMP") or os.environ.get("TEMP") or ""
 
-default_type = 'db3'        # default format if none specified
-pql_user_functions = {}     # user-defined pql functions  (pql == primitive query language)
+pql_user_functions = dict() # user-defined pql functions  (pql == primitive query language)
                             # it is not real sql and won't be for a long time (if ever)
 
 _Template_Records = dict()  # signature:_meta of template records
@@ -1958,7 +1958,14 @@ class Record(object):
         self._update_disk()
 class RecordTemplate(object):
     """Provides routines to mimic a dbf record."""
-    __slots__ = ('_meta', '_data', '_old_data', '_memos', '__weakref__')
+    __slots__ = ('_meta', '_data', '_old_data', '_memos', '_write_to_disk', '__weakref__')
+    def _commit_flux(self):
+        "stores field updates to disk; if any errors restores previous contents and propogates exception"
+        if self._write_to_disk:
+            raise DbfError("record not in flux")
+        self._memos.clear()
+        self._old_data = None
+        self._write_to_disk = True
     def _retrieve_field_value(self, index, name):
         """calls appropriate routine to convert value stored in field from array
         @param record_data: the data portion of the record
@@ -1981,6 +1988,20 @@ class RecordTemplate(object):
         retrieve = self._meta.fieldtypes[field_type]['Retrieve']
         datum = retrieve(record_data, fielddef, self._meta.memo, self._meta.decoder)
         return datum
+    def _rollback_flux(self):
+        "discards all changes since ._start_flux()"
+        if self._write_to_disk:
+            raise DbfError("template not in flux")
+        self._data = self._old_data
+        self._old_data = None
+        self._memos.clear()
+        self._write_to_disk = True
+    def _start_flux(self):
+        "Allows record.field_name = ... and record[...] = ...; must use ._commit_flux() to commit changes"
+        if not self._write_to_disk:
+            raise DbfError("template already in a state of flux")
+        self._old_data = self._data[:]
+        self._write_to_disk = False
     def _update_field_value(self, index, name, value):
         "calls appropriate routine to convert value to ascii bytes, and save it in record"
         fielddef = self._meta[name]
@@ -2019,10 +2040,11 @@ class RecordTemplate(object):
             _Template_Records[sig] = table.new(
                     ':%s:' % layout.filename,
                     default_data_types=table._meta._default_data_types,
-                    field_data_types=table._meta._field_data_types,
+                    field_data_types=table._meta._field_data_types, on_disk=False
                     )._meta
         layout = _Template_Records[sig]
         record = object.__new__(cls)
+        record._write_to_disk = True
         record._meta = layout
         record._memos = {}
         for name in layout.memofields:
@@ -2545,8 +2567,8 @@ def retrieve_logical(bytes, fielddef, *ignore):
         if empty is NoneType:
             return None
         return empty()
-    elif LOGICAL_BAD_IS_FALSE:
-        return False
+    elif LOGICAL_BAD_IS_NONE:
+        return None
     else:
         raise BadDataError('Logical field contained %r' % bytes)
     return typ(bytes)
@@ -2851,6 +2873,16 @@ def ezip(*iters):
 
 # Public classes
 
+class IndexLocation(long):
+    """used by Index.index_search -- represents the index where the match criteria
+    is if True, or would be if False"""
+    def __new__(cls, value, found):
+        "value is the number, found is True/False"
+        result = long.__new__(cls, value)
+        result.found = found
+        return result
+    def __nonzero__(self):
+        return self.found
 class FieldInfo(tuple):
     "tuple with named attributes for representing a field's dbf type, length, decimal portion, and python class"
     __slots__= ()
@@ -3360,7 +3392,7 @@ class Table(_Navigation):
             raise TypeError('type <%s> not valid for indexing' % type(value))
     def __init__(self, filename, field_specs=None, memo_size=128, ignore_memos=False, 
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
-                 dbf_type=None,
+                 dbf_type=None, on_disk=True,
                  ):
         """open/create dbf file
         filename should include path if needed
@@ -3371,7 +3403,7 @@ class Table(_Navigation):
         keep_memos will also load any memo fields into memory
         meta_only will ignore all records, keeping only basic table information
         codepage will override whatever is set in the table itself"""
-        if filename[0] == filename[-1] == ':':
+        if not on_disk:
             if field_specs is None:
                 raise DbfError("field list must be specified for memory tables")
         self._indexen = self._Indexen()
@@ -3408,7 +3440,7 @@ class Table(_Navigation):
                 types = (types, )
             for result_name, result_type in ezip(('Class','Empty','Null'), types):
                 fieldtypes[field][result_name] = result_type
-        if filename[0] == filename[-1] == ':':
+        if not on_disk:
             self._table = []
             meta.location = IN_MEMORY
             meta.memoname = filename
@@ -3498,7 +3530,7 @@ class Table(_Navigation):
         return self._meta.header.record_count
     def __new__(cls, filename, field_specs=None, memo_size=128, ignore_memos=False, 
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
-                 dbf_type=None,
+                 dbf_type=None, on_disk=True,
                  ):
         if dbf_type is None and isinstance(filename, Table):
             return filename
@@ -3803,20 +3835,22 @@ class Table(_Navigation):
             self._meta.dfd.close()
             self._meta.dfd = None
         self._meta.status = CLOSED
-    def create_backup(self, new_name=None):
+    def create_backup(self, new_name=None, on_disk=None):
         "creates a backup table"
         meta = self._meta
         already_open = meta.status != CLOSED
         if not already_open:
             self.open()
-        if self.filename[0] == self.filename[-1] == ':' and new_name is None:
-            new_name = self.filename[:-1] + '_backup:'
+        if on_disk is None:
+            on_disk = meta.location
+        if not on_disk and new_name is None:
+            new_name = self.filename + '_backup'
         if new_name is None:
             upper = self.filename.isupper()
             name, ext = os.path.splitext(os.path.split(self.filename)[1])
             extra = ('_backup', '_BACKUP')[upper]
             new_name = os.path.join(temp_dir, name + extra + ext)
-        bkup = Table(new_name, self.structure(), codepage=self.codepage.name, dbf_type=self._versionabbr)
+        bkup = Table(new_name, self.structure(), codepage=self.codepage.name, dbf_type=self._versionabbr, on_disk=on_disk)
         bkup.open()
         for record in self:
             bkup.append(record)
@@ -3938,11 +3972,11 @@ class Table(_Navigation):
         else:
             raise NotFoundError("dbf.Table.index(x): x not in table", data=record)
 
-    def new(self, filename, field_specs=None, memo_size=None, ignore_memos=None, codepage=None, default_data_types=None, field_data_types=None):
+    def new(self, filename, field_specs=None, memo_size=None, ignore_memos=None, codepage=None, default_data_types=None, field_data_types=None, on_disk=True):
         "returns a new table of the same type"
         if field_specs is None:
             field_specs = self.structure()
-        if not (filename[0] == filename[-1] == ':'):
+        if on_disk:
             path, name = os.path.split(filename)
             if path == "":
                 filename = os.path.join(os.path.split(self.filename)[0], filename)
@@ -3958,7 +3992,7 @@ class Table(_Navigation):
             default_data_types = self._meta._default_data_types
         if field_data_types is None:
             field_data_types = self._meta._field_data_types
-        return Table(filename, field_specs, memo_size, ignore_memos, codepage, default_data_types, field_data_types, dbf_type=self._versionabbr)
+        return Table(filename, field_specs, memo_size, ignore_memos, codepage, default_data_types, field_data_types, dbf_type=self._versionabbr, on_disk=on_disk)
     def nullable_field(self, field):
         "returns True if field allows Nulls"
         if field not in self.field_names:
@@ -5171,7 +5205,7 @@ class Index(_Navigation):
         start and stop default to the first and last record"""
         if not isinstance(record, (Record, RecordTemplate, dict, tuple)):
             raise TypeError("x should be a record, template, dict, or tuple, not %r" % type(record))
-        self._still_valid_check()
+        self._nav_check()
         if start is None:
             start = 0
         if stop is None:
@@ -5181,11 +5215,37 @@ class Index(_Navigation):
                 return i
         else:
             raise NotFoundError("dbf.Index.index(x): x not in Index", data=record)
+    def index_search(self, match, start=None, stop=None, nearest=False, partial=False):
+        """returns the index of match between start and stop
+        start and stop default to the first and last record.
+        if nearest is true returns the location of where the match should be
+        otherwise raises NotFoundError"""
+        self._nav_check()
+        if not isinstance(match, tuple):
+            match = (match, )
+        if start is None:
+            start = 0
+        if stop is None:
+            stop = len(self)
+        loc = self._search(match, start, stop)
+        if loc == len(self._values):
+            if nearest:
+                return IndexLocation(loc, False)
+            raise NotFoundError("dbf.Index.index_search(x): x not in index", data=match)
+        if self._values[loc] == match \
+        or partial and self._partial_match(self._values[loc], match):
+            return IndexLocation(loc, True)
+        elif nearest:
+            return IndexLocation(loc, False)
+        else:
+            raise NotFoundError("dbf.Index.index_search(x): x not in Index", data=match)
     def query(self, criteria):
         """criteria is a callback that returns a truthy value for matching record"""
+        self._nav_check()
         return pql(self, criteria)
     def search(self, match, partial=False):
         "returns dbf.List of all (partially) matching records"
+        self._nav_check()
         result = List()
         if not isinstance(match, tuple):
             match = (match, )
@@ -5519,18 +5579,6 @@ def _codepage_lookup(cp):
     return cp, sd, ld
 # miscellany
 
-def codepage(cp=None):
-    "get/set default codepage for any new tables"
-    global default_codepage
-    cp, sd, ld = _codepage_lookup(cp or default_codepage)
-    default_codepage = sd
-    return "%s (LDID: 0x%02x - %s)" % (sd, ord(cp), ld)
-def encoding(cp=None):
-    "get/set default encoding for non-unicode strings passed into a table"
-    global input_decoding
-    cp, sd, ld = _codepage_lookup(cp or input_decoding)
-    default_codepage = sd
-    return "%s (LDID: 0x%02x - %s)" % (sd, ord(cp), ld)
 class _Db4Table(Table):
     version = 'dBase IV w/memos (non-functional)'
     _versionabbr = 'db4'
@@ -5840,7 +5888,7 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
             field_names = ['%s M' % fn for fn in field_names]
     else:
         field_names = ['f0 M']
-    mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
+    mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
     mtable.open()
     fields_so_far = 1
     for row in reader:
@@ -5912,7 +5960,7 @@ def gather(record, data, drop=False):
     """saves data into a record's fields; writes to disk if not in flux
     keys with no matching field will raise a FieldMissingError exception unless drop_missing == True
     if an Exception occurs the record is restored before reraising"""
-    if record._meta.status == CLOSED:
+    if isinstance(record, Record) and record._meta.status == CLOSED:
         raise DbfError("%s is closed; cannot modify record" % record._meta.filename)
     record_in_flux = not record._write_to_disk
     if not record_in_flux:
@@ -5979,7 +6027,7 @@ fake_module('api',
     'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
     'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
     'InvalidFieldSpecError', 'NonUnicodeError', 'NotFoundError',
-    'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
+    'DbfWarning', 'Eof', 'Bof', 'DoNotIndex', 'IndexLocation',
     'Process',
     ).register()
 

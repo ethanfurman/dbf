@@ -4567,6 +4567,7 @@ class FpTable(Table):
         for name in meta.fields:
             old_fields[name]['type'] = meta[name][TYPE]
             old_fields[name]['class'] = meta[name][CLASS]
+            old_fields[name]['empty'] = meta[name][EMPTY]
         meta.fields[:] = []
         offset = 1
         fieldsdef = meta.header.fields

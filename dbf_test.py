@@ -2585,7 +2585,7 @@ class Test_IndexLocation(unittest.TestCase):
 
 class Test_Dbf_Creation(unittest.TestCase):
     "Testing table creation..."
-    def test_dbf_memory_tables(self):
+    def test_db3_memory_tables(self):
         "dbf tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
@@ -2594,7 +2594,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
-    def test_dbf_disk_tables(self):
+    def test_db3_disk_tables(self):
         "dbf table on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
         for i in range(1, len(fields)+1):
@@ -2692,6 +2692,26 @@ class Test_Dbf_Creation(unittest.TestCase):
         newtable.close()
         bckup = Table(os.path.join(tempdir, newtable.backup))
         self.assertEqual(bckup.codepage, newtable.codepage)
+    def test_db3_ignore_memos(self):
+        table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='db3').open()
+        table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
+        table.close()
+        table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='db3', ignore_memos=True)
+    def test_fp_ignore_memos(self):
+        table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='fp').open()
+        table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
+        table.close()
+        table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='fp', ignore_memos=True)
+    def test_vfp_ignore_memos(self):
+        table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='vfp').open()
+        table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
+        table.close()
+        table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='vfp', ignore_memos=True)
+    def test_clp_ignore_memos(self):
+        table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='clp').open()
+        table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
+        table.close()
+        table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='clp', ignore_memos=True)
 
 class Test_Dbf_Records(unittest.TestCase):
     "Testing records"

@@ -6,7 +6,7 @@ Copyright
     - Author: Ethan Furman
     - Contact: ethanf@admailinc.com
     - Organization: Ad-Mail, Inc.
-    - Version: 0.94.004 as of 15 Aug 2012
+    - Version: 0.94.004 as of 17 Aug 2012
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -31,7 +31,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 94, 4)
+version = (0, 94, 5)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Iter', 'Date', 'DateTime', 'Time', 'CodePage',

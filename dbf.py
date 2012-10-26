@@ -103,7 +103,7 @@ if sys.version_info[:2] < (2, 6):
     # 2.6+ property for 2.5-,
     # define our own property type
     class property(object):
-        "2.6 properties for 2.5-"    
+        "2.6 properties for 2.5-"
         def __init__(self, fget=None, fset=None, fdel=None, doc=None):
             self.fget = fget
             self.fset = fset
@@ -115,7 +115,7 @@ if sys.version_info[:2] < (2, 6):
                 self.__doc__ = fget.__doc__
         def __get__(self, obj, objtype=None):
             if obj is None:
-                return self         
+                return self
             if self.fget is None:
                 raise AttributeError("unreadable attribute")
             return self.fget(obj)
@@ -728,7 +728,7 @@ class DateTime(object):
         if self:
             return self._datetime
         return None
-    @classmethod    
+    @classmethod
     def fromordinal(cls, number):
         if number:
             return cls(datetime.datetime.fromordinal(number))
@@ -920,7 +920,7 @@ Time._null_time._time = None
 NullTime = Time()
 
 class Logical(object):
-    """return type for Logical fields; 
+    """return type for Logical fields;
     can take the values of True, False, or None/Null"""
     def __new__(cls, value=None):
         if value is None or value is Null or value is Other or value is Unknown:
@@ -1141,7 +1141,7 @@ class Logical(object):
         if x.value is None:
             raise ValueError("unable to return hex() of %r" % x)
         return hex(x.value)
-        
+
     def __and__(x, y):
         """AND (conjunction) x & y:
         True iff both x, y are True
@@ -1551,7 +1551,7 @@ class _Navigation(object):
             return RecordVaporWare('bof', self)
     def goto(self, where):
         """changes the record pointer to the first matching (deleted) record
-        where should be either an integer, or 'top' or 'bottom'. 
+        where should be either an integer, or 'top' or 'bottom'.
         top    -> before first record
         bottom -> after last record"""
         self._nav_check()
@@ -2442,7 +2442,7 @@ def pack_str(string):
         "Returns an 11 byte, upper-cased, null padded string suitable for field names; raises DbfError if the string is bigger than 10 bytes"
         if len(string) > 10:
             raise DbfError("Maximum string size is ten characters -- %s has %d characters" % (string, len(string)))
-        return struct.pack('11s', string.upper())       
+        return struct.pack('11s', string.upper())
 def unpack_short_int(bytes, bigendian=False):
         "Returns the value in the two-byte integer passed in"
         if bigendian:
@@ -2581,8 +2581,15 @@ def update_logical(data, *ignore):
     if data == False:
         return 'F'
     raise ValueError("unable to automatically coerce %r to Logical" % data)
+
+
 def retrieve_memo(bytes, fielddef, memo, decoder):
-    "Returns the block of data from a memo file"
+    """
+    Returns the block of data from a memo file
+    """
+    if memo is None:
+        return "(Memo Ignored)"
+
     stringval = bytes.tostring().strip()
     if not stringval:
         cls = fielddef[EMPTY]
@@ -2594,6 +2601,8 @@ def retrieve_memo(bytes, fielddef, memo, decoder):
     if fielddef[FLAGS] & BINARY:
         return data
     return fielddef[CLASS](decoder(data)[0])
+
+
 def update_memo(string, fielddef, memo, decoder, encoder):
     "Writes string as a memo, returns the block number it was saved into"
     if string == None:
@@ -2682,6 +2691,8 @@ def update_vfp_datetime(moment, *ignore):
     return ''.join(bytes)
 def retrieve_vfp_memo(bytes, fielddef, memo, decoder):
     "Returns the block of data from a memo file"
+    if memo is None:
+        return "(Memo Ignored)"
     block = struct.unpack('<i', bytes)[0]
     if not block:
         cls =  fielddef[EMPTY]
@@ -2959,7 +2970,7 @@ class Table(_Navigation):
                         'Type':'Character', 'Init':add_character, 'Blank':lambda x: ' '*x, 'Retrieve':retrieve_character, 'Update':update_character,
                         'Class':unicode, 'Empty':unicode, 'flags':tuple(),
                         },
-                'D' : { 
+                'D' : {
                         'Type':'Date', 'Init':add_date, 'Blank':lambda x: '        ', 'Retrieve':retrieve_date, 'Update':update_date,
                         'Class':datetime.date, 'Empty':none, 'flags':tuple(),
                         },
@@ -2967,15 +2978,15 @@ class Table(_Navigation):
                         'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: ' '*x, 'Init':add_numeric,
                         'Class':'default', 'Empty':none, 'flags':tuple(),
                         },
-                'L' : { 
+                'L' : {
                         'Type':'Logical', 'Init':add_logical, 'Blank':lambda x: '?', 'Retrieve':retrieve_logical, 'Update':update_logical,
                         'Class':bool, 'Empty':none, 'flags':tuple(),
                         },
-                'M' : { 
+                'M' : {
                         'Type':'Memo', 'Init':add_memo, 'Blank':lambda x: '          ', 'Retrieve':retrieve_memo, 'Update':update_memo,
                         'Class':unicode, 'Empty':unicode, 'flags':tuple(),
                         },
-                'N' : { 
+                'N' : {
                         'Type':'Numeric', 'Init':add_numeric, 'Blank':lambda x: ' '*x, 'Retrieve':retrieve_numeric, 'Update':update_numeric,
                         'Class':'default', 'Empty':none, 'flags':tuple(),
                         },
@@ -3011,7 +3022,7 @@ class Table(_Navigation):
         def __init__(self):
             self._indexen = set()
         def __iter__(self):
-            self._indexen = set([s for s in self._indexen if s() is not None])    
+            self._indexen = set([s for s in self._indexen if s() is not None])
             return (s() for s in self._indexen if s() is not None)
         def __len__(self):
             self._indexen = set([s for s in self._indexen if s() is not None])
@@ -3050,7 +3061,7 @@ class Table(_Navigation):
                 return self._data[29]
             else:
                 cp, sd, ld = _codepage_lookup(cp)
-                self._data[29] = cp                    
+                self._data[29] = cp
                 return cp
         @property
         def data(self):
@@ -3379,7 +3390,7 @@ class Table(_Navigation):
         return object.__getattribute__(self, name)
     def __getitem__(self, value):
         if isinstance(value, (int, long)):
-            if not -self._meta.header.record_count <= value < self._meta.header.record_count: 
+            if not -self._meta.header.record_count <= value < self._meta.header.record_count:
                 raise IndexError("Record %d is not in table." % value)
             return self._table[value]
         elif type(value) == slice:
@@ -3390,7 +3401,7 @@ class Table(_Navigation):
             return sequence
         else:
             raise TypeError('type <%s> not valid for indexing' % type(value))
-    def __init__(self, filename, field_specs=None, memo_size=128, ignore_memos=False, 
+    def __init__(self, filename, field_specs=None, memo_size=128, ignore_memos=False,
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
                  dbf_type=None, on_disk=True,
                  ):
@@ -3454,7 +3465,7 @@ class Table(_Navigation):
         if codepage is not None:
             header.codepage(codepage)
             cp, sd, ld = _codepage_lookup(codepage)
-            self._meta.decoder = codecs.getdecoder(sd) 
+            self._meta.decoder = codecs.getdecoder(sd)
             self._meta.encoder = codecs.getencoder(sd)
         if field_specs:
             if meta.location == ON_DISK:
@@ -3463,7 +3474,7 @@ class Table(_Navigation):
             if codepage is None:
                 header.codepage(default_codepage)
                 cp, sd, ld = _codepage_lookup(header.codepage())
-                meta.decoder = codecs.getdecoder(sd) 
+                meta.decoder = codecs.getdecoder(sd)
                 meta.encoder = codecs.getencoder(sd)
             meta.status = READ_WRITE
             self.add_fields(field_specs)
@@ -3478,13 +3489,13 @@ class Table(_Navigation):
                 dfd.close()
                 dfd = None
                 raise DbfError(
-                    "%s does not support %s [%x]" % 
+                    "%s does not support %s [%x]" %
                     (self._version,
                     version_map.get(header.version, 'Unknown: %s' % header.version),
                     ord(header.version)))
             if codepage is None:
                 cp, sd, ld = _codepage_lookup(header.codepage())
-                self._meta.decoder = codecs.getdecoder(sd) 
+                self._meta.decoder = codecs.getdecoder(sd)
                 self._meta.encoder = codecs.getencoder(sd)
             fieldblock = dfd.read(header.start - 32)
             for i in range(len(fieldblock)//32+1):
@@ -3506,8 +3517,8 @@ class Table(_Navigation):
         for field in meta.fields:
             field_type = meta[field][TYPE]
             default_field_type = (
-                fieldtypes[field_type]['Class'], 
-                fieldtypes[field_type]['Empty'], 
+                fieldtypes[field_type]['Class'],
+                fieldtypes[field_type]['Empty'],
                 )
             specific_field_type = field_data_types.get(field)
             if specific_field_type is not None and not isinstance(specific_field_type, tuple):
@@ -3521,14 +3532,14 @@ class Table(_Navigation):
             meta[field] = meta[field][:-2] + tuple(classes)
         meta.status = READ_ONLY
         self.close()
-        
+
     def __iter__(self):
         "iterates over the table's records"
         return Iter(self)
     def __len__(self):
         "returns number of records in table"
         return self._meta.header.record_count
-    def __new__(cls, filename, field_specs=None, memo_size=128, ignore_memos=False, 
+    def __new__(cls, filename, field_specs=None, memo_size=128, ignore_memos=False,
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
                  dbf_type=None, on_disk=True,
                  ):
@@ -3570,8 +3581,8 @@ class Table(_Navigation):
         Last updated:  %s
         Record count:  %d
         Field count:   %d
-        Record length: %d """ % (self.filename, version_map.get(self._meta.header.version, 
-            'unknown - ' + hex(ord(self._meta.header.version))), self.codepage, status, 
+        Record length: %d """ % (self.filename, version_map.get(self._meta.header.version,
+            'unknown - ' + hex(ord(self._meta.header.version))), self.codepage, status,
             self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
         for i in range(len(self.field_names)):
@@ -3589,7 +3600,7 @@ class Table(_Navigation):
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to change codepage' % meta.filename)
         meta.header.codepage(codepage.code)
-        meta.decoder = codecs.getdecoder(codepage.name) 
+        meta.decoder = codecs.getdecoder(codepage.name)
         meta.encoder = codecs.getencoder(codepage.name)
         self._update_disk(headeronly=True)
     @property
@@ -3635,7 +3646,7 @@ class Table(_Navigation):
         fields = self.structure() + self._list_fields(field_specs, sep=';')
         if (len(fields) + ('_nullflags' in meta)) > meta.max_fields:
             raise DbfError(
-                    "Adding %d more field%s would exceed the limit of %d" 
+                    "Adding %d more field%s would exceed the limit of %d"
                     % (len(fields), ('','s')[len(fields)==1], meta.max_fields)
                     )
         old_table = None
@@ -3719,7 +3730,7 @@ class Table(_Navigation):
             raise FieldMissingError(', '.join(missing))
         if len(self.field_names) + 1 > meta.max_fields:
             raise DbfError(
-                    "Adding the hidden _nullflags field would exceed the limit of %d fields for this table" 
+                    "Adding the hidden _nullflags field would exceed the limit of %d fields for this table"
                     % (meta.max_fields, )
                     )
         old_table = None
@@ -4194,7 +4205,7 @@ class Db3Table(Table):
     _yesMemoMask = '\x80'
     _noMemoMask = '\x7f'
     _binary_types = ()
-    _character_types = ('C','M') 
+    _character_types = ('C','M')
     _currency_types = tuple()
     _date_types = ('D',)
     _datetime_types = tuple()
@@ -4325,7 +4336,7 @@ class ClpTable(Db3Table):
     _yesMemoMask = '\x80'
     _noMemoMask = '\x7f'
     _binary_types = ()
-    _character_types = ('C','M') 
+    _character_types = ('C','M')
     _currency_types = tuple()
     _date_types = ('D',)
     _datetime_types = tuple()
@@ -4622,7 +4633,7 @@ class FpTable(Table):
             year, month, day = struct.unpack('<BBB', bytestr)
             year += 2000
             return Date(year, month, day)
-            
+
 class VfpTable(FpTable):
     'Provides an interface for working with Visual FoxPro 6 tables'
     _version = 'Visual Foxpro'
@@ -4632,7 +4643,7 @@ class VfpTable(FpTable):
         return {
             'C' : {
                     'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':lambda x: ' '*x, 'Init':add_vfp_character,
-                    'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ), 
+                    'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ),
                     },
             'Y' : {
                     'Type':'Currency', 'Retrieve':retrieve_currency, 'Update':update_currency, 'Blank':lambda x: '\x00'*8, 'Init':add_vfp_currency,
@@ -4668,7 +4679,7 @@ class VfpTable(FpTable):
                     },
             'M' : {
                     'Type':'Memo', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_vfp_memo,
-                    'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ), 
+                    'Class':unicode, 'Empty':unicode, 'flags':('binary','nocptrans','null', ),
                     },
             'G' : {
                     'Type':'General', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_vfp_memo,
@@ -4753,7 +4764,7 @@ class VfpTable(FpTable):
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
-                    
+
 class List(_Navigation):
     "list of Dbf records, with set-like behavior"
     _desc = ''
@@ -5825,7 +5836,7 @@ def Process(records):
 def index(sequence):
     "returns integers 0 - len(sequence)"
     for i in xrange(len(sequence)):
-        yield i    
+        yield i
 def guess_table_type(filename):
     reported = table_type(filename)
     possibles = []

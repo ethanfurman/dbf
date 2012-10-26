@@ -81,37 +81,21 @@ Custom data types:
 Whirlwind Tour
 --------------
 
-import datetime
-import dbf
+    :::python
+    import datetime
+    import dbf
 
-table = dbf.Table(':test:', 'name C(25); age N(3,0); birth D; qualified L')
-table.open()
+    table = dbf.Table(':test:', 'name C(25); age N(3,0); birth D; qualified L')
+    table.open()
 
-for datum in (
-        ('Spanky', 7, dbf.Date.fromymd('20010315'), False),
-        ('Spunky', 23, dbf.Date(1989, 07, 23), True),
-        ('Sparky', 99, dbf.Date(), dbf.Unknown),
-        ):
-    table.append(datum)
+    for datum in (
+            ('Spanky', 7, dbf.Date.fromymd('20010315'), False),
+            ('Spunky', 23, dbf.Date(1989, 07, 23), True),
+            ('Sparky', 99, dbf.Date(), dbf.Unknown),
+            ):
+        table.append(datum)
 
-for record in table:
-    print record
-    print '--------'
-    print record[0:3]
-    print record['name':'birth']
-    print [record.name, record.age, record.birth]
-    print '--------'
-
-custom = table.new(
-        filename='test_on_disk',
-        default_data_types=dict(C=dbf.Char, D=dbf.Date, L=dbf.Logical),
-        )
-
-with custom:    # automatically opened and closed
     for record in table:
-        custom.append(record)
-    for record in custom:
-        dbf.write(record, name=record.name.upper())
         print record
         print '--------'
         print record[0:3]
@@ -119,4 +103,21 @@ with custom:    # automatically opened and closed
         print [record.name, record.age, record.birth]
         print '--------'
 
-table.close()
+    custom = table.new(
+            filename='test_on_disk',
+            default_data_types=dict(C=dbf.Char, D=dbf.Date, L=dbf.Logical),
+            )
+
+    with custom:    # automatically opened and closed
+        for record in table:
+            custom.append(record)
+        for record in custom:
+            dbf.write(record, name=record.name.upper())
+            print record
+            print '--------'
+            print record[0:3]
+            print record['name':'birth']
+            print [record.name, record.age, record.birth]
+            print '--------'
+
+    table.close()

@@ -1,6 +1,32 @@
 What's New
 ==========
 
+0.94.006
+--------
+
+Miscellaneous bugs squashed.
+
+backup tables are created in the same location as the original table if TMP,
+TEMP, nor DBF_TEMP are defined in the environment
+
+delete() and undelete() now support RecordTemplate
+
+Process() and Templates() now support start, stop, and filter to allow finer
+control of which records will be returned.
+
+Added Relation, which makes linking two tables together on a common field easier.
+Not persistent.
+
+xBase-Compatibility Break: added utf8 codepage (xf0).
+
+Backwards-Compatibility Break: reverted Logical.__eq__ to return True if Logical
+is True, False otherwise; this properly mimics the behavior of using True/False/None
+directly.  If the previous behavior is desired, use Quantum instead (it uses the
+states On/Off/Other), or use `if Unknown: ... ; elif ... ; else ... `.
+
+Many thanks to all who have help with ideas and bug fixes.
+
+
 0.94.004
 --------
 
@@ -20,6 +46,12 @@ should be (a False value will only be returned if nearest == True).
 Backwards-Compatibility Break: memory-only tables are now specified with on_disk=True
 instead of bracketing the filename with ':'.  Removed dbf.codepage() and dbf.encoding()
 as users can directly access dbf.default_codepage and dbf.input_decoding.
+
+Backwards-Compatibility Break: .use_deleted no longer used (it disappeared sometime
+between .90.0 and now). Rationale: the deleted flag is just that: a flag.  The record is
+still present and still available.  If you don't want to use it, either check if the
+record has been deleted (dbf.is_deleted(record)) or create an index that doesn't include
+the deleted records... or pack the table and actually remove the records for good.
 
 
 0.94.003

@@ -128,7 +128,7 @@ def combinate(Xs, N):
 def index(sequence):
     "returns integers 0 - len(sequence)"
     for i in xrange(len(sequence)):
-        yield i    
+        yield i
 
 # tests
 def active(rec):
@@ -449,7 +449,7 @@ class Test_Null(unittest.TestCase):
         null |= 1
         self.assertTrue(null is Null)
         value = 1
-        value |= null 
+        value |= null
         self.assertTrue(value is Null)
 
         self.assertTrue(str(divmod(null, 1)) == '(<null>, <null>)')
@@ -460,7 +460,7 @@ class Test_Null(unittest.TestCase):
         null <<=3
         self.assertTrue(null is Null)
         value = 9
-        value <<= null 
+        value <<= null
         self.assertTrue(value is Null)
 
         self.assertTrue(null >> 1 is Null)
@@ -468,7 +468,7 @@ class Test_Null(unittest.TestCase):
         null >>= 3
         self.assertTrue(null is Null)
         value = 9
-        value >>= null 
+        value >>= null
         self.assertTrue(value is Null)
 
         self.assertTrue(-null is Null)
@@ -2196,7 +2196,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != False) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 2)
-            
+
         huh = Quantum(Other)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
@@ -2262,7 +2262,7 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != None) is unknown, True)
         if py_ver >= (2, 5):
             self.assertEqual((0, 1, 2)[huh], 0)
-            
+
         huh = Quantum('No')
         unknown = Quantum('?')
         self.assertEqual(huh, False)
@@ -2957,7 +2957,7 @@ class Test_Dbf_Records(unittest.TestCase):
         for record in table:
             self.assertTrue(type(record.text) is unicode)
             self.assertTrue(type(record.memo) is unicode)
-        
+
         table = Table(':memory:', 'text C(50); memo M', codepage='cp1252', dbf_type='vfp',
             default_data_types=dict(C=Char, M=Char), on_disk=False)
         table.open()
@@ -3485,7 +3485,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table = self.dbf_table
         table.open()
         dbf._debug = True
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -3694,7 +3694,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "basic function tests - len, contains & iterators"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -3838,7 +3838,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "finding, ordering, searching"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -3911,7 +3911,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "scattering and gathering fields, and new()"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -3957,7 +3957,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "renaming fields, __contains__, has_key"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -3981,7 +3981,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "kamikaze"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -4025,7 +4025,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "multiple append"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -4063,7 +4063,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "slices"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -4087,7 +4087,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "reset record"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -4144,7 +4144,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         "from_csv"
         table = self.dbf_table
         table.open()
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist
@@ -4203,7 +4203,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         table = self.dbf_table
         table.open()
         test_record = dbf.scatter(table[5])
-        namelist = self.dbf_namelist 
+        namelist = self.dbf_namelist
         paidlist = self.dbf_paidlist
         qtylist = self.dbf_qtylist
         orderlist = self.dbf_orderlist

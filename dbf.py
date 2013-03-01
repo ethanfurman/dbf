@@ -54,11 +54,9 @@ import codecs
 import collections
 import csv
 import datetime
-import locale
 import os
 import struct
 import sys
-import time
 import weakref
 
 from array import array
@@ -71,7 +69,8 @@ from types import NoneType
 
 py_ver = sys.version_info[:2]
 
-# if bad data in logical fields, return None? (else raise error)
+# Flag for behavior if bad data is encountered in a logical field
+# Return None if True, else raise BadDataError
 LOGICAL_BAD_IS_NONE = True
 
 # treat non-unicode data as ...
@@ -131,7 +130,7 @@ if py_ver < (2, 6):
         def __call__(self, func):
             self.fget = func
             if not self.__doc__:
-                self.__doc__ = fget.__doc__
+                self.__doc__ = self.fget.__doc__
 
         def __get__(self, obj, objtype=None):
             if obj is None:
@@ -183,7 +182,7 @@ else:
 
     SEEK_SET, SEEK_CUR, SEEK_END = os.SEEK_SET, os.SEEK_CUR, os.SEEK_END
 
-
+# collections.defaultdict for <= 2.4
 try:
     from collections import defaultdict
 except ImportError:
@@ -509,7 +508,7 @@ Vapor = Vapor()
 
 class Char(unicode):
     """
-    strips trailing whitespace, and ignores trailing whitespace for comparisons
+    Strips trailing whitespace, and ignores trailing whitespace for comparisons
     """
 
     def __new__(cls, text=''):
@@ -590,7 +589,8 @@ class Date(object):
 
     def __new__(cls, year=None, month=0, day=0):
         """
-        date should be either a datetime.date or date/month/day should all be appropriate integers
+        date should be either a datetime.date or date/month/day should
+        all be appropriate integers
         """
         if year is None or year is Null:
             return cls._null_date
@@ -1185,8 +1185,9 @@ NullTime = Time()
 
 class Logical(object):
     """
-    return type for Logical fields;
-    can take the values of True, False, or None/Null
+    Logical field return type.
+
+    Accepts values of True, False, or None/Null
     """
 
     def __new__(cls, value=None):
@@ -1594,8 +1595,9 @@ Unknown = Logical()
 
 class Quantum(object):
     """
-    return type for Logical fields; implements boolean algebra
-    can take the values of True, False, or None/Null/Unknown/Other
+    Logical field return type that implements boolean algebra
+
+    Accepts values of True/On, False/Off, or None/Null/Unknown/Other
     """
 
     def __new__(cls, value=None):
@@ -1832,7 +1834,7 @@ Other = Quantum()
 
 class _Navigation(object):
     """
-    provides VPFish movement methods
+    Navigation base class that provides VPFish movement methods
     """
 
     _index = -1
@@ -2015,14 +2017,18 @@ class _Navigation(object):
 
 class Record(object):
     """
-    Provides routines to extract and save data within the fields of a dbf record.
+    Provides routines to extract and save data within the fields of a
+    dbf record.
     """
 
-    __slots__ = ('_recnum', '_meta', '_data', '_old_data', '_dirty', '_memos', '_write_to_disk', '__weakref__')
+    __slots__ = ('_recnum', '_meta', '_data', '_old_data', '_dirty',
+                 '_memos', '_write_to_disk', '__weakref__')
 
     def __new__(cls, recnum, layout, kamikaze='', _fromdisk=False):
         """
-        record = ascii array of entire record; layout=record specification; memo = memo object for table
+        record = ascii array of entire record;
+        layout=record specification;
+        memo = memo object for table
         """
         record = object.__new__(cls)
         record._dirty = False
@@ -2400,7 +2406,8 @@ class RecordTemplate(object):
 
     def _commit_flux(self):
         """
-        stores field updates to disk; if any errors restores previous contents and propogates exception
+        Flushes field updates to disk
+        If any errors restores previous contents and raises `DbfError`
         """
         if self._write_to_disk:
             raise DbfError("record not in flux")
@@ -2410,7 +2417,8 @@ class RecordTemplate(object):
 
     def _retrieve_field_value(self, index, name):
         """
-        calls appropriate routine to convert value stored in field from array
+        Calls appropriate routine to convert value stored in field from
+        array
         """
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
@@ -2651,7 +2659,9 @@ class RecordVaporWare(object):
 
     def __new__(cls, position, sequence):
         """
-        record = ascii array of entire record; layout=record specification; memo = memo object for table
+        record = ascii array of entire record
+        layout=record specification
+        memo = memo object for table
         """
         if position not in ('bof', 'eof'):
             raise ValueError("position should be 'bof' or 'eof', not %r" % position)
@@ -2671,7 +2681,7 @@ class RecordVaporWare(object):
 
     def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
-            raise AttributeError, 'Method %s is not implemented.' % name
+            raise AttributeError('Method %s is not implemented.' % name)
         else:
             return Vapor
 
@@ -2730,21 +2740,29 @@ class RecordVaporWare(object):
 class _DbfMemo(object):
     """
     Provides access to memo fields as dictionaries
-    must override _init, _get_memo, and _put_memo to
+    Must override _init, _get_memo, and _put_memo to
     store memo contents to disk
     """
 
     def _init(self):
-        "initialize disk file usage"
+        """
+        Initialize disk file usage
+        """
 
     def _get_memo(self, block):
-        "retrieve memo contents from disk"
+        """
+        Retrieve memo contents from disk
+        """
 
     def _put_memo(self, data):
-        "store memo contents to disk"
+        """
+        Store memo contents to disk
+        """
 
     def _zap(self):
-        "resets memo structure back to zero memos"
+        """
+        Resets memo structure back to zero memos
+        """
         self.memory.clear()
         self.nextmemo = 1
 
@@ -2756,7 +2774,9 @@ class _DbfMemo(object):
         self.meta.newmemofile = False
 
     def get_memo(self, block):
-        "gets the memo in block"
+        """
+        Gets the memo in block
+        """
         if self.meta.ignorememos or not block:
             return ''
         if self.meta.location == ON_DISK:
@@ -2765,7 +2785,9 @@ class _DbfMemo(object):
             return self.memory[block]
 
     def put_memo(self, data):
-        "stores data in memo file, returns block number"
+        """
+        Stores data in memo file, returns block number
+        """
         if self.meta.ignorememos or data == '':
             return 0
         if self.meta.location == IN_MEMORY:
@@ -3045,14 +3067,14 @@ def update_character(string, fielddef, memo, decoder, encoder):
 
 def retrieve_currency(bytes, fielddef, *ignore):
     """
-    returns the currency value in bytes
+    Returns the currency value in bytes
     """
     value = struct.unpack('<q', bytes)[0]
     return fielddef[CLASS](("%de-4" % value).strip())
 
 def update_currency(value, *ignore):
     """
-    returns the value to be stored in the record's disk data
+    Returns the value to be stored in the record's disk data
     """
     if value == None:
         value = 0
@@ -3078,7 +3100,7 @@ def retrieve_date(bytes, fielddef, *ignore):
 
 def update_date(moment, *ignore):
     """
-    returns the Date or datetime.date object ascii-encoded (yyyymmdd)
+    Returns the Date or datetime.date object ascii-encoded (yyyymmdd)
     """
     if moment == None:
         return '        '
@@ -3103,7 +3125,8 @@ def update_double(value, *ignore):
 
 def retrieve_integer(bytes, fielddef, *ignore):
     """
-    Returns the binary number stored in bytes in little-endian format as fielddef[CLASS]
+    Returns the binary number stored in bytes in little-endian
+    format as fielddef[CLASS]
     """
     typ = fielddef[CLASS]
     if typ == 'default':
@@ -3112,7 +3135,7 @@ def retrieve_integer(bytes, fielddef, *ignore):
 
 def update_integer(value, *ignore):
     """
-    returns value in little-endian binary format
+    Returns value in little-endian binary format
     """
     if value == None:
         value = 0
@@ -3126,7 +3149,9 @@ def update_integer(value, *ignore):
 
 def retrieve_logical(bytes, fielddef, *ignore):
     """
-    Returns True if bytes is 't', 'T', 'y', or 'Y', None if '?', and False otherwise
+    Returns True if bytes is 't', 'T', 'y', or 'Y'
+    None if '?'
+    False otherwise
     """
     cls = fielddef[CLASS]
     empty = fielddef[EMPTY]
@@ -3218,7 +3243,8 @@ def retrieve_numeric(bytes, fielddef, *ignore):
 
 def update_numeric(value, fielddef, *ignore):
     """
-    returns value as ascii representation, rounding decimal portion as necessary
+    returns value as ascii representation, rounding decimal
+    portion as necessary
     """
     if value == None:
         return fielddef[LENGTH] * ' '
@@ -3263,8 +3289,9 @@ def retrieve_vfp_datetime(bytes, fielddef, *ignore):
 
 def update_vfp_datetime(moment, *ignore):
     """
-    sets the date/time stored in moment
-    moment must have fields year, month, day, hour, minute, second, microsecond
+    Sets the date/time stored in moment
+    moment must have fields:
+        year, month, day, hour, minute, second, microsecond
     """
     bytes = ['\x00'] * 8
     if moment:
@@ -3527,8 +3554,10 @@ class Tables(object):
 
 class IndexLocation(long):
     """
-    used by Index.index_search -- represents the index where the match criteria
-    is if True, or would be if False
+    Represents the index where the match criteria is if True,
+    or would be if False
+
+    Used by Index.index_search
     """
 
     def __new__(cls, value, found):
@@ -3604,12 +3633,13 @@ class CodePage(tuple):
 
 class Iter(_Navigation):
     """
-    cycles through records in table
+    Provides iterable behavior for a table
     """
 
     def __init__(self, table, include_vapor=False):
         """
-        if include_vapor is True a Vapor record is included as the last record
+        Return a Vapor record as the last record in the iteration
+        if include_vapor is True
         """
         self._table = table
         self._record = None
@@ -3637,7 +3667,7 @@ class Iter(_Navigation):
 
 class Table(_Navigation):
     """
-    Provides a framework for dbf style tables.
+    Base class for dbf style tables
     """
 
     _version = 'basic memory table'
@@ -3722,7 +3752,7 @@ class Table(_Navigation):
 
     class _MetaData(dict):
         """
-        per table values
+        Container class for storing per table metadata
         """
         blankrecord = None
         dfd = None              # file handle
@@ -4076,7 +4106,7 @@ class Table(_Navigation):
 
     def _nav_check(self):
         """
-        raises error if table is closed
+        Raises `DbfError` if table is closed
         """
         if self._meta.status == CLOSED:
             raise DbfError('table %s is closed' % self.filename)

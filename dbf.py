@@ -4,7 +4,7 @@ Copyright
 =========
     - Portions copyright: 2008-2012 Ad-Mail, Inc -- All rights reserved.
     - Author: Ethan Furman
-    - Version: 0.94.004 as of 17 Aug 2012
+    - Version: 0.95.001 as of 28 Feb 2013
     - Portions copyright: 2012 Ethan Furman -- All rights reserved.
     - Contact: ethan@stoneleaf.us
 
@@ -31,7 +31,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 94, 6)
+version = (0, 95, 1)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',

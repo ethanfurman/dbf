@@ -55,6 +55,7 @@ import collections
 import csv
 import datetime
 import os
+import re
 import struct
 import sys
 import weakref
@@ -4269,6 +4270,13 @@ class Table(_Navigation):
             if ext.lower() != '.dbf':
                 meta.filename =  filename + '.dbf'
             meta.memoname = base + self._memoext
+            # Take the first match, assume there aren't multiple memo files that
+            # map to the same case-insensitive filename.
+            dirname, basename = os.path.split(meta.memoname)
+            re_memofile = re.compile(re.escape(basename), re.I)
+            matches = filter(re_memofile.match, os.listdir(dirname or '.'))
+            if matches:
+                meta.memoname = os.path.join(dirname, matches[0])
             meta.location = ON_DISK
         if codepage is not None:
             header.codepage(codepage)

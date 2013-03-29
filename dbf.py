@@ -5511,7 +5511,7 @@ class FpTable(Table):
                     'Class':datetime.date, 'Empty':none, 'flags':('null', ),
                     },
             'M' : {
-                    'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_vfp_memo,
+                    'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: (' '*(x-1))+'0', 'Init':add_vfp_memo,
                     'Class':unicode, 'Empty':unicode, 'flags':('binary', 'nocptrans', 'null', ),
                     },
             'G' : {

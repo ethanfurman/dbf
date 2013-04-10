@@ -2629,16 +2629,37 @@ class RecordTemplate(object):
             self.__setattr__(name, value)
         elif isinstance(name, Integer):
             self.__setattr__(self._meta.fields[name], value)
+        #elif isinstance(name, slice):
+        #    sequence = []
+        #    for field in self._meta.fields[name]:
+        #        sequence.append(field)
+        #    if len(sequence) != len(value):
+        #        raise DbfError("length of slices not equal")
+        #    for field, val in zip(sequence, value):
+        #        self.__setattr__(field, val)
+        #else:
+        #    raise TypeError("%s is not a field name" % name)
         elif isinstance(name, slice):
             sequence = []
+            field_names = dbf.field_names(self)
+            if isinstance(name.start, String) or isinstance(name.stop, String):
+                start, stop, step = name.start, name.stop, name.step
+                if start not in field_names or stop not in field_names:
+                    raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
+                if step is not None and not isinstance(step, Integer):
+                    raise DbfError("step value must be an int or long, not %r" % type(step))
+                start = field_names.index(start)
+                stop = field_names.index(stop) + 1
+                name = slice(start, stop, step)
             for field in self._meta.fields[name]:
                 sequence.append(field)
             if len(sequence) != len(value):
                 raise DbfError("length of slices not equal")
             for field, val in zip(sequence, value):
-                self.__setattr__(field, val)
+                self[field] = val
         else:
             raise TypeError("%s is not a field name" % name)
+
 
     def __repr__(self):
         return self._data.tostring()
@@ -7268,6 +7289,8 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
     """
     reader = csv.reader(codecs.open(csvfile, 'r', encoding='latin-1', errors=errors))
     if field_names:
+        if isinstance(field_names, String):
+            field_names = field_names.split()
         if ' ' not in field_names[0]:
             field_names = ['%s M' % fn for fn in field_names]
     else:

@@ -69,8 +69,10 @@ Custom data types:
 
     Logical  -->  adds Unknown state to bool's: instead of True/False/None,
                   values are Truth, Falsth, and Unknown, with appropriate
-                  tri-state logic; while bool(None) is False, bool(Unknown)
-                  raises a TypeError;  __index__ of Unknown is 2
+                  tri-state logic with one caveat: as a matter of practicality
+                  bool(Falsth) and bool(Unknown) are both False; if you want
+                  bool(Unknown) to raise a TypeError instead, use Quantums.
+                  __index__ of Unknown is 2, Truth is 1, and Falsth is 0.
 
     Quantum  -->  similar to Logical, but implements boolean algebra (I think)
 

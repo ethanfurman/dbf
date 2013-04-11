@@ -11,7 +11,7 @@ import traceback
 
 py_ver = sys.version_info[:2]
 
-if dbf.version != (0, 95, 1):
+if dbf.version != (0, 95, 3):
     raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
 else:
     print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (

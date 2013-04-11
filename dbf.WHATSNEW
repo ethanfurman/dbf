@@ -1,6 +1,14 @@
 What's New
 ==========
 
+0.95.003
+--------
+
+Fixed issue with incorrect memo size in base file (thanks, Glenn!)
+
+Memo file extensions now have the same casing as the dbf file's, and are
+searched for that way (thanks again, Glenn!)
+
 0.95.002
 --------
 

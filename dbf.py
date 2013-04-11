@@ -31,7 +31,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 1)
+version = (0, 95, 3)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -55,7 +55,6 @@ import collections
 import csv
 import datetime
 import os
-import re
 import struct
 import sys
 import weakref
@@ -64,6 +63,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 import decimal
 from decimal import Decimal
+from glob import glob
 from math import floor
 import types
 from types import NoneType
@@ -470,8 +470,6 @@ class NullType(object):
             raise TypeError("unhashable type: 'Null'")
 
     def __new__(cls, *args):
-        if args:
-            print args
         return cls.null
 
     def __nonzero__(self):
@@ -4289,15 +4287,23 @@ class Table(_Navigation):
         else:
             base, ext = os.path.splitext(filename)
             if ext.lower() != '.dbf':
-                meta.filename =  filename + '.dbf'
-            meta.memoname = base + self._memoext
-            # Take the first match, assume there aren't multiple memo files that
-            # map to the same case-insensitive filename.
-            dirname, basename = os.path.split(meta.memoname)
-            re_memofile = re.compile(re.escape(basename), re.I)
-            matches = filter(re_memofile.match, os.listdir(dirname or '.'))
-            if matches:
-                meta.memoname = os.path.join(dirname, matches[0])
+                meta.filename = filename + '.dbf'
+                searchname = filename + '.[Db][Bb][Ff]'
+            else:
+                meta.filename = filename
+                searchname = filename
+            matches = glob(searchname)
+            if len(matches) == 1:
+                meta.filename = matches[0]
+            elif matches:
+                raise DbfError("please specify exactly which of %r you want" % (matches, ))
+            case = [('l','u')[c.isupper()] for c in meta.filename[-4:]]
+            if case == ['l','l','l','l']:
+                meta.memoname = base + self._memoext.lower()
+            elif case == ['l','u','u','u']:
+                meta.memoname = base + self._memoext.upper()
+            else:
+                meta.memoname = base + ''.join([c.lower() if case[i] == 'l' else c.upper() for i, c in enumerate(self._memoext)])
             meta.location = ON_DISK
         if codepage is not None:
             header.codepage(codepage)
@@ -4399,7 +4405,7 @@ class Table(_Navigation):
         else:
             base, ext = os.path.splitext(filename)
             if ext.lower() != '.dbf':
-                filename =  filename + '.dbf'
+                filename = filename + '.dbf'
             possibles = guess_table_type(filename)
             if len(possibles) == 1:
                 return object.__new__(possibles[0][2])
@@ -5532,15 +5538,15 @@ class FpTable(Table):
                     'Class':datetime.date, 'Empty':none, 'flags':('null', ),
                     },
             'M' : {
-                    'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: (' '*(x-1))+'0', 'Init':add_vfp_memo,
+                    'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '          ', 'Init':add_memo,
                     'Class':unicode, 'Empty':unicode, 'flags':('binary', 'nocptrans', 'null', ),
                     },
             'G' : {
-                    'Type':'General', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_vfp_memo,
+                    'Type':'General', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '          ', 'Init':add_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             'P' : {
-                    'Type':'Picture', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '\x00\x00\x00\x00', 'Init':add_vfp_memo,
+                    'Type':'Picture', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: '          ', 'Init':add_memo,
                     'Class':bytes, 'Empty':bytes, 'flags':('null', ),
                     },
             '0' : {
@@ -7241,7 +7247,12 @@ def table_type(filename):
     """
     base, ext = os.path.splitext(filename)
     if ext == '':
-        filename = base + '.dbf'
+        filename = base + '.[Dd][Bb][Ff]'
+        matches = glob(filename)
+        if matches:
+            filename = matches[0]
+        else:
+            filename = base + '.dbf'
     if not os.path.exists(filename):
         raise DbfError('File %s not found' % filename)
     fd = open(filename)

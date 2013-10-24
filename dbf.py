@@ -3,9 +3,8 @@
 Copyright
 =========
     - Portions copyright: 2008-2012 Ad-Mail, Inc -- All rights reserved.
+    - Portions copyright: 2012-2013 Ethan Furman -- All rights reserved.
     - Author: Ethan Furman
-    - Version: 0.95.001 as of 28 Feb 2013
-    - Portions copyright: 2012 Ethan Furman -- All rights reserved.
     - Contact: ethan@stoneleaf.us
 
 Redistribution and use in source and binary forms, with or without
@@ -19,19 +18,19 @@ modification, are permitted provided that the following conditions are met:
       names of its contributors may be used to endorse or promote products
       derived from this software without specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY Ad-Mail, Inc ''AS IS'' AND ANY
-EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL Ad-Mail, Inc BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+THIS SOFTWARE IS PROVIDED ''AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
+OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 3)
+version = (0, 95, 6)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -63,6 +62,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 import decimal
 from decimal import Decimal
+from enum import Enum, IntEnum
 from glob import glob
 from math import floor
 import types
@@ -95,6 +95,145 @@ _Template_Records = dict()
 
 Integer = int, long
 String = str, unicode
+
+# dec jan feb mar apr may jun jul aug sep oct nov dec jan
+days_per_month = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
+days_per_leap_month = [31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
+
+class IsoDay(IntEnum):
+    MONDAY = 1
+    TUESDAY = 2
+    WEDNESDAY = 3
+    THURSDAY = 4
+    FRIDAY = 5
+    SATURDAY = 6
+    SUNDAY = 7
+
+    def next_delta(self, day):
+        """Return number of days needed to get from self to day."""
+        if self == day:
+            return 7
+        delta = day - self
+        if delta < 0:
+            delta += 7
+        return delta
+
+    def last_delta(self, day):
+        """Return number of days needed to get from self to day."""
+        if self == day:
+            return -7
+        delta = day - self
+        if delta > 0:
+            delta -= 7
+        return delta
+
+class RelativeDay(Enum):
+    LAST_SUNDAY = ()
+    LAST_SATURDAY = ()
+    LAST_FRIDAY = ()
+    LAST_THURSDAY = ()
+    LAST_WEDNESDAY = ()
+    LAST_TUESDAY = ()
+    LAST_MONDAY = ()
+    NEXT_MONDAY = ()
+    NEXT_TUESDAY = ()
+    NEXT_WEDNESDAY = ()
+    NEXT_THURSDAY = ()
+    NEXT_FRIDAY = ()
+    NEXT_SATURDAY = ()
+    NEXT_SUNDAY = ()
+
+    def __new__(cls):
+        result = object.__new__(cls)
+        result._value = len(cls.__members__) + 1
+        return result
+
+    def days_from(self, day):
+        target = IsoDay[self.name[5:]]
+        if self.name[:4] == 'LAST':
+            return day.last_delta(target)
+        return day.next_delta(target)
+globals().update(RelativeDay.__members__)
+
+class IsoMonth(IntEnum):
+    JANUARY = 1
+    FEBRUARY = 2
+    MARCH = 3
+    APRIL = 4
+    MAY = 5
+    JUNE = 6
+    JULY = 7
+    AUGUST = 8
+    SEPTEMBER = 9
+    OCTOBER = 10
+    NOVEMBER = 11
+    DECEMBER = 12
+
+    def next_delta(self, month):
+        """Return number of months needed to get from self to month."""
+        if self == month:
+            return 12
+        delta = month - self
+        if delta < 0:
+            delta += 12
+        return delta
+
+    def last_delta(self, month):
+        """Return number of months needed to get from self to month."""
+        if self == month:
+            return -12
+        delta = month - self
+        if delta > 0:
+            delta -= 12
+        return delta
+
+class RelativeMonth(Enum):
+    LAST_DECEMBER = ()
+    LAST_NOVEMBER = ()
+    LAST_OCTOBER = ()
+    LAST_SEPTEMBER = ()
+    LAST_AUGUST = ()
+    LAST_JULY = ()
+    LAST_JUNE = ()
+    LAST_MAY = ()
+    LAST_APRIL = ()
+    LAST_MARCH= ()
+    LAST_FEBRUARY = ()
+    LAST_JANUARY = ()
+    NEXT_JANUARY = ()
+    NEXT_FEBRUARY = ()
+    NEXT_MARCH = ()
+    NEXT_APRIL = ()
+    NEXT_MAY = ()
+    NEXT_JUNE = ()
+    NEXT_JULY = ()
+    NEXT_AUGUST = ()
+    NEXT_SEPTEMBER = ()
+    NEXT_OCTOBER = ()
+    NEXT_NOVEMBER = ()
+    NEXT_DECEMBER = ()
+
+    def __new__(cls):
+        result = object.__new__(cls)
+        result._value = len(cls.__members__) + 1
+        return result
+
+    def months_from(self, month):
+        target = IsoMonth[self.name[5:]]
+        if self.name[:4] == 'LAST':
+            return month.last_delta(target)
+        return month.next_delta(target)
+globals().update(RelativeMonth.__members__)
+
+def is_leapyear(year):
+    if year % 400 == 0:
+        return True
+    elif year % 100 == 0:
+        return False
+    elif year % 4 == 0:
+        return True
+    else:
+        return False
 
 # 2.7 constructs
 if py_ver < (2, 7):
@@ -131,7 +270,7 @@ if py_ver < (2, 6):
         def __call__(self, func):
             self.fget = func
             if not self.__doc__:
-                self.__doc__ = self.fget.__doc__
+                self.__doc__ = func.__doc__
 
         def __get__(self, obj, objtype=None):
             if obj is None:
@@ -578,7 +717,6 @@ class Char(unicode):
         result.field_size = self.field_size
         return result
 
-
 class Date(object):
     """
     adds null capable datetime.date constructs
@@ -616,6 +754,11 @@ class Date(object):
         if isinstance(other, type(None)):
             return self._date is None
         return NotImplemented
+
+    def __format__(self, spec):
+        if self:
+            return self._date.__format__(spec)
+        return ''
 
     def __getattr__(self, name):
         return self._date.__getattribute__(name)
@@ -749,6 +892,42 @@ class Date(object):
             return cls()
         return cls(datetime.date(int(yyyymmdd[:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:])))
 
+    def replace(self, year=None, month=None, day=None, delta_year=0, delta_month=0, delta_day=0):
+        if not self:
+            return self.__class__._null_date
+        old_year, old_month, old_day = self.timetuple()[:3]
+        if isinstance(month, RelativeMonth):
+            this_month = IsoMonth(old_month)
+            delta_month += month.months_from(this_month)
+            month = None
+        if isinstance(day, RelativeDay):
+            this_day = IsoDay(self.isoweekday())
+            delta_day += day.days_from(this_day)
+            day = None
+        year = (year or old_year) + delta_year
+        month = (month or old_month) + delta_month
+        day = (day or old_day) + delta_day
+        days_in_month = (days_per_month, days_per_leap_month)[is_leapyear(year)]
+        while not(0 < month < 13) or not (0 < day <= days_in_month[month]):
+            while month < 1:
+                year -= 1
+                month = 12 + month
+            while month > 12:
+                year += 1
+                month = month - 12
+            days_in_month = (days_per_month, days_per_leap_month)[is_leapyear(year)]
+            while day < 1:
+                month -= 1
+                day = days_in_month[month] + day
+                if not 0 < month < 13:
+                    break
+            while day > days_in_month[month]:
+                day = day - days_in_month[month]
+                month += 1
+                if not 0 < month < 13:
+                    break
+        return Date(year, month, day)
+
     def strftime(self, format):
         if self:
             return self._date.strftime(format)
@@ -808,6 +987,11 @@ class DateTime(object):
         if isinstance(other, type(None)):
             return self._datetime is None
         return NotImplemented
+
+    def __format__(self, spec):
+        if self:
+            return self._datetime.__format__(spec)
+        return ''
 
     def __getattr__(self, name):
         if self:
@@ -973,6 +1157,70 @@ class DateTime(object):
     def now(cls):
         return cls(datetime.datetime.now())
 
+    def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None,
+              delta_year=0, delta_month=0, delta_day=0, delta_hour=0, delta_minute=0, delta_second=0):
+        if not self:
+            return self.__class__._null_datetime
+        old_year, old_month, old_day, old_hour, old_minute, old_second, old_micro = self.timetuple()[:7]
+        if isinstance(month, RelativeMonth):
+            this_month = IsoMonth(old_month)
+            delta_month += month.months_from(this_month)
+            month = None
+        if isinstance(day, RelativeDay):
+            this_day = IsoDay(self.isoweekday())
+            delta_day += day.days_from(this_day)
+            day = None
+        year = (year or old_year) + delta_year
+        month = (month or old_month) + delta_month
+        day = (day or old_day) + delta_day
+        hour = (hour or old_hour) + delta_hour
+        minute = (minute or old_minute) + delta_minute
+        second = (second or old_second) + delta_second
+        microsecond = microsecond or old_micro
+        days_in_month = (days_per_month, days_per_leap_month)[is_leapyear(year)]
+        while ( not (0 < month < 13)
+        or      not (0 < day <= days_in_month[month])
+        or      not (0 <= hour < 24)
+        or      not (0 <= minute < 60)
+        or      not (0 <= second < 60)
+        ):
+            while month < 1:
+                year -= 1
+                month = 12 + month
+            while month > 12:
+                year += 1
+                month = month - 12
+            days_in_month = (days_per_month, days_per_leap_month)[is_leapyear(year)]
+            while day < 1:
+                month -= 1
+                day = days_in_month[month] + day
+                if not 0 < month < 13:
+                    break
+            while day > days_in_month[month]:
+                day = day - days_in_month[month]
+                month += 1
+                if not 0 < month < 13:
+                    break
+            while hour < 1:
+                day -= 1
+                hour = 24 + hour
+            while hour > 23:
+                day += 1
+                hour = hour - 24
+            while minute < 0:
+                hour -= 1
+                minute = 60 + minute
+            while minute > 59:
+                hour += 1
+                minute = minute - 60
+            while second < 0:
+                minute -= 1
+                second = 60 + second
+            while second > 59:
+                minute += 1
+                second = second - 60
+        return DateTime(year, month, day, hour, minute, second, microsecond)
+
     def time(self):
         if self:
             return Time(self.hour, self.minute, self.second, self.microsecond)
@@ -1034,6 +1282,11 @@ class Time(object):
         if isinstance(other, type(None)):
             return self._time is None
         return NotImplemented
+
+    def __format__(self, spec):
+        if self:
+            return self._time.__format__(spec)
+        return ''
 
     def __getattr__(self, name):
         if self:
@@ -1174,6 +1427,38 @@ class Time(object):
     @staticmethod
     def now():
         return DateTime.now().time()
+
+    def replace(self, hour=None, minute=None, second=None, microsecond= None, delta_hour=0, delta_minute=0, delta_second=0):
+        if not self:
+            return self.__class__._null_time
+        old_hour, old_minute, old_second, old_micro = self.hour, self.minute, self.second, self.microsecond
+        hour = (hour or old_hour) + delta_hour
+        minute = (minute or old_minute) + delta_minute
+        second = (second or old_second) + delta_second
+        microsecond = microsecond or old_micro
+        while not (0 <= hour < 24) or not (0 <= minute < 60) or not (0 <= second < 60):
+            while second < 0:
+                minute -= 1
+                second = 60 + second
+            while second > 59:
+                minute += 1
+                second = second - 60
+            while minute < 0:
+                hour -= 1
+                minute = 60 + minute
+            while minute > 59:
+                hour += 1
+                minute = minute - 60
+            while hour < 1:
+                hour = 24 + hour
+            while hour > 23:
+                hour = hour - 24
+        return Time(hour, minute, second, microsecond)
+
+    def time(self):
+        if self:
+            self._time
+        return None
 
 Time.max = Time(datetime.time.max)
 Time.min = Time(datetime.time.min)
@@ -2628,16 +2913,6 @@ class RecordTemplate(object):
             self.__setattr__(name, value)
         elif isinstance(name, Integer):
             self.__setattr__(self._meta.fields[name], value)
-        #elif isinstance(name, slice):
-        #    sequence = []
-        #    for field in self._meta.fields[name]:
-        #        sequence.append(field)
-        #    if len(sequence) != len(value):
-        #        raise DbfError("length of slices not equal")
-        #    for field, val in zip(sequence, value):
-        #        self.__setattr__(field, val)
-        #else:
-        #    raise TypeError("%s is not a field name" % name)
         elif isinstance(name, slice):
             sequence = []
             field_names = dbf.field_names(self)
@@ -3548,7 +3823,7 @@ def ezip(*iters):
 
 class Tables(object):
     """
-    context manager for multiple tables
+    context manager for multiple tables and/or indices
     """
     def __init__(yo, *tables):
         if len(tables) == 1 and not isinstance(tables[0], (Table, str, unicode)):
@@ -3723,7 +3998,9 @@ class Table(_Navigation):
                         'Class':'default', 'Empty':none, 'flags':tuple(),
                         },
                 }
-
+    @MutableDefault
+    def _previous_status():
+        return []
     _memoext = ''
     _memoClass = _DbfMemo
     _yesMemoMask = ''
@@ -4182,12 +4459,12 @@ class Table(_Navigation):
         return False
 
     def __enter__(self):
-        self._previous_status = self._meta.status
+        self._previous_status.append(self._meta.status)
         self.open()
         return self
 
     def __exit__(self, *exc_info):
-        if self._previous_status == CLOSED:
+        if self._previous_status.pop() == CLOSED:
             self.close()
 
     def __getattr__(self, name):
@@ -6183,6 +6460,7 @@ class Index(_Navigation):
         self._records = {}            # record numbers:values
         self.__doc__ = key.__doc__ or 'unknown'
         self._key = key
+        self._previous_status = []
         for record in table:
             value = key(record)
             if value is DoNotIndex:
@@ -6250,7 +6528,7 @@ class Index(_Navigation):
                 result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
             return result
         elif isinstance (key, (str, unicode, tuple, Record, RecordTemplate)):
-            if isinstance(key, Record, RecordTemplate):
+            if isinstance(key, (Record, RecordTemplate)):
                 key = self.key(key)
             elif isinstance(key, String):
                 key = (key, )
@@ -6258,7 +6536,7 @@ class Index(_Navigation):
             hi = self._search(key, where='right')
             if lo == hi:
                 raise NotFoundError(key)
-            result = List(desc='match = %r' % key)
+            result = List(desc='match = %r' % (key, ))
             for loc in range(lo, hi):
                 record = self._table[self._rec_by_val[loc]]
                 result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
@@ -6267,11 +6545,11 @@ class Index(_Navigation):
             raise TypeError('indices must be integers, match objects must by strings or tuples')
 
     def __enter__(self):
-        self._table.open()
+        self._table.__enter__()
         return self
 
     def __exit__(self, *exc_info):
-        self._table.close()
+        self._table.__exit__()
         return False
 
     def __iter__(self):

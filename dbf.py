@@ -1424,6 +1424,23 @@ class Time(object):
         else:
             return NotImplemented
 
+    @classmethod
+    def fromfloat(cls, num):
+        "2.5 == 2 hours, 30 minutes"
+        if num < 0:
+            raise ValueError("positive value required (got %r)" % num)
+        if num == 0:
+            return Time()
+        hours = int(floor(num))
+        remainder = num % hours
+        minutes = int(floor(remainder * 60))
+        if minutes == 0:
+            seconds = 0
+        else:
+            remainder = remainder * 60 % minutes
+            seconds = int(floor(remainder * 60))
+        return Time(hours, minutes, seconds)
+
     @staticmethod
     def now():
         return DateTime.now().time()
@@ -1457,7 +1474,7 @@ class Time(object):
 
     def time(self):
         if self:
-            self._time
+            return self._time
         return None
 
 Time.max = Time(datetime.time.max)
@@ -4395,7 +4412,7 @@ class Table(_Navigation):
         if specs is None:
             specs = self.field_names
         elif isinstance(specs, str):
-            specs = specs.split(sep)
+            specs = specs.strip(sep).split(sep)
         else:
             specs = list(specs)
         specs = [s.strip() for s in specs]

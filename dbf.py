@@ -30,7 +30,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 6)
+version = (0, 95, 7)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -40,7 +40,7 @@ __all__ = (
         'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
         'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
         'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
-        'NullDate', 'NullDateTime', 'NullTime', 'Vapor',
+        'NullDate', 'NullDateTime', 'NullTime', 'Vapor', 'Period',
         'Process', 'Templates',
         'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal', 'IndexLocation',
         'guess_table_type', 'table_type',
@@ -1426,20 +1426,31 @@ class Time(object):
 
     @classmethod
     def fromfloat(cls, num):
-        "2.5 == 2 hours, 30 minutes"
+        "2.5 == 2 hours, 30 minutes, 0 seconds, 0 microseconds"
         if num < 0:
             raise ValueError("positive value required (got %r)" % num)
         if num == 0:
             return Time()
-        hours = int(floor(num))
-        remainder = num % hours
-        minutes = int(floor(remainder * 60))
-        if minutes == 0:
-            seconds = 0
+        print num
+        hours = int(num)
+        print num, hours
+        if hours:
+            num = num % hours
+        minutes = int(num * 60)
+        print num, hours, minutes
+        if minutes:
+            num = num * 60 % minutes
         else:
-            remainder = remainder * 60 % minutes
-            seconds = int(floor(remainder * 60))
-        return Time(hours, minutes, seconds)
+            num = num * 60
+        seconds = int(num * 60)
+        print num, hours, minutes, seconds
+        if seconds:
+            num = num * 60 % seconds
+        else:
+            num = num * 60
+        microseconds = int(num * 1000)
+        print num, hours, minutes, seconds, microseconds
+        return Time(hours, minutes, seconds, microseconds)
 
     @staticmethod
     def now():
@@ -1477,11 +1488,47 @@ class Time(object):
             return self._time
         return None
 
+    def tofloat(self):
+        "returns Time as a float"
+        hour = self.hour
+        minute = self.minute * (1.0 / 60)
+        second = self.second * (1.0 / 3600)
+        microsecond = self.microsecond * (1.0 / 3600000)
+        return hour + minute + second + microsecond
+
 Time.max = Time(datetime.time.max)
 Time.min = Time(datetime.time.min)
 Time._null_time = object.__new__(Time)
 Time._null_time._time = None
 NullTime = Time()
+
+
+class Period(object):
+    "for matching various time ranges"
+
+    def __init__(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None):
+        params = vars()
+        self._mask = {}
+        for attr in ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond'):
+            value = params[attr]
+            if value is not None:
+                self._mask[attr] = value
+
+    def __contains__(self, other):
+        if not self._mask:
+            return True
+        for attr, value in self._mask.items():
+            other_value = getattr(other, attr, None)
+            if other_value != value:
+                return False
+        return True
+
+    def __repr__(self):
+        items = []
+        for attr in ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond'):
+            if attr in self._mask:
+                items.append('%s=%s' % (attr, self._mask[attr]))
+        return "Period(%s)" % ', '.join(items)
 
 
 class Logical(object):
@@ -7781,7 +7828,7 @@ fake_module('api',
     'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time',
     'Logical', 'Quantum', 'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
     'recno', 'source_table', 'reset', 'scatter', 'undelete',
-    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor',
+    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor', 'Period',
     'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
     'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
     'FieldSpecError', 'NonUnicodeError', 'NotFoundError',

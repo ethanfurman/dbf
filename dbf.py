@@ -1105,7 +1105,7 @@ class DateTime(object):
 
     def __repr__(self):
         if self:
-            return "DateTime(%d, %d, %d, %d, %d, %d, %d)" % (
+            return "DateTime(%5d, %2d, %2d, %2d, %2d, %2d, %2d)" % (
                 self._datetime.timetuple()[:6] + (self._datetime.microsecond, )
                 )
         else:
@@ -1113,7 +1113,9 @@ class DateTime(object):
 
     def __str__(self):
         if self:
-            return self.isoformat()
+            return "%4d-%2d-%2d %2d:%2d:%2d.%2d)" % (
+                self._datetime.timetuple()[:6] + (self._datetime.microsecond, )
+                )
         return ""
 
     def __sub__(self, other):
@@ -1519,8 +1521,12 @@ class Period(object):
             return True
         for attr, value in self._mask.items():
             other_value = getattr(other, attr, None)
-            if other_value != value:
-                return False
+            try:
+                if other_value == value or other_value in value:
+                    continue
+            except TypeError:
+                pass
+            return False
         return True
 
     def __repr__(self):
@@ -4611,6 +4617,14 @@ class Table(_Navigation):
         header.extra = self._dbfTableHeaderExtra
         if default_data_types is None:
             default_data_types = dict()
+        elif default_data_types == 'enhanced':
+            default_data_types = {
+                    'C' : dbf.Char,
+                    'L' : dbf.Logical,
+                    'D' : dbf.Date,
+                    'T' : dbf.DateTime,
+                    }
+            
         self._meta._default_data_types = default_data_types
         if field_data_types is None:
             field_data_types = dict()

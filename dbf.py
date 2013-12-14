@@ -30,7 +30,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 7)
+version = (0, 95, 8)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -732,7 +732,9 @@ class Date(object):
         if year is None or year is Null:
             return cls._null_date
         nd = object.__new__(cls)
-        if isinstance(year, (datetime.date)):
+        if isinstance(year, String):
+            return Date.strptime(year)
+        elif isinstance(year, (datetime.date)):
             nd._date = year
         elif isinstance(year, (Date)):
             nd._date = year._date
@@ -761,7 +763,12 @@ class Date(object):
         return ''
 
     def __getattr__(self, name):
-        return self._date.__getattribute__(name)
+        if name == '_date':
+            raise AttributeError('_date missing!')
+        elif self:
+            return getattr(self._date, name)
+        else:
+            raise AttributeError('NullDate object has no attribute %s' % name)
 
     def __ge__(self, other):
         if isinstance(other, (datetime.date)):
@@ -836,7 +843,7 @@ class Date(object):
         return NotImplemented
 
     def __nonzero__(self):
-        return bool(self._date)
+        return self._date is not None
 
     __radd__ = __add__
 
@@ -858,7 +865,7 @@ class Date(object):
 
     def __str__(self):
         if self:
-            return self.isoformat()
+            return str(self._date)
         return ""
 
     def __sub__(self, other):
@@ -934,6 +941,12 @@ class Date(object):
         return ''
 
     @classmethod
+    def strptime(cls, date_string, format=None):
+        if format is not None:
+            return cls(datetime.date.strptime(date_string, format))
+        return cls(datetime.date.strptime(date_string, "%Y-%m-%d"))
+
+    @classmethod
     def today(cls):
         return cls(datetime.date.today())
 
@@ -962,11 +975,11 @@ class DateTime(object):
         if year is None or year is Null:
             return cls._null_datetime
         ndt = object.__new__(cls)
-        if isinstance(year, (datetime.datetime)):
-            microsec = year.microsecond
-            hour, minute, second = year.hour, year.minute, year.second
-            year, month, day = year.year, year.month, year.day
-        if isinstance(year, (DateTime)):
+        if isinstance(year, String):
+            return DateTime.strptime(year)
+        elif isinstance(year, (datetime.datetime)):
+            ndt._datetime = year
+        elif isinstance(year, (DateTime)):
             ndt._datetime = year._datetime
         elif year is not None:
             microsec = microsec // 1000 * 1000
@@ -994,11 +1007,12 @@ class DateTime(object):
         return ''
 
     def __getattr__(self, name):
-        if self:
-            attribute = self._datetime.__getattribute__(name)
-            return attribute
+        if name == '_datetime':
+            raise AttributeError('_datetime missing!')
+        elif self:
+            return getattr(self._datetime, name)
         else:
-            raise AttributeError('null DateTime object has no attribute %s' % name)
+            raise AttributeError('NullDateTime object has no attribute %s' % name)
 
     def __ge__(self, other):
         if self:
@@ -1089,7 +1103,7 @@ class DateTime(object):
         return NotImplemented
 
     def __nonzero__(self):
-        return bool(self._datetime)
+        return self._datetime is not None
 
     __radd__ = __add__
 
@@ -1113,9 +1127,7 @@ class DateTime(object):
 
     def __str__(self):
         if self:
-            return "%4d-%2d-%2d %2d:%2d:%2d.%2d)" % (
-                self._datetime.timetuple()[:6] + (self._datetime.microsecond, )
-                )
+            return str(self._datetime)
         return ""
 
     def __sub__(self, other):
@@ -1223,6 +1235,20 @@ class DateTime(object):
                 second = second - 60
         return DateTime(year, month, day, hour, minute, second, microsecond)
 
+    def strftime(self, format):
+        if self:
+            return self._datetime.strftime(format)
+        return ''
+
+    @classmethod
+    def strptime(cls, datetime_string, format=None):
+        if format is not None:
+            return cls(datetime.datetime.strptime(datetime_string, format))
+        try:
+            return cls(datetime.datetime.strptime(datetime_string, "%Y-%m-%d %H:%M:%S.%f"))
+        except ValueError:
+            return cls(datetime.datetime.strptime(datetime_string, "%Y-%m-%d %H:%M:%S"))
+
     def time(self):
         if self:
             return Time(self.hour, self.minute, self.second, self.microsecond)
@@ -1252,15 +1278,17 @@ class Time(object):
 
     def __new__(cls, hour=None, minute=0, second=0, microsec=0):
         """
-        hour may be a datetime.time
+        hour may be a datetime.time or a str(Time)
         """
         if hour is None or hour is Null:
             return cls._null_time
         nt = object.__new__(cls)
-        if isinstance(hour, (datetime.time)):
+        if isinstance(hour, String):
+            return Time.strptime(hour)
+        elif isinstance(hour, (datetime.time)):
             microsec = hour.microsecond
             hour, minute, second = hour.hour, hour.minute, hour.second
-        if isinstance(hour, (Time)):
+        elif isinstance(hour, (Time)):
             nt._time = hour._time
         elif hour is not None:
             microsec = microsec // 1000 * 1000
@@ -1291,11 +1319,12 @@ class Time(object):
         return ''
 
     def __getattr__(self, name):
-        if self:
-            attribute = self._time.__getattribute__(name)
-            return attribute
+        if name == '_time':
+            raise AttributeError('_time missing!')
+        elif self:
+            return getattr(self._time, name)
         else:
-            raise AttributeError('null Time object has no attribute %s' % name)
+            raise AttributeError('NullTime object has no attribute %s' % name)
 
     def __ge__(self, other):
         if self:
@@ -1386,7 +1415,7 @@ class Time(object):
         return NotImplemented
 
     def __nonzero__(self):
-        return bool(self._time)
+        return self._time is not None
 
     __radd__ = __add__
 
@@ -1408,7 +1437,7 @@ class Time(object):
 
     def __str__(self):
         if self:
-            return self.isoformat()
+            return str(self._time)
         return ""
 
     def __sub__(self, other):
@@ -1416,8 +1445,7 @@ class Time(object):
             t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
             o = datetime.datetime(2012, 6, 27, other.hour, other.minute, other.second, other.microsecond)
-            t -= other
-            return Time(t.hour, t.minute, t.second, t.microsecond)
+            return t - o
         elif self and isinstance(other, (datetime.timedelta)):
             t = self._time
             t = datetime.datetime(2012, 6, 27, t.hour, t.minute, t.second, t.microsecond)
@@ -1484,6 +1512,20 @@ class Time(object):
             while hour > 23:
                 hour = hour - 24
         return Time(hour, minute, second, microsecond)
+
+    def strftime(self, format):
+        if self:
+            return self._time.strftime(format)
+        return ''
+
+    @classmethod
+    def strptime(cls, time_string, format=None):
+        if format is not None:
+            return cls(datetime.time.strptime(time_string, format))
+        try:
+            return cls(datetime.time.strptime(time_string, "%H:%M:%S.%f"))
+        except ValueError:
+            return cls(datetime.time.strptime(time_string, "%H:%M:%S"))
 
     def time(self):
         if self:
@@ -7851,3 +7893,5 @@ fake_module('api',
     ).register()
 
 dbf = fake_module('dbf', *__all__)
+
+

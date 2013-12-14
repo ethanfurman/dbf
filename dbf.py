@@ -56,6 +56,7 @@ import datetime
 import os
 import struct
 import sys
+import time
 import weakref
 
 from array import array
@@ -943,8 +944,8 @@ class Date(object):
     @classmethod
     def strptime(cls, date_string, format=None):
         if format is not None:
-            return cls(datetime.date.strptime(date_string, format))
-        return cls(datetime.date.strptime(date_string, "%Y-%m-%d"))
+            return cls(*(time.strptime(date_string, format)[0:3]))
+        return cls(*(time.strptime(date_string, "%Y-%m-%d")[0:3]))
 
     @classmethod
     def today(cls):
@@ -1460,26 +1461,21 @@ class Time(object):
         if num < 0:
             raise ValueError("positive value required (got %r)" % num)
         if num == 0:
-            return Time()
-        print num
+            return Time(0)
         hours = int(num)
-        print num, hours
         if hours:
             num = num % hours
         minutes = int(num * 60)
-        print num, hours, minutes
         if minutes:
             num = num * 60 % minutes
         else:
             num = num * 60
         seconds = int(num * 60)
-        print num, hours, minutes, seconds
         if seconds:
             num = num * 60 % seconds
         else:
             num = num * 60
         microseconds = int(num * 1000)
-        print num, hours, minutes, seconds, microseconds
         return Time(hours, minutes, seconds, microseconds)
 
     @staticmethod

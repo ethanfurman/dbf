@@ -2,8 +2,9 @@
 =========
 Copyright
 =========
+
     - Portions copyright: 2008-2012 Ad-Mail, Inc -- All rights reserved.
-    - Portions copyright: 2012-2013 Ethan Furman -- All rights reserved.
+    - Portions copyright: 2012-2014 Ethan Furman -- All rights reserved.
     - Author: Ethan Furman
     - Contact: ethan@stoneleaf.us
 
@@ -30,7 +31,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 8)
+version = (0, 95, 11)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -937,9 +938,10 @@ class Date(object):
         return Date(year, month, day)
 
     def strftime(self, format):
+        fmt_cls = type(format)
         if self:
-            return self._date.strftime(format)
-        return ''
+            return fmt_cls(self._date.strftime(format))
+        return fmt_cls('')
 
     @classmethod
     def strptime(cls, date_string, format=None):
@@ -1237,18 +1239,24 @@ class DateTime(object):
         return DateTime(year, month, day, hour, minute, second, microsecond)
 
     def strftime(self, format):
+        fmt_cls = type(format)
         if self:
-            return self._datetime.strftime(format)
-        return ''
+            return fmt_cls(self._datetime.strftime(format))
+        return fmt_cls('')
 
     @classmethod
     def strptime(cls, datetime_string, format=None):
         if format is not None:
             return cls(datetime.datetime.strptime(datetime_string, format))
-        try:
-            return cls(datetime.datetime.strptime(datetime_string, "%Y-%m-%d %H:%M:%S.%f"))
-        except ValueError:
-            return cls(datetime.datetime.strptime(datetime_string, "%Y-%m-%d %H:%M:%S"))
+        for format in (
+                "%Y-%m-%d %H:%M:%S.%f",
+                "%Y-%m-%d %H:%M:%S",
+                ):
+            try:
+                return cls(datetime.datetime.strptime(datetime_string, format))
+            except ValueError:
+                pass
+        raise ValueError("Unable to convert %r" % datetime_string)
 
     def time(self):
         if self:
@@ -1510,18 +1518,24 @@ class Time(object):
         return Time(hour, minute, second, microsecond)
 
     def strftime(self, format):
+        fmt_cls = type(format)
         if self:
-            return self._time.strftime(format)
-        return ''
+            return fmt_cls(self._time.strftime(format))
+        return fmt_cls('')
 
     @classmethod
     def strptime(cls, time_string, format=None):
         if format is not None:
             return cls(datetime.time.strptime(time_string, format))
-        try:
-            return cls(datetime.time.strptime(time_string, "%H:%M:%S.%f"))
-        except ValueError:
-            return cls(datetime.time.strptime(time_string, "%H:%M:%S"))
+        for format in (
+                "%H:%M:%S.%f",
+                "%H:%M:%S",
+                ):
+            try:
+                return cls(datetime.datetime.strptime(datetime_string, format))
+            except ValueError:
+                pass
+        raise ValueError("Unable to convert %r" % datetime_string)
 
     def time(self):
         if self:
@@ -2220,6 +2234,14 @@ Quantum.set_implication('material')
 On = Quantum(True)
 Off = Quantum(False)
 Other = Quantum()
+
+
+# add xmlrpc support
+from xmlrpclib import Marshaller
+Marshaller.dispatch[Char] = Marshaller.dump_unicode
+Marshaller.dispatch[Logical] = Marshaller.dump_bool
+Marshaller.dispatch[DateTime] = Marshaller.dump_datetime
+del Marshaller
 
 
 # Internal classes
@@ -3426,6 +3448,43 @@ def unpack_str(chars):
         name.append(ch.lower())
     return ''.join(name)
 
+def scinot(value, decimals):
+    """
+    return scientific notation with not more than decimals-1 decimal places
+    """
+    value = str(value)
+    sign = ''
+    if value[0] in ('+-'):
+        sign = value[0]
+        if sign == '+':
+            sign = ''
+        value = value[1:]
+    if 'e' in value:    #7.8e-05
+        e = value.find('e')
+        if e - 1 <= decimals:
+            return sign + value
+        integer, mantissa, power = value[0], value[1:e], value[e+1:]
+        print integer, mantissa, power
+        mantissa = mantissa[:decimals]
+        value = sign + integer + mantissa + 'e' + power
+        return value
+    integer, mantissa = value[0], value[1:]
+    print integer, mantissa
+    if integer == '0':
+        for e, integer in enumerate(mantissa):
+            if integer not in ('.0'):
+                break
+        mantissa = '.' + mantissa[e+1:]
+        print mantissa
+        mantissa = mantissa[:decimals]
+        value = sign + integer + mantissa + 'e-%03d' % e
+        return value
+    e = mantissa.find('.')
+    mantissa = '.' + mantissa.replace('.','')
+    mantissa = mantissa[:decimals]
+    value = sign + integer + mantissa + 'e+%03d' % e
+    return value
+
 def unsupported_type(something, *ignore):
     """
     called if a data type is not supported for that style of table
@@ -3656,12 +3715,17 @@ def update_numeric(value, fielddef, *ignore):
     except Exception:
         raise DbfError("incompatible type: %s(%s)" % (type(value), value))
     decimalsize = fielddef[DECIMALS]
+    totalsize = fielddef[LENGTH]
     if decimalsize:
         decimalsize += 1
-    maxintegersize = fielddef[LENGTH] - decimalsize
+    maxintegersize = totalsize - decimalsize
     integersize = len("%.0f" % floor(value))
     if integersize > maxintegersize:
-        raise DataOverflowError('Integer portion too big')
+        if integersize != 1:
+            raise DataOverflowError('Integer portion too big')
+        string = scinot(value, decimalsize)
+        if len(string) > totalsize:
+            raise DataOverflowError('Value representation too long for field')
     return "%*.*f" % (fielddef[LENGTH], fielddef[DECIMALS], value)
 
 def retrieve_vfp_datetime(bytes, fielddef, *ignore):
@@ -3797,8 +3861,8 @@ def add_numeric(format, flags):
     flag = 0
     for f in format[1:]:
         flag |= FIELD_FLAGS[f]
-    if not 0 < length < 18:
-        raise FieldSpecError("Numeric fields must be between 1 and 17 digits, not %d" % length)
+    if not 0 < length < 20:
+        raise FieldSpecError("Numeric fields must be between 1 and 19 digits, not %d" % length)
     if decimals and not 0 < decimals <= length - 2:
         raise FieldSpecError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
     return length, decimals, flag
@@ -7889,5 +7953,4 @@ fake_module('api',
     ).register()
 
 dbf = fake_module('dbf', *__all__)
-
 

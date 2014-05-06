@@ -31,7 +31,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 11)
+version = (0, 95, 12)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -1172,7 +1172,17 @@ class DateTime(object):
 
     @classmethod
     def now(cls):
-        return cls(datetime.datetime.now())
+        "only accurate to milliseconds"
+        now = datetime.datetime.now()
+        milli, micro = divmod(now.microsecond, 1000)
+        odd = milli % 2
+        if micro < 500:
+            pass
+        elif micro > 500:
+            milli += 1
+        elif odd:
+            milli += 1
+        return cls(now).replace(microsecond=milli*1000)
 
     def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None,
               delta_year=0, delta_month=0, delta_day=0, delta_hour=0, delta_minute=0, delta_second=0):
@@ -1488,6 +1498,7 @@ class Time(object):
 
     @staticmethod
     def now():
+        "only accurate to milliseconds"
         return DateTime.now().time()
 
     def replace(self, hour=None, minute=None, second=None, microsecond= None, delta_hour=0, delta_minute=0, delta_second=0):

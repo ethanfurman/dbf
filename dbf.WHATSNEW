@@ -1,6 +1,50 @@
 What's New
 ==========
 
+0.95.012
+--------
+
+adjust setup.py to require enum34
+
+add custom data types to xmlrpclib.Marshaller (marshalled as the underlying
+type)
+
+add support for storing numbers as scientific notation
+
+fixed DateTime.now() and Time.now() to only return milliseconds
+
+
+0.95.008
+--------
+
+fix Period.__contains__
+
+add new default_data_type to Table.__init__ of 'enhanced' which selects all
+the custom data types (Char, Logical, Date, DateTime)
+
+add string input type to Date, Time, and DateTime
+
+
+0.95.007
+--------
+
+Add .fromfloat() to Time
+
+Add .tofloat() to Time
+
+Add Period for matching various time periods 
+
+
+0.95.006
+--------
+
+Add .format() and .replace() to Date, Time, and DateTime
+
+Add nesting to Table context manager
+
+Add enumerations IsoDay, RelativeDay, IsoMonth, RelativeMonth
+
+
 0.95.003
 --------
 
@@ -9,12 +53,14 @@ Fixed issue with incorrect memo size in base file (thanks, Glenn!)
 Memo file extensions now have the same casing as the dbf file's, and are
 searched for that way (thanks again, Glenn!)
 
+
 0.95.002
 --------
 
 Fixed the version number in this file for the last release. :/
 
 string slices now work for RecordTemplate
+
 
 0.95.001
 --------
@@ -37,9 +83,9 @@ xBase-Compatibility Break: added utf8 codepage (xf0).
 Backwards-Compatibility Break: reverted Logical.__eq__ to return True if Logical
 is True, False otherwise; this properly mimics the behavior of using True/False/None
 directly.  If the previous behavior is desired, use Quantum instead (it uses the
-states On/Off/Other), or use `if Unknown: ... ; elif ... ; else ... `.
+states On/Off/Other), or use `if some_var is Unknown: ... ; elif some_var ... ; else ... `.
 
-Many thanks to all who have help with ideas and bug fixes.
+Many thanks to all who have helped with ideas and bug fixes.
 
 
 0.94.004

@@ -24,7 +24,8 @@ statement.
 
 Index -- nonpersistent index for a table.
 
-Fields:
+Fields::
+
     dBase III (Null not supported)
 
         Character --> unicode
@@ -54,7 +55,7 @@ Fields:
     If a field is uninitialized (Date, Logical, Numeric, Memo, General,
     Picture) then None is returned for the value.
 
-Custom data types:
+Custom data types::
 
     Null     -->  used to support Null values
 
@@ -69,51 +70,59 @@ Custom data types:
 
     Logical  -->  adds Unknown state to bool's: instead of True/False/None,
                   values are Truth, Falsth, and Unknown, with appropriate
-                  tri-state logic; while bool(None) is False, bool(Unknown)
-                  raises a TypeError;  __index__ of Unknown is 2
+                  tri-state logic; just as bool(None) is False, bool(Unknown)
+                  is also False;  the numerical values of Falsth, Truth, and
+                  Unknown is 0, 1, 2
 
-    Quantum  -->  similar to Logical, but implements boolean algebra (I think)
+    Quantum  -->  similar to Logical, but implements boolean algebra (I think).
+                  Has states of Off, On, and Other.  Other has no boolean nor
+                  numerical value, and attempts to use it as such will raise
+                  an exception
 
 
 Whirlwind Tour
 --------------
 
-import datetime
-import dbf
+    import datetime
+    import dbf
 
-table = dbf.Table(':test:', 'name C(25); age N(3,0); birth D; qualified L')
-table.open()
+    table = dbf.Table(
+            filename='test',
+            field_specs='name C(25); age N(3,0); birth D; qualified L',
+            on_disk=False,
+            )
+    table.open()
 
-for datum in (
-        ('Spanky', 7, dbf.Date.fromymd('20010315'), False),
-        ('Spunky', 23, dbf.Date(1989, 07, 23), True),
-        ('Sparky', 99, dbf.Date(), dbf.Unknown),
-        ):
-    table.append(datum)
+    for datum in (
+            ('Spanky', 7, dbf.Date.fromymd('20010315'), False),
+            ('Spunky', 23, dbf.Date(1989, 07, 23), True),
+            ('Sparky', 99, dbf.Date(), dbf.Unknown),
+            ):
+        table.append(datum)
 
-for record in table:
-    print record
-    print '--------'
-    print record[0:3]
-    print record['name':'birth']
-    print [record.name, record.age, record.birth]
-    print '--------'
-
-custom = table.new(
-        filename='test_on_disk',
-        default_data_types=dict(C=dbf.Char, D=dbf.Date, L=dbf.Logical),
-        )
-
-with custom:    # automatically opened and closed
     for record in table:
-        custom.append(record)
-    for record in custom:
-        dbf.write(record, name=record.name.upper())
         print record
         print '--------'
         print record[0:3]
-        print record['name':'birth']
+        print record['name':'qualified']
         print [record.name, record.age, record.birth]
         print '--------'
 
-table.close()
+    custom = table.new(
+            filename='test_on_disk',
+            default_data_types=dict(C=dbf.Char, D=dbf.Date, L=dbf.Logical),
+            )
+
+    with custom:    # automatically opened and closed
+        for record in table:
+            custom.append(record)
+        for record in custom:
+            dbf.write(record, name=record.name.upper())
+            print record
+            print '--------'
+            print record[0:3]
+            print record['name':'qualified']
+            print [record.name, record.age, record.birth]
+            print '--------'
+
+    table.close()

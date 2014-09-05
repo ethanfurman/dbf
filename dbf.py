@@ -2714,7 +2714,7 @@ class Record(object):
         """
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
-        nullable = flags & NULLABLE
+        nullable = flags & NULLABLE and '_nullflags' in self._meta
         binary = flags & BINARY
         if nullable:
             byte, bit = divmod(index, 8)
@@ -2771,7 +2771,7 @@ class Record(object):
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
         binary = flags & BINARY
-        nullable = flags & NULLABLE
+        nullable = flags & NULLABLE and '_nullflags' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
             byte, bit = divmod(index, 8)
@@ -2847,7 +2847,7 @@ class RecordTemplate(object):
         """
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
-        nullable = flags & NULLABLE
+        nullable = flags & NULLABLE and '_nullflags' in self._meta
         binary = flags & BINARY
         if nullable:
             byte, bit = divmod(index, 8)
@@ -2889,7 +2889,7 @@ class RecordTemplate(object):
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
         binary = flags & BINARY
-        nullable = flags & NULLABLE
+        nullable = flags & NULLABLE and '_nullflags' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
             byte, bit = divmod(index, 8)

@@ -31,7 +31,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = (0, 95, 12)
+version = (0, 95, 13)
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
@@ -95,8 +95,7 @@ pql_user_functions = dict()
 # signature:_meta of template records
 _Template_Records = dict()
 
-Integer = int, long
-String = str, unicode
+baseinteger = int, long
 
 # dec jan feb mar apr may jun jul aug sep oct nov dec jan
 days_per_month = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
@@ -652,10 +651,9 @@ class Char(unicode):
     """
 
     def __new__(cls, text=''):
-        if not isinstance(text, (str, unicode, cls)):
+        if not isinstance(text, (basestring, cls)):
             raise ValueError("Unable to automatically coerce %r to Char" % text)
         result = unicode.__new__(cls, text.rstrip())
-        result.field_size = len(text)
         return result
 
     __hash__ = unicode.__hash__
@@ -664,7 +662,7 @@ class Char(unicode):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, str, unicode)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return unicode(self) == other.rstrip()
 
@@ -672,7 +670,7 @@ class Char(unicode):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, str, unicode)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return unicode(self) >= other.rstrip()
 
@@ -680,7 +678,7 @@ class Char(unicode):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, str, unicode)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return unicode(self) > other.rstrip()
 
@@ -688,7 +686,7 @@ class Char(unicode):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, str, unicode)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return unicode(self) <= other.rstrip()
 
@@ -696,7 +694,7 @@ class Char(unicode):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, str, unicode)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return unicode(self) < other.rstrip()
 
@@ -704,7 +702,7 @@ class Char(unicode):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, str, unicode)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return unicode(self) != other.rstrip()
 
@@ -716,7 +714,6 @@ class Char(unicode):
 
     def __add__(self, other):
         result = self.__class__(unicode(self) + other)
-        result.field_size = self.field_size
         return result
 
 class Date(object):
@@ -734,7 +731,7 @@ class Date(object):
         if year is None or year is Null:
             return cls._null_date
         nd = object.__new__(cls)
-        if isinstance(year, String):
+        if isinstance(year, basestring):
             return Date.strptime(year)
         elif isinstance(year, (datetime.date)):
             nd._date = year
@@ -978,7 +975,7 @@ class DateTime(object):
         if year is None or year is Null:
             return cls._null_datetime
         ndt = object.__new__(cls)
-        if isinstance(year, String):
+        if isinstance(year, basestring):
             return DateTime.strptime(year)
         elif isinstance(year, (datetime.datetime)):
             ndt._datetime = year
@@ -1302,7 +1299,7 @@ class Time(object):
         if hour is None or hour is Null:
             return cls._null_time
         nt = object.__new__(cls)
-        if isinstance(hour, String):
+        if isinstance(hour, basestring):
             return Time.strptime(hour)
         elif isinstance(hour, (datetime.time)):
             microsec = hour.microsecond
@@ -1610,7 +1607,7 @@ class Logical(object):
     def __new__(cls, value=None):
         if value is None or value is Null or value is Other or value is Unknown:
             return cls.unknown
-        elif isinstance(value, String):
+        elif isinstance(value, basestring):
             if value.lower() in ('t', 'true', 'y', 'yes', 'on'):
                 return cls.true
             elif value.lower() in ('f', 'false', 'n', 'no', 'off'):
@@ -2020,7 +2017,7 @@ class Quantum(object):
     def __new__(cls, value=None):
         if value is None or value is Null or value is Other or value is Unknown:
             return cls.unknown
-        elif isinstance(value, String):
+        elif isinstance(value, basestring):
             if value.lower() in ('t', 'true', 'y', 'yes', 'on'):
                 return cls.true
             elif value.lower() in ('f', 'false', 'n', 'no', 'off'):
@@ -2151,7 +2148,7 @@ class Quantum(object):
     @classmethod
     def set_implication(cls, method):
         "sets IMP to material or relevant"
-        if not isinstance(method, String) or method.lower() not in ('material', 'relevant'):
+        if not isinstance(method, basestring) or method.lower() not in ('material', 'relevant'):
             raise ValueError("method should be 'material' (for strict boolean) or 'relevant', not %r'" % method)
         if method.lower() == 'material':
             cls.C = cls._C_material
@@ -2365,7 +2362,7 @@ class _Navigation(object):
         """
         self._nav_check()
         max = len(self)
-        if isinstance(where, Integer):
+        if isinstance(where, baseinteger):
             if not -max <= where < max:
                 raise IndexError("Record %d does not exist" % where)
             if where < 0:
@@ -2380,7 +2377,7 @@ class _Navigation(object):
     @property
     def last_record(self):
         """
-        returns first available record (does not move index)
+        returns last available record (does not move index)
         """
         self._nav_check()
         index = self._get_index('reverse', start=len(self))
@@ -2425,7 +2422,7 @@ class _Navigation(object):
             direction = 'forward'
         self._index = index = self._get_index(direction, n)
         if index < 0:
-            raise Bof
+            raise Bof()
         elif index >= len(self):
             raise Eof()
         else:
@@ -2532,7 +2529,7 @@ class Record(object):
 
     def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
-            raise AttributeError, 'Method %s is not implemented.' % name
+            raise AttributeError('Method %s is not implemented.' % name)
         if not name in self._meta.fields:
             raise FieldMissingError(name)
         if name in self._memos:
@@ -2541,12 +2538,13 @@ class Record(object):
             index = self._meta.fields.index(name)
             value = self._retrieve_field_value(index, name)
             return value
-        except DbfError, error:
+        except DbfError:
+            error = sys.exc_info()[1]
             error.message = "field --%s-- is %s -> %s" % (name, self._meta.fieldtypes[fielddef['type']]['Type'], error.message)
             raise
 
     def __getitem__(self, item):
-        if isinstance(item, Integer):
+        if isinstance(item, baseinteger):
             fields = self._meta.user_fields
             field_count = len(fields)
             if not -field_count <= item < field_count:
@@ -2557,12 +2555,12 @@ class Record(object):
             return self[field]
         elif isinstance(item, slice):
             sequence = []
-            if isinstance(item.start, String) or isinstance(item.stop, String):
+            if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
                 field_names = dbf.field_names(self)
                 start, stop, step = item.start, item.stop, item.step
                 if start not in field_names or stop not in field_names:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int or long, not %r" % type(step))
                 start = field_names.index(start)
                 stop = field_names.index(stop) + 1
@@ -2570,7 +2568,7 @@ class Record(object):
             for index in self._meta.fields[item]:
                 sequence.append(self[index])
             return sequence
-        elif isinstance(item, String):
+        elif isinstance(item, basestring):
             return self.__getattr__(item)
         else:
             raise TypeError("%r is not a field name" % item)
@@ -2600,7 +2598,8 @@ class Record(object):
         index = self._meta.fields.index(name)
         try:
             self._update_field_value(index, name, value)
-        except DbfError, error:
+        except DbfError:
+            error = sys.exc_info()[1]
             fielddef = self._meta[name]
             message = "%s (%s) = %r --> %s" % (name, self._meta.fieldtypes[fielddef[TYPE]]['Type'], value, error.args)
             data = name
@@ -2612,18 +2611,18 @@ class Record(object):
             raise DbfError("%s not in read/write mode" % self._meta.filename)
         if self._write_to_disk:
             raise DbfError("unable to modify fields individually except in `with` or `Process()`")
-        if isinstance(name, String):
+        if isinstance(name, basestring):
             self.__setattr__(name, value)
-        elif isinstance(name, Integer):
+        elif isinstance(name, baseinteger):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
             field_names = dbf.field_names(self)
-            if isinstance(name.start, String) or isinstance(name.stop, String):
+            if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = name.start, name.stop, name.step
                 if start not in field_names or stop not in field_names:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int or long, not %r" % type(step))
                 start = field_names.index(start)
                 stop = field_names.index(stop) + 1
@@ -2654,7 +2653,8 @@ class Record(object):
             raise DbfError("record not in flux")
         try:
             self._write()
-        except Exception, exc:
+        except Exception:
+            exc = sys.exc_info()[1]
             self._data[:] = self._old_data
             self._update_disk(data=self._old_data)
             raise DbfError("unable to write updates to disk, original data restored: %r" % (exc,))
@@ -2724,12 +2724,12 @@ class Record(object):
                 if ord(null_data[byte]) >> bit & 1:
                     return Null
             except IndexError:
-                print null_data
-                print index
-                print byte, bit
-                print len(self._data), self._data
-                print null_def
-                print null_data
+                print(null_data)
+                print(index)
+                print(byte, bit)
+                print(len(self._data), self._data)
+                print(null_def)
+                print(null_data)
                 raise
 
         record_data = self._data[fielddef[START]:fielddef[END]]
@@ -2979,7 +2979,7 @@ class RecordTemplate(object):
 
     def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
-            raise AttributeError, 'Method %s is not implemented.' % name
+            raise AttributeError('Method %s is not implemented.' % name)
         if not name in self._meta.fields:
             raise FieldMissingError(name)
         if name in self._memos:
@@ -2988,13 +2988,14 @@ class RecordTemplate(object):
             index = self._meta.fields.index(name)
             value = self._retrieve_field_value(index, name)
             return value
-        except DbfError, error:
+        except DbfError:
+            error = sys.exc_info()[1]
             error.message = "field --%s-- is %s -> %s" % (name, self._meta.fieldtypes[fielddef['type']]['Type'], error.message)
             raise
 
     def __getitem__(self, item):
         fields = self._meta.user_fields
-        if isinstance(item, Integer):
+        if isinstance(item, baseinteger):
             field_count = len(fields)
             if not -field_count <= item < field_count:
                 raise NotFoundError("Field offset %d is not in record" % item)
@@ -3004,11 +3005,11 @@ class RecordTemplate(object):
             return self[field]
         elif isinstance(item, slice):
             sequence = []
-            if isinstance(item.start, String) or isinstance(item.stop, String):
+            if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
                 start, stop, step = item.start, item.stop, item.step
                 if start not in fields or stop not in fields:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int or long, not %r" % type(step))
                 start = fields.index(start)
                 stop = fields.index(stop) + 1
@@ -3016,7 +3017,7 @@ class RecordTemplate(object):
             for index in self._meta.fields[item]:
                 sequence.append(self[index])
             return sequence
-        elif isinstance(item, String):
+        elif isinstance(item, basestring):
             return self.__getattr__(item)
         else:
             raise TypeError("%r is not a field name" % item)
@@ -3042,7 +3043,8 @@ class RecordTemplate(object):
         index = self._meta.fields.index(name)
         try:
             self._update_field_value(index, name, value)
-        except DbfError, error:
+        except DbfError:
+            error = sys.exc_info()[1]
             fielddef = self._meta[name]
             message = "%s (%s) = %r --> %s" % (name, self._meta.fieldtypes[fielddef[TYPE]]['Type'], value, error.message)
             data = name
@@ -3050,18 +3052,18 @@ class RecordTemplate(object):
             raise err_cls(message, data)
 
     def __setitem__(self, name, value):
-        if isinstance(name, String):
+        if isinstance(name, basestring):
             self.__setattr__(name, value)
-        elif isinstance(name, Integer):
+        elif isinstance(name, baseinteger):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
             field_names = dbf.field_names(self)
-            if isinstance(name.start, String) or isinstance(name.stop, String):
+            if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = name.start, name.stop, name.step
                 if start not in field_names or stop not in field_names:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int or long, not %r" % type(step))
                 start = field_names.index(start)
                 stop = field_names.index(stop) + 1
@@ -3122,11 +3124,11 @@ class RecordVaporWare(object):
             return Vapor
 
     def __getitem__(self, item):
-        if isinstance(item, Integer):
+        if isinstance(item, baseinteger):
             return Vapor
         elif isinstance(item, slice):
             raise TypeError('slice notation not allowed on Vapor records')
-        elif isinstance(item, String):
+        elif isinstance(item, basestring):
             return self.__getattr__(item)
         else:
             raise TypeError("%r is not a field name" % item)
@@ -3152,7 +3154,7 @@ class RecordVaporWare(object):
         raise TypeError("cannot change Vapor record")
 
     def __setitem__(self, name, value):
-        if isinstance(name, (String + Integer)):
+        if isinstance(name, (basestring, baseinteger)):
             raise TypeError("cannot change Vapor record")
         elif isinstance(name, slice):
             raise TypeError("slice notation not allowed on Vapor records")
@@ -3253,7 +3255,8 @@ class _Db3Memo(_DbfMemo):
                     self.meta.mfd.seek(0)
                     next = self.meta.mfd.read(4)
                     self.nextmemo = unpack_long_int(next)
-                except Exception, exc:
+                except Exception:
+                    exc = sys.exc_info()[1]
                     raise DbfError("memo file appears to be corrupt: %r" % exc.args)
 
     def _get_memo(self, block):
@@ -3330,7 +3333,8 @@ class _VfpMemo(_DbfMemo):
                     header = self.meta.mfd.read(512)
                     self.nextmemo = unpack_long_int(header[:4], bigendian=True)
                     self.meta.memo_size = unpack_short_int(header[6:8], bigendian=True)
-                except Exception, exc:
+                except Exception:
+                    exc = sys.exc_info()[1]
                     raise DbfError("memo file appears to be corrupt: %r" % exc.args)
 
     def _get_memo(self, block):
@@ -3475,18 +3479,15 @@ def scinot(value, decimals):
         if e - 1 <= decimals:
             return sign + value
         integer, mantissa, power = value[0], value[1:e], value[e+1:]
-        print integer, mantissa, power
         mantissa = mantissa[:decimals]
         value = sign + integer + mantissa + 'e' + power
         return value
     integer, mantissa = value[0], value[1:]
-    print integer, mantissa
     if integer == '0':
         for e, integer in enumerate(mantissa):
             if integer not in ('.0'):
                 break
         mantissa = '.' + mantissa[e+1:]
-        print mantissa
         mantissa = mantissa[:decimals]
         value = sign + integer + mantissa + 'e-%03d' % e
         return value
@@ -4009,12 +4010,12 @@ class Tables(object):
     context manager for multiple tables and/or indices
     """
     def __init__(yo, *tables):
-        if len(tables) == 1 and not isinstance(tables[0], (Table, str, unicode)):
+        if len(tables) == 1 and not isinstance(tables[0], (Table, basestring)):
             tables = tables[0]
         yo._tables = []
         yo._entered = []
         for table in tables:
-            if isinstance(table, String):
+            if isinstance(table, basestring):
                 table = Table(table)
             yo._tables.append(table)
     def __enter__(yo):
@@ -4673,7 +4674,7 @@ class Table(_Navigation):
         return object.__getattribute__(self, name)
 
     def __getitem__(self, value):
-        if isinstance(value, Integer):
+        if isinstance(value, baseinteger):
             if not -self._meta.header.record_count <= value < self._meta.header.record_count:
                 raise NotFoundError("Record %d is not in table %s." % (value, self.filename))
             return self._table[value]
@@ -4792,7 +4793,8 @@ class Table(_Navigation):
         else:
             try:
                 dfd = meta.dfd = open(meta.filename, 'r+b')
-            except IOError, e:
+            except IOError:
+                e= sys.exc_info()[1]
                 raise DbfError(str(e))
             dfd.seek(0)
             meta.header = header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
@@ -5060,7 +5062,8 @@ class Table(_Navigation):
             flags = self._meta.fieldtypes[field_type]['flags']
             try:
                 length, decimals, flags = init(pieces, flags)
-            except FieldSpecError, exc:
+            except FieldSpecError:
+                exc = sys.exc_info()[1]
                 raise FieldSpecError(exc.message + ' (%s:%s)' % (meta.filename, name))
             start = offset
             end = offset + length
@@ -5677,7 +5680,8 @@ class Db3Table(Table):
             if memo_fields:
                 try:
                     self._meta.memo = self._memoClass(self._meta)
-                except Exception, exc:
+                except Exception:
+                    exc = sys.exc_info()[1]
                     self._meta.dfd.close()
                     self._meta.dfd = None
                     raise BadDataError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1])
@@ -6064,7 +6068,8 @@ class FpTable(Table):
             if memo_fields:
                 try:
                     self._meta.memo = self._memoClass(self._meta)
-                except Exception, exc:
+                except Exception:
+                    exc = sys.exc_info()[1]
                     self._meta.dfd.close()
                     self._meta.dfd = None
                     raise BadDataError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1])
@@ -6718,10 +6723,10 @@ class Index(_Navigation):
                 record = self._table[self._rec_by_val[loc]]
                 result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
             return result
-        elif isinstance (key, (str, unicode, tuple, Record, RecordTemplate)):
+        elif isinstance (key, (basestring, tuple, Record, RecordTemplate)):
             if isinstance(key, (Record, RecordTemplate)):
                 key = self.key(key)
-            elif isinstance(key, String):
+            elif isinstance(key, basestring):
                 key = (key, )
             lo = self._search(key, where='left')
             hi = self._search(key, where='right')
@@ -6773,7 +6778,7 @@ class Index(_Navigation):
 
     def _partial_match(self, target, match):
         target = target[:len(match)]
-        if isinstance(match[-1], String):
+        if isinstance(match[-1], basestring):
             target = list(target)
             target[-1] = target[-1][:len(match[-1])]
             target = tuple(target)
@@ -6898,12 +6903,12 @@ class Relation(object):
         src_table, src_field = src
         tgt_table, tgt_field = tgt
         try:
-            if isinstance(src_field, Integer):
+            if isinstance(src_field, baseinteger):
                 table, field = src_table, src_field
                 src_field = table.field_names[field]
             else:
                 src_table.field_names.index(src_field)
-            if isinstance(tgt_field, Integer):
+            if isinstance(tgt_field, baseinteger):
                 table, field = tgt_table, tgt_field
                 tgt_field = table.field_names[field]
             else:
@@ -7026,7 +7031,7 @@ class Relation(object):
     def one_or_many(yo, table):
         yo.index    # make sure yo._tables has been populated
         try:
-            if isinstance(table, String):
+            if isinstance(table, basestring):
                 table = (yo._src_table, yo._tgt_table)[yo._tgt_table_name == table]
             return yo._tables[table]
         except IndexError:
@@ -7290,7 +7295,7 @@ def pql(records, command):
     recognized pql commands are SELECT, UPDATE | REPLACE, DELETE, RECALL, ADD, DROP
     """
     close_table = False
-    if isinstance(records, String):
+    if isinstance(records, basestring):
         records = Table(records)
         close_table = True
     try:
@@ -7479,7 +7484,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
         filename = table.filename
     if field_names is None:
         field_names = table.field_names
-    if isinstance(field_names, String):
+    if isinstance(field_names, basestring):
         field_names = [f.strip() for f in field_names.split(',')]
     format = format.lower()
     if format not in ('csv', 'tab', 'fixed'):
@@ -7761,7 +7766,7 @@ def first_record(table_name):
     table = Table(table_name)
     table.open()
     try:
-        print str(table[0])
+        print(str(table[0]))
     finally:
         table.close()
 
@@ -7777,7 +7782,7 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
     """
     reader = csv.reader(codecs.open(csvfile, 'r', encoding='latin-1', errors=errors))
     if field_names:
-        if isinstance(field_names, String):
+        if isinstance(field_names, basestring):
             field_names = field_names.split()
         if ' ' not in field_names[0]:
             field_names = ['%s M' % fn for fn in field_names]
@@ -7842,7 +7847,7 @@ def info(table_name):
     prints table info
     """
     table = Table(table_name)
-    print str(table)
+    print(str(table))
 
 def rename_field(table_name, oldfield, newfield):
     """
@@ -7867,10 +7872,10 @@ def hex_dump(records):
     """
     for index, dummy in enumerate(records):
         chars = dummy._data
-        print "%2d: " % index,
+        print("%2d: " % (index,))
         for char in chars[1:]:
-            print " %2x " % ord(char),
-        print
+            print(" %2x " % (ord(char),))
+        print()
 
 
 # Foxpro functions

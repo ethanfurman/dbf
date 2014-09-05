@@ -13,7 +13,7 @@ Latest release has many backwards incompatibilities, as well as some documentati
 """
 
 setup( name='dbf',
-       version= '0.95.012',
+       version= '0.95.013',
        license='BSD License',
        description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
        long_description=long_desc,

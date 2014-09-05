@@ -1,6 +1,13 @@
 What's New
 ==========
 
+0.95.013
+--------
+
+Null fields properly ignored if table doesn't support it (I think -- no one has
+given me such a table to test with; contributions of such tables welcome!)
+
+
 0.95.012
 --------
 

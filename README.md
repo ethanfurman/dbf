@@ -1,5 +1,5 @@
-dbf v0.95.001
-=============
+dbf
+===
 
 dbf (also known as python dbase) is a module for reading/writing
 dBase III, FP, VFP, and Clipper .dbf database files.  It's

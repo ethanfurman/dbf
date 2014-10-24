@@ -4423,10 +4423,27 @@ class Table(_Navigation):
 
         def __init__(self, count, meta):
             self._meta = meta
-            self._weakref_list = [weakref.ref(_DeadObject)] * count
+            self._max_count = count
+            self._weakref_list = {}
+            self._accesses = 0
+            self._dead_check = 1024
 
         def __getitem__(self, index):
-            maybe = self._weakref_list[index]()
+            # maybe = self._weakref_list[index]()
+            if index < 0:
+                if self._max_count + index < 0:
+                    raise IndexError('index %d smaller than available records' % index)
+                index = self._max_count + index
+            if index >= self._max_count:
+                raise IndexError('index %d greater than available records' % index)
+            maybe = self._weakref_list.get(index)
+            if maybe:
+                maybe = maybe()
+            self._accesses += 1
+            if self._accesses >= self._dead_check:
+                for key, value in self._weakref_list.items():
+                    if value() is None:
+                        del self._weakref_list[key]
             if not maybe:
                 meta = self._meta
                 if meta.status == CLOSED:
@@ -4447,19 +4464,25 @@ class Table(_Navigation):
             return maybe
 
         def append(self, record):
-            self._weakref_list.append(weakref.ref(record))
+            self._weakref_list[self._max_count] = weakref.ref(record)
+            self._max_count += 1
 
         def clear(self):
-            self._weakref_list[:] = []
+            for key in self._weakref_list.keys():
+                del self._weakref_list[key]
+            self._max_count = 0
 
         def flush(self):
-            for maybe in self._weakref_list:
+            for maybe in self._weakref_list.values():
                 maybe = maybe()
                 if maybe and not maybe._write_to_disk:
                     raise DbfError("some records have not been written to disk")
 
         def pop(self):
-            return self._weakref_list.pop()
+            if not self._max_count:
+                raise IndexError('no records exist')
+            self._max_count -= 1
+            return self[self._max_count-1]
 
     def _build_header_fields(self):
         """
@@ -4666,7 +4689,7 @@ class Table(_Navigation):
                 'variable_types',
                 ):
             return getattr(self, '_'+name)
-        if name in ('_table'):
+        if name in ('_table', ):
                 if self._meta.location == ON_DISK:
                     self._table = self._Table(len(self), self._meta)
                 else:

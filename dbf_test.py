@@ -4656,13 +4656,24 @@ class Test_Dbf_Lists(unittest.TestCase):
             'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
             )
         table.open()
+        records = []
         for i in range(len(floats)):
             name = words[i]
             paid = len(words[i]) % 3 == 0
             qty = floats[i]
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
-            table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
+            data = {'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc}
+            table.append(data)
+            records.append(data)
+        table.close()
+        table.open()
+        for trec, drec in zip(table, records):
+            self.assertEqual(trec.name.strip(), drec['name'])
+            self.assertEqual(trec.paid, drec['paid'])
+            self.assertEqual(trec.qty, drec['qty'])
+            self.assertEqual(trec.orderdate, drec['orderdate'])
+            self.assertEqual(trec.desc, drec['desc'])
         table.close()
     def tearDown(self):
         self.dbf_table.close()

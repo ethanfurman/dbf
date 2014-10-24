@@ -1,11 +1,16 @@
 What's New
 ==========
 
+0.95.014
+--------
+
+use a sparse container for the table -- should make very large dbf files usable
+
+
 0.95.013
 --------
 
-Null fields properly ignored if table doesn't support it (I think -- no one has
-given me such a table to test with; contributions of such tables welcome!)
+Null fields properly ignored if table doesn't support it
 
 
 0.95.012

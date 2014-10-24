@@ -1,4 +1,4 @@
-dbf v0.95.001
+dbf v0.95.014
 =============
 
 dbf (also known as python dbase) is a module for reading/writing
@@ -83,7 +83,7 @@ Whirlwind Tour
 import datetime
 import dbf
 
-table = dbf.Table(':test:', 'name C(25); age N(3,0); birth D; qualified L')
+table = dbf.Table('test', 'name C(25); age N(3,0); birth D; qualified L', on_disk=False)
 table.open()
 
 for datum in (

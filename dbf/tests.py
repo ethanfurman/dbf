@@ -4,30 +4,25 @@ import sys
 import unittest
 import tempfile
 import shutil
-import dbf
 import datetime
-from dbf.api import *
 import traceback
 
 py_ver = sys.version_info[:2]
+module = globals()
 
-if dbf.version != (0, 95, 13):
-    raise ValueError("Wrong version of dbf -- should be %d.%02d.%03d" % dbf.version)
+import dbf
+from dbf.api import *
+
+if py_ver < (3, 0):
+    EOF = '\x1a'
 else:
-    print "\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
-        dbf.version + (sys.platform, sys.version) )
-    # 2.5 constructs
-
-try:
-    all
-except NameError:
-    def all(iterable):
-        for element in iterable:
-            if not element:
-                return False
-        return True
+    unicode = str
+    xrange = range
+    dbf.LatinByte.export_to(module)
 
 
+print("\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
+    dbf.version + (sys.platform, sys.version) ))
 
 
 # Walker in Leaves -- by Scot Noel -- http://www.scienceandfantasyfiction.com/sciencefiction/Walker-in-Leaves/walker-in-leaves.htm
@@ -139,7 +134,8 @@ def inactive(rec):
     if is_deleted(rec):
         return recno(rec)
     return DoNotIndex
-class Test_Char(unittest.TestCase):
+
+class TestChar(unittest.TestCase):
     def test_exceptions(self):
         "exceptions"
         self.assertRaises(ValueError, Char, 7)
@@ -234,7 +230,7 @@ class Test_Char(unittest.TestCase):
         self.assertFalse(a5 > a6)
         self.assertTrue(a6 > a5)
 
-class Test_Date_Time(unittest.TestCase):
+class TestDateTime(unittest.TestCase):
     "Testing Date"
     def test_date_creation(self):
         "Date creation"
@@ -375,7 +371,8 @@ class Test_Date_Time(unittest.TestCase):
         self.assertEqual(uno != uno, False)
         self.assertEqual(dos != dos, False)
         self.assertEqual(tres != tres, False)
-class Test_Null(unittest.TestCase):
+
+class TestNull(unittest.TestCase):
     def test_all(self):
         null = Null = dbf.Null()
         self.assertTrue(null is dbf.Null())
@@ -482,8 +479,7 @@ class Test_Null(unittest.TestCase):
 
         self.assertRaises(TypeError, hash, null)
 
-
-class Test_Logical(unittest.TestCase):
+class TestLogical(unittest.TestCase):
     "Testing Logical"
     def test_unknown(self):
         "Unknown"
@@ -496,7 +492,7 @@ class Test_Logical(unittest.TestCase):
             self.assertEqual(huh != False, True, "huh is %r from %r, which is not None" % (huh, unk))
             self.assertEqual(huh == False, False, "huh is %r from %r, which is not None" % (huh, unk))
             if py_ver >= (2, 5):
-                self.assertEqual((0, 1, 2)[huh], 2)
+                self.assertRaises(ValueError, lambda : (0, 1, 2)[huh])
     def test_true(self):
         "true"
         for true in 'True', 'yes', 't', 'Y', 7, ['blah']:
@@ -529,9 +525,9 @@ class Test_Logical(unittest.TestCase):
         ack = Logical([])
         unk = Logical('?')
         bla = Logical(None)
-        self.assertEquals(heh is hah, True)
-        self.assertEquals(ick is ack, True)
-        self.assertEquals(unk is bla, True)
+        self.assertEqual(heh is hah, True)
+        self.assertEqual(ick is ack, True)
+        self.assertEqual(unk is bla, True)
     def test_error(self):
         "errors"
         self.assertRaises(ValueError, Logical, 'wrong')
@@ -540,507 +536,507 @@ class Test_Logical(unittest.TestCase):
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
-        self.assertEquals((true & true) is true, True)
-        self.assertEquals((true & false) is false, True)
-        self.assertEquals((false & true) is false, True)
-        self.assertEquals((false & false) is false, True)
-        self.assertEquals((true & unknown) is unknown, True)
-        self.assertEquals((false & unknown) is false, True)
-        self.assertEquals((unknown & true) is unknown, True)
-        self.assertEquals((unknown & false) is false, True)
-        self.assertEquals((unknown & unknown) is unknown, True)
-        self.assertEquals((true & True) is true, True)
-        self.assertEquals((true & False) is false, True)
-        self.assertEquals((false & True) is false, True)
-        self.assertEquals((false & False) is false, True)
-        self.assertEquals((true & None) is unknown, True)
-        self.assertEquals((false & None) is false, True)
-        self.assertEquals((unknown & True) is unknown, True)
-        self.assertEquals((unknown & False) is false, True)
-        self.assertEquals((unknown & None) is unknown, True)
-        self.assertEquals((True & true) is true, True)
-        self.assertEquals((True & false) is false, True)
-        self.assertEquals((False & true) is false, True)
-        self.assertEquals((False & false) is false, True)
-        self.assertEquals((True & unknown) is unknown, True)
-        self.assertEquals((False & unknown) is false, True)
-        self.assertEquals((None & true) is unknown, True)
-        self.assertEquals((None & false) is false, True)
-        self.assertEquals((None & unknown) is unknown, True)
-        self.assertEquals(type(true & 0), int)
-        self.assertEquals(true & 0, 0)
-        self.assertEquals(type(true & 3), int)
-        self.assertEquals(true & 3, 1)
-        self.assertEquals(type(false & 0), int)
-        self.assertEquals(false & 0, 0)
-        self.assertEquals(type(false & 2), int)
-        self.assertEquals(false & 2, 0)
-        self.assertEquals(type(unknown & 0), int)
-        self.assertEquals(unknown & 0, 0)
-        self.assertEquals(unknown & 2, unknown)
+        self.assertEqual((true & true) is true, True)
+        self.assertEqual((true & false) is false, True)
+        self.assertEqual((false & true) is false, True)
+        self.assertEqual((false & false) is false, True)
+        self.assertEqual((true & unknown) is unknown, True)
+        self.assertEqual((false & unknown) is false, True)
+        self.assertEqual((unknown & true) is unknown, True)
+        self.assertEqual((unknown & false) is false, True)
+        self.assertEqual((unknown & unknown) is unknown, True)
+        self.assertEqual((true & True) is true, True)
+        self.assertEqual((true & False) is false, True)
+        self.assertEqual((false & True) is false, True)
+        self.assertEqual((false & False) is false, True)
+        self.assertEqual((true & None) is unknown, True)
+        self.assertEqual((false & None) is false, True)
+        self.assertEqual((unknown & True) is unknown, True)
+        self.assertEqual((unknown & False) is false, True)
+        self.assertEqual((unknown & None) is unknown, True)
+        self.assertEqual((True & true) is true, True)
+        self.assertEqual((True & false) is false, True)
+        self.assertEqual((False & true) is false, True)
+        self.assertEqual((False & false) is false, True)
+        self.assertEqual((True & unknown) is unknown, True)
+        self.assertEqual((False & unknown) is false, True)
+        self.assertEqual((None & true) is unknown, True)
+        self.assertEqual((None & false) is false, True)
+        self.assertEqual((None & unknown) is unknown, True)
+        self.assertEqual(type(true & 0), int)
+        self.assertEqual(true & 0, 0)
+        self.assertEqual(type(true & 3), int)
+        self.assertEqual(true & 3, 1)
+        self.assertEqual(type(false & 0), int)
+        self.assertEqual(false & 0, 0)
+        self.assertEqual(type(false & 2), int)
+        self.assertEqual(false & 2, 0)
+        self.assertEqual(type(unknown & 0), int)
+        self.assertEqual(unknown & 0, 0)
+        self.assertEqual(unknown & 2, unknown)
 
         t = true
         t &= true
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         t = true
         t &= false
-        self.assertEquals(t is false, True)
+        self.assertEqual(t is false, True)
         f = false
         f &= true
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         f = false
         f &= false
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = true
         t &= unknown
-        self.assertEquals(t is unknown, True)
+        self.assertEqual(t is unknown, True)
         f = false
         f &= unknown
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         u = unknown
         u &= true
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u &= false
-        self.assertEquals(u is false, True)
+        self.assertEqual(u is false, True)
         u = unknown
         u &= unknown
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = true
         t &= True
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         t = true
         t &= False
-        self.assertEquals(t is false, True)
+        self.assertEqual(t is false, True)
         f = false
         f &= True
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         f = false
         f &= False
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = true
         t &= None
-        self.assertEquals(t is unknown, True)
+        self.assertEqual(t is unknown, True)
         f = false
         f &= None
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         u = unknown
         u &= True
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u &= False
-        self.assertEquals(u is false, True)
+        self.assertEqual(u is false, True)
         u = unknown
         u &= None
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = True
         t &= true
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         t = True
         t &= false
-        self.assertEquals(t is false, True)
+        self.assertEqual(t is false, True)
         f = False
         f &= true
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         f = False
         f &= false
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = True
         t &= unknown
-        self.assertEquals(t is unknown, True)
+        self.assertEqual(t is unknown, True)
         f = False
         f &= unknown
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         u = None
         u &= true
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = None
         u &= false
-        self.assertEquals(u is false, True)
+        self.assertEqual(u is false, True)
         u = None
         u &= unknown
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = true
         t &= 0
-        self.assertEquals(type(true & 0), int)
+        self.assertEqual(type(true & 0), int)
         t = true
         t &= 0
-        self.assertEquals(true & 0, 0)
+        self.assertEqual(true & 0, 0)
         t = true
         t &= 3
-        self.assertEquals(type(true & 3), int)
+        self.assertEqual(type(true & 3), int)
         t = true
         t &= 3
-        self.assertEquals(true & 3, 1)
+        self.assertEqual(true & 3, 1)
         f = false
         f &= 0
-        self.assertEquals(type(false & 0), int)
+        self.assertEqual(type(false & 0), int)
         f = false
         f &= 0
-        self.assertEquals(false & 0, 0)
+        self.assertEqual(false & 0, 0)
         f = false
         f &= 2
-        self.assertEquals(type(false & 2), int)
+        self.assertEqual(type(false & 2), int)
         f = false
         f &= 2
-        self.assertEquals(false & 2, 0)
+        self.assertEqual(false & 2, 0)
         u = unknown
         u &= 0
-        self.assertEquals(type(unknown & 0), int)
+        self.assertEqual(type(unknown & 0), int)
         u = unknown
         u &= 0
-        self.assertEquals(unknown & 0, 0)
+        self.assertEqual(unknown & 0, 0)
         u = unknown
         u &= 2
-        self.assertEquals(unknown & 2, unknown)
+        self.assertEqual(unknown & 2, unknown)
 
     def test_or(self):
         "or"
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
-        self.assertEquals((true | true) is true, True)
-        self.assertEquals((true | false) is true, True)
-        self.assertEquals((false | true) is true, True)
-        self.assertEquals((false | false) is false, True)
-        self.assertEquals((true | unknown) is true, True)
-        self.assertEquals((false | unknown) is unknown, True)
-        self.assertEquals((unknown | true) is true, True)
-        self.assertEquals((unknown | false) is unknown, True)
-        self.assertEquals((unknown | unknown) is unknown, True)
-        self.assertEquals((true | True) is true, True)
-        self.assertEquals((true | False) is true, True)
-        self.assertEquals((false | True) is true, True)
-        self.assertEquals((false | False) is false, True)
-        self.assertEquals((true | None) is true, True)
-        self.assertEquals((false | None) is unknown, True)
-        self.assertEquals((unknown | True) is true, True)
-        self.assertEquals((unknown | False) is unknown, True)
-        self.assertEquals((unknown | None) is unknown, True)
-        self.assertEquals((True | true) is true, True)
-        self.assertEquals((True | false) is true, True)
-        self.assertEquals((False | true) is true, True)
-        self.assertEquals((False | false) is false, True)
-        self.assertEquals((True | unknown) is true, True)
-        self.assertEquals((False | unknown) is unknown, True)
-        self.assertEquals((None | true) is true, True)
-        self.assertEquals((None | false) is unknown, True)
-        self.assertEquals((None | unknown) is unknown, True)
-        self.assertEquals(type(true | 0), int)
-        self.assertEquals(true | 0, 1)
-        self.assertEquals(type(true | 2), int)
-        self.assertEquals(true | 2, 3)
-        self.assertEquals(type(false | 0), int)
-        self.assertEquals(false | 0, 0)
-        self.assertEquals(type(false | 2), int)
-        self.assertEquals(false | 2, 2)
-        self.assertEquals(unknown | 0, unknown)
-        self.assertEquals(unknown | 2, unknown)
+        self.assertEqual((true | true) is true, True)
+        self.assertEqual((true | false) is true, True)
+        self.assertEqual((false | true) is true, True)
+        self.assertEqual((false | false) is false, True)
+        self.assertEqual((true | unknown) is true, True)
+        self.assertEqual((false | unknown) is unknown, True)
+        self.assertEqual((unknown | true) is true, True)
+        self.assertEqual((unknown | false) is unknown, True)
+        self.assertEqual((unknown | unknown) is unknown, True)
+        self.assertEqual((true | True) is true, True)
+        self.assertEqual((true | False) is true, True)
+        self.assertEqual((false | True) is true, True)
+        self.assertEqual((false | False) is false, True)
+        self.assertEqual((true | None) is true, True)
+        self.assertEqual((false | None) is unknown, True)
+        self.assertEqual((unknown | True) is true, True)
+        self.assertEqual((unknown | False) is unknown, True)
+        self.assertEqual((unknown | None) is unknown, True)
+        self.assertEqual((True | true) is true, True)
+        self.assertEqual((True | false) is true, True)
+        self.assertEqual((False | true) is true, True)
+        self.assertEqual((False | false) is false, True)
+        self.assertEqual((True | unknown) is true, True)
+        self.assertEqual((False | unknown) is unknown, True)
+        self.assertEqual((None | true) is true, True)
+        self.assertEqual((None | false) is unknown, True)
+        self.assertEqual((None | unknown) is unknown, True)
+        self.assertEqual(type(true | 0), int)
+        self.assertEqual(true | 0, 1)
+        self.assertEqual(type(true | 2), int)
+        self.assertEqual(true | 2, 3)
+        self.assertEqual(type(false | 0), int)
+        self.assertEqual(false | 0, 0)
+        self.assertEqual(type(false | 2), int)
+        self.assertEqual(false | 2, 2)
+        self.assertEqual(unknown | 0, unknown)
+        self.assertEqual(unknown | 2, unknown)
 
         t = true
         t |= true
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         t = true
         t |= false
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = false
         f |= true
-        self.assertEquals(f is true, True)
+        self.assertEqual(f is true, True)
         f = false
         f |= false
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = true
         t |= unknown
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = false
         f |= unknown
-        self.assertEquals(f is unknown, True)
+        self.assertEqual(f is unknown, True)
         u = unknown
         u |= true
-        self.assertEquals(u is true, True)
+        self.assertEqual(u is true, True)
         u = unknown
         u |= false
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u |= unknown
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = true
         t |= True
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         t = true
         t |= False
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = false
         f |= True
-        self.assertEquals(f is true, True)
+        self.assertEqual(f is true, True)
         f = false
         f |= False
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = true
         t |= None
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = false
         f |= None
-        self.assertEquals(f is unknown, True)
+        self.assertEqual(f is unknown, True)
         u = unknown
         u |= True
-        self.assertEquals(u is true, True)
+        self.assertEqual(u is true, True)
         u = unknown
         u |= False
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u |= None
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = True
         t |= true
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         t = True
         t |= false
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = False
         f |= true
-        self.assertEquals(f is true, True)
+        self.assertEqual(f is true, True)
         f = False
         f |= false
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = True
         t |= unknown
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = False
         f |= unknown
-        self.assertEquals(f is unknown, True)
+        self.assertEqual(f is unknown, True)
         u = None
         u |= true
-        self.assertEquals(u is true, True)
+        self.assertEqual(u is true, True)
         u = None
         u |= false
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = None
         u |= unknown
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = true
         t |= 0
-        self.assertEquals(type(t), int)
+        self.assertEqual(type(t), int)
         t = true
         t |= 0
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t |= 2
-        self.assertEquals(type(t), int)
+        self.assertEqual(type(t), int)
         t = true
         t |= 2
-        self.assertEquals(t, 3)
+        self.assertEqual(t, 3)
         f = false
         f |= 0
-        self.assertEquals(type(f), int)
+        self.assertEqual(type(f), int)
         f = false
         f |= 0
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f |= 2
-        self.assertEquals(type(f), int)
+        self.assertEqual(type(f), int)
         f = false
         f |= 2
-        self.assertEquals(f, 2)
+        self.assertEqual(f, 2)
         u = unknown
         u |= 0
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
     def test_xor(self):
         "xor"
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
-        self.assertEquals((true ^ true) is false, True)
-        self.assertEquals((true ^ false) is true, True)
-        self.assertEquals((false ^ true) is true, True)
-        self.assertEquals((false ^ false) is false, True)
-        self.assertEquals((true ^ unknown) is unknown, True)
-        self.assertEquals((false ^ unknown) is unknown, True)
-        self.assertEquals((unknown ^ true) is unknown, True)
-        self.assertEquals((unknown ^ false) is unknown, True)
-        self.assertEquals((unknown ^ unknown) is unknown, True)
-        self.assertEquals((true ^ True) is false, True)
-        self.assertEquals((true ^ False) is true, True)
-        self.assertEquals((false ^ True) is true, True)
-        self.assertEquals((false ^ False) is false, True)
-        self.assertEquals((true ^ None) is unknown, True)
-        self.assertEquals((false ^ None) is unknown, True)
-        self.assertEquals((unknown ^ True) is unknown, True)
-        self.assertEquals((unknown ^ False) is unknown, True)
-        self.assertEquals((unknown ^ None) is unknown, True)
-        self.assertEquals((True ^ true) is false, True)
-        self.assertEquals((True ^ false) is true, True)
-        self.assertEquals((False ^ true) is true, True)
-        self.assertEquals((False ^ false) is false, True)
-        self.assertEquals((True ^ unknown) is unknown, True)
-        self.assertEquals((False ^ unknown) is unknown, True)
-        self.assertEquals((None ^ true) is unknown, True)
-        self.assertEquals((None ^ false) is unknown, True)
-        self.assertEquals((None ^ unknown) is unknown, True)
-        self.assertEquals(type(true ^ 2), int)
-        self.assertEquals(true ^ 2, 3)
-        self.assertEquals(type(true ^ 0), int)
-        self.assertEquals(true ^ 0, 1)
-        self.assertEquals(type(false ^ 0), int)
-        self.assertEquals(false ^ 0, 0)
-        self.assertEquals(type(false ^ 2), int)
-        self.assertEquals(false ^ 2, 2)
-        self.assertEquals(unknown ^ 0, unknown)
-        self.assertEquals(unknown ^ 2, unknown)
+        self.assertEqual((true ^ true) is false, True)
+        self.assertEqual((true ^ false) is true, True)
+        self.assertEqual((false ^ true) is true, True)
+        self.assertEqual((false ^ false) is false, True)
+        self.assertEqual((true ^ unknown) is unknown, True)
+        self.assertEqual((false ^ unknown) is unknown, True)
+        self.assertEqual((unknown ^ true) is unknown, True)
+        self.assertEqual((unknown ^ false) is unknown, True)
+        self.assertEqual((unknown ^ unknown) is unknown, True)
+        self.assertEqual((true ^ True) is false, True)
+        self.assertEqual((true ^ False) is true, True)
+        self.assertEqual((false ^ True) is true, True)
+        self.assertEqual((false ^ False) is false, True)
+        self.assertEqual((true ^ None) is unknown, True)
+        self.assertEqual((false ^ None) is unknown, True)
+        self.assertEqual((unknown ^ True) is unknown, True)
+        self.assertEqual((unknown ^ False) is unknown, True)
+        self.assertEqual((unknown ^ None) is unknown, True)
+        self.assertEqual((True ^ true) is false, True)
+        self.assertEqual((True ^ false) is true, True)
+        self.assertEqual((False ^ true) is true, True)
+        self.assertEqual((False ^ false) is false, True)
+        self.assertEqual((True ^ unknown) is unknown, True)
+        self.assertEqual((False ^ unknown) is unknown, True)
+        self.assertEqual((None ^ true) is unknown, True)
+        self.assertEqual((None ^ false) is unknown, True)
+        self.assertEqual((None ^ unknown) is unknown, True)
+        self.assertEqual(type(true ^ 2), int)
+        self.assertEqual(true ^ 2, 3)
+        self.assertEqual(type(true ^ 0), int)
+        self.assertEqual(true ^ 0, 1)
+        self.assertEqual(type(false ^ 0), int)
+        self.assertEqual(false ^ 0, 0)
+        self.assertEqual(type(false ^ 2), int)
+        self.assertEqual(false ^ 2, 2)
+        self.assertEqual(unknown ^ 0, unknown)
+        self.assertEqual(unknown ^ 2, unknown)
 
         t = true
         t ^= true
-        self.assertEquals(t is false, True)
+        self.assertEqual(t is false, True)
         t = true
         t ^= false
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = false
         f ^= true
-        self.assertEquals(f is true, True)
+        self.assertEqual(f is true, True)
         f = false
         f ^= false
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = true
         t ^= unknown
-        self.assertEquals(t is unknown, True)
+        self.assertEqual(t is unknown, True)
         f = false
         f ^= unknown
-        self.assertEquals(f is unknown, True)
+        self.assertEqual(f is unknown, True)
         u = unknown
         u ^= true
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u ^= false
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u ^= unknown
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = true
         t ^= True
-        self.assertEquals(t is false, True)
+        self.assertEqual(t is false, True)
         t = true
         t ^= False
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = false
         f ^= True
-        self.assertEquals(f is true, True)
+        self.assertEqual(f is true, True)
         f = false
         f ^= False
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = true
         t ^= None
-        self.assertEquals(t is unknown, True)
+        self.assertEqual(t is unknown, True)
         f = false
         f ^= None
-        self.assertEquals(f is unknown, True)
+        self.assertEqual(f is unknown, True)
         u = unknown
         u ^= True
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u ^= False
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = unknown
         u ^= None
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = True
         t ^= true
-        self.assertEquals(t is false, True)
+        self.assertEqual(t is false, True)
         t = True
         t ^= false
-        self.assertEquals(t is true, True)
+        self.assertEqual(t is true, True)
         f = False
         f ^= true
-        self.assertEquals(f is true, True)
+        self.assertEqual(f is true, True)
         f = False
         f ^= false
-        self.assertEquals(f is false, True)
+        self.assertEqual(f is false, True)
         t = True
         t ^= unknown
-        self.assertEquals(t is unknown, True)
+        self.assertEqual(t is unknown, True)
         f = False
         f ^= unknown
-        self.assertEquals(f is unknown, True)
+        self.assertEqual(f is unknown, True)
         u = None
         u ^= true
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = None
         u ^= false
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         u = None
         u ^= unknown
-        self.assertEquals(u is unknown, True)
+        self.assertEqual(u is unknown, True)
         t = true
         t ^= 0
-        self.assertEquals(type(true ^ 0), int)
+        self.assertEqual(type(true ^ 0), int)
         t = true
         t ^= 0
-        self.assertEquals(true ^ 0, 1)
+        self.assertEqual(true ^ 0, 1)
         t = true
         t ^= 2
-        self.assertEquals(type(true ^ 2), int)
+        self.assertEqual(type(true ^ 2), int)
         t = true
         t ^= 2
-        self.assertEquals(true ^ 2, 3)
+        self.assertEqual(true ^ 2, 3)
         f = false
         f ^= 0
-        self.assertEquals(type(false ^ 0), int)
+        self.assertEqual(type(false ^ 0), int)
         f = false
         f ^= 0
-        self.assertEquals(false ^ 0, 0)
+        self.assertEqual(false ^ 0, 0)
         f = false
         f ^= 2
-        self.assertEquals(type(false ^ 2), int)
+        self.assertEqual(type(false ^ 2), int)
         f = false
         f ^= 2
-        self.assertEquals(false ^ 2, 2)
+        self.assertEqual(false ^ 2, 2)
         u = unknown
         u ^= 0
-        self.assertEquals(unknown ^ 0, unknown)
+        self.assertEqual(unknown ^ 0, unknown)
         u = unknown
         u ^= 2
-        self.assertEquals(unknown ^ 2, unknown)
+        self.assertEqual(unknown ^ 2, unknown)
 
     def test_negation(self):
         "negation"
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(-true, -1)
-        self.assertEquals(-false, 0)
-        self.assertEquals(-none, none)
+        self.assertEqual(-true, -1)
+        self.assertEqual(-false, 0)
+        self.assertEqual(-none, none)
     def test_posation(self):
         "posation"
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(+true, 1)
-        self.assertEquals(+false, 0)
-        self.assertEquals(+none, none)
+        self.assertEqual(+true, 1)
+        self.assertEqual(+false, 0)
+        self.assertEqual(+none, none)
     def test_abs(self):
         "abs()"
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(abs(true), 1)
-        self.assertEquals(abs(false), 0)
-        self.assertEquals(abs(none), none)
+        self.assertEqual(abs(true), 1)
+        self.assertEqual(abs(false), 0)
+        self.assertEqual(abs(none), none)
     def test_invert(self):
         "~ operator"
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(~true, -2)
-        self.assertEquals(~false, -1)
-        self.assertEquals(~none, none)
+        self.assertEqual(~true, -2)
+        self.assertEqual(~false, -1)
+        self.assertEqual(~none, none)
 
     def test_complex(self):
         "complex"
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(complex(true), complex(1))
-        self.assertEquals(complex(false), complex(0))
+        self.assertEqual(complex(true), complex(1))
+        self.assertEqual(complex(false), complex(0))
         self.assertRaises(ValueError, complex, none)
 
     def test_int(self):
@@ -1048,26 +1044,27 @@ class Test_Logical(unittest.TestCase):
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(int(true), 1)
-        self.assertEquals(int(false), 0)
+        self.assertEqual(int(true), 1)
+        self.assertEqual(int(false), 0)
         self.assertRaises(ValueError, int, none)
 
-    def test_long(self):
-        "long"
-        true = Logical(True)
-        false = Logical(False)
-        none = Logical(None)
-        self.assertEquals(long(true), 1L)
-        self.assertEquals(long(false), 0L)
-        self.assertRaises(ValueError, long, none)
+    if py_ver < (3, 0):
+        def test_long(self):
+            "long"
+            true = Logical(True)
+            false = Logical(False)
+            none = Logical(None)
+            self.assertEqual(long(true), long(1))
+            self.assertEqual(long(false), long(0))
+            self.assertRaises(ValueError, long, none)
 
     def test_float(self):
         "float"
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(float(true), 1.0)
-        self.assertEquals(float(false), 0.0)
+        self.assertEqual(float(true), 1.0)
+        self.assertEqual(float(false), 0.0)
         self.assertRaises(ValueError, float, none)
 
     def test_oct(self):
@@ -1075,8 +1072,8 @@ class Test_Logical(unittest.TestCase):
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(oct(true), oct(1))
-        self.assertEquals(oct(false), oct(0))
+        self.assertEqual(oct(true), oct(1))
+        self.assertEqual(oct(false), oct(0))
         self.assertRaises(ValueError, oct, none)
 
     def test_hex(self):
@@ -1084,8 +1081,8 @@ class Test_Logical(unittest.TestCase):
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEquals(hex(true), hex(1))
-        self.assertEquals(hex(false), hex(0))
+        self.assertEqual(hex(true), hex(1))
+        self.assertEqual(hex(false), hex(0))
         self.assertRaises(ValueError, hex, none)
 
     def test_addition(self):
@@ -1093,795 +1090,795 @@ class Test_Logical(unittest.TestCase):
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
-        self.assertEquals(true + true, 2)
-        self.assertEquals(true + false, 1)
-        self.assertEquals(false + true, 1)
-        self.assertEquals(false + false, 0)
-        self.assertEquals(true + unknown, unknown)
-        self.assertEquals(false + unknown, unknown)
-        self.assertEquals(unknown + true, unknown)
-        self.assertEquals(unknown + false, unknown)
-        self.assertEquals(unknown + unknown, unknown)
-        self.assertEquals(true + True, 2)
-        self.assertEquals(true + False, 1)
-        self.assertEquals(false + True, 1)
-        self.assertEquals(false + False, 0)
-        self.assertEquals(true + None, unknown)
-        self.assertEquals(false + None, unknown)
-        self.assertEquals(unknown + True, unknown)
-        self.assertEquals(unknown + False, unknown)
-        self.assertEquals(unknown + None, unknown)
-        self.assertEquals(True + true, 2)
-        self.assertEquals(True + false, 1)
-        self.assertEquals(False + true, 1)
-        self.assertEquals(False + false, 0)
-        self.assertEquals(True + unknown, unknown)
-        self.assertEquals(False + unknown, unknown)
-        self.assertEquals(None + true, unknown)
-        self.assertEquals(None + false, unknown)
-        self.assertEquals(None + unknown, unknown)
+        self.assertEqual(true + true, 2)
+        self.assertEqual(true + false, 1)
+        self.assertEqual(false + true, 1)
+        self.assertEqual(false + false, 0)
+        self.assertEqual(true + unknown, unknown)
+        self.assertEqual(false + unknown, unknown)
+        self.assertEqual(unknown + true, unknown)
+        self.assertEqual(unknown + false, unknown)
+        self.assertEqual(unknown + unknown, unknown)
+        self.assertEqual(true + True, 2)
+        self.assertEqual(true + False, 1)
+        self.assertEqual(false + True, 1)
+        self.assertEqual(false + False, 0)
+        self.assertEqual(true + None, unknown)
+        self.assertEqual(false + None, unknown)
+        self.assertEqual(unknown + True, unknown)
+        self.assertEqual(unknown + False, unknown)
+        self.assertEqual(unknown + None, unknown)
+        self.assertEqual(True + true, 2)
+        self.assertEqual(True + false, 1)
+        self.assertEqual(False + true, 1)
+        self.assertEqual(False + false, 0)
+        self.assertEqual(True + unknown, unknown)
+        self.assertEqual(False + unknown, unknown)
+        self.assertEqual(None + true, unknown)
+        self.assertEqual(None + false, unknown)
+        self.assertEqual(None + unknown, unknown)
 
         t = true
         t += true
-        self.assertEquals(t, 2)
+        self.assertEqual(t, 2)
         t = true
         t += false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f += true
-        self.assertEquals(f, 1)
+        self.assertEqual(f, 1)
         f = false
         f += false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t += unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f += unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u += true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u += false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u += unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t += True
-        self.assertEquals(t, 2)
+        self.assertEqual(t, 2)
         t = true
         t += False
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f += True
-        self.assertEquals(f, 1)
+        self.assertEqual(f, 1)
         f = false
         f += False
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t += None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f += None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u += True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u += False
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u += None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t += true
-        self.assertEquals(t, 2)
+        self.assertEqual(t, 2)
         t = True
         t += false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = False
         f += true
-        self.assertEquals(f, 1)
+        self.assertEqual(f, 1)
         f = False
         f += false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = True
         t += unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f += unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u += true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u += false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u += unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
     def test_multiplication(self):
         "multiplication"
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
-        self.assertEquals(true * true, 1)
-        self.assertEquals(true * false, 0)
-        self.assertEquals(false * true, 0)
-        self.assertEquals(false * false, 0)
-        self.assertEquals(true * unknown, unknown)
-        self.assertEquals(false * unknown, 0)
-        self.assertEquals(unknown * true, unknown)
-        self.assertEquals(unknown * false, 0)
-        self.assertEquals(unknown * unknown, unknown)
-        self.assertEquals(true * True, 1)
-        self.assertEquals(true * False, 0)
-        self.assertEquals(false * True, 0)
-        self.assertEquals(false * False, 0)
-        self.assertEquals(true * None, unknown)
-        self.assertEquals(false * None, 0)
-        self.assertEquals(unknown * True, unknown)
-        self.assertEquals(unknown * False, 0)
-        self.assertEquals(unknown * None, unknown)
-        self.assertEquals(True * true, 1)
-        self.assertEquals(True * false, 0)
-        self.assertEquals(False * true, 0)
-        self.assertEquals(False * false, 0)
-        self.assertEquals(True * unknown, unknown)
-        self.assertEquals(False * unknown, 0)
-        self.assertEquals(None * true, unknown)
-        self.assertEquals(None * false, 0)
-        self.assertEquals(None * unknown, unknown)
+        self.assertEqual(true * true, 1)
+        self.assertEqual(true * false, 0)
+        self.assertEqual(false * true, 0)
+        self.assertEqual(false * false, 0)
+        self.assertEqual(true * unknown, unknown)
+        self.assertEqual(false * unknown, 0)
+        self.assertEqual(unknown * true, unknown)
+        self.assertEqual(unknown * false, 0)
+        self.assertEqual(unknown * unknown, unknown)
+        self.assertEqual(true * True, 1)
+        self.assertEqual(true * False, 0)
+        self.assertEqual(false * True, 0)
+        self.assertEqual(false * False, 0)
+        self.assertEqual(true * None, unknown)
+        self.assertEqual(false * None, 0)
+        self.assertEqual(unknown * True, unknown)
+        self.assertEqual(unknown * False, 0)
+        self.assertEqual(unknown * None, unknown)
+        self.assertEqual(True * true, 1)
+        self.assertEqual(True * false, 0)
+        self.assertEqual(False * true, 0)
+        self.assertEqual(False * false, 0)
+        self.assertEqual(True * unknown, unknown)
+        self.assertEqual(False * unknown, 0)
+        self.assertEqual(None * true, unknown)
+        self.assertEqual(None * false, 0)
+        self.assertEqual(None * unknown, unknown)
 
         t = true
         t *= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t *= false
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         f = false
         f *= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f *= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t *= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f *= unknown
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         u = unknown
         u *= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u *= false
-        self.assertEquals(u, 0)
+        self.assertEqual(u, 0)
         u = unknown
         u *= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t *= True
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t *= False
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         f = false
         f *= True
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f *= False
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t *= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f *= None
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         u = unknown
         u *= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u *= False
-        self.assertEquals(u, 0)
+        self.assertEqual(u, 0)
         u = unknown
         u *= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t *= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = True
         t *= false
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         f = False
         f *= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = False
         f *= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = True
         t *= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f *= unknown
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         u = None
         u *= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u *= false
-        self.assertEquals(u, 0)
+        self.assertEqual(u, 0)
         u = None
         u *= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
     def test_subtraction(self):
         "subtraction"
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
-        self.assertEquals(true - true, 0)
-        self.assertEquals(true - false, 1)
-        self.assertEquals(false - true, -1)
-        self.assertEquals(false - false, 0)
-        self.assertEquals(true - unknown, unknown)
-        self.assertEquals(false - unknown, unknown)
-        self.assertEquals(unknown - true, unknown)
-        self.assertEquals(unknown - false, unknown)
-        self.assertEquals(unknown - unknown, unknown)
-        self.assertEquals(true - True, 0)
-        self.assertEquals(true - False, 1)
-        self.assertEquals(false - True, -1)
-        self.assertEquals(false - False, 0)
-        self.assertEquals(true - None, unknown)
-        self.assertEquals(false - None, unknown)
-        self.assertEquals(unknown - True, unknown)
-        self.assertEquals(unknown - False, unknown)
-        self.assertEquals(unknown - None, unknown)
-        self.assertEquals(True - true, 0)
-        self.assertEquals(True - false, 1)
-        self.assertEquals(False - true, -1)
-        self.assertEquals(False - false, 0)
-        self.assertEquals(True - unknown, unknown)
-        self.assertEquals(False - unknown, unknown)
-        self.assertEquals(None - true, unknown)
-        self.assertEquals(None - false, unknown)
-        self.assertEquals(None - unknown, unknown)
+        self.assertEqual(true - true, 0)
+        self.assertEqual(true - false, 1)
+        self.assertEqual(false - true, -1)
+        self.assertEqual(false - false, 0)
+        self.assertEqual(true - unknown, unknown)
+        self.assertEqual(false - unknown, unknown)
+        self.assertEqual(unknown - true, unknown)
+        self.assertEqual(unknown - false, unknown)
+        self.assertEqual(unknown - unknown, unknown)
+        self.assertEqual(true - True, 0)
+        self.assertEqual(true - False, 1)
+        self.assertEqual(false - True, -1)
+        self.assertEqual(false - False, 0)
+        self.assertEqual(true - None, unknown)
+        self.assertEqual(false - None, unknown)
+        self.assertEqual(unknown - True, unknown)
+        self.assertEqual(unknown - False, unknown)
+        self.assertEqual(unknown - None, unknown)
+        self.assertEqual(True - true, 0)
+        self.assertEqual(True - false, 1)
+        self.assertEqual(False - true, -1)
+        self.assertEqual(False - false, 0)
+        self.assertEqual(True - unknown, unknown)
+        self.assertEqual(False - unknown, unknown)
+        self.assertEqual(None - true, unknown)
+        self.assertEqual(None - false, unknown)
+        self.assertEqual(None - unknown, unknown)
 
         t = true
         t -= true
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = true
         t -= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f -= true
-        self.assertEquals(f, -1)
+        self.assertEqual(f, -1)
         f = false
         f -= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t -= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f -= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u -= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u -= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u -= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t -= True
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = true
         t -= False
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f -= True
-        self.assertEquals(f, -1)
+        self.assertEqual(f, -1)
         f = false
         f -= False
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t -= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f -= None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u -= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u -= False
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u -= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t -= true
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = True
         t -= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = False
         f -= true
-        self.assertEquals(f, -1)
+        self.assertEqual(f, -1)
         f = False
         f -= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = True
         t -= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f -= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u -= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u -= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u -= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
     def test_division(self):
         "division"
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
-        self.assertEquals(true / true, 1)
-        self.assertEquals(true / false, unknown)
-        self.assertEquals(false / true, 0)
-        self.assertEquals(false / false, unknown)
-        self.assertEquals(true / unknown, unknown)
-        self.assertEquals(false / unknown, unknown)
-        self.assertEquals(unknown / true, unknown)
-        self.assertEquals(unknown / false, unknown)
-        self.assertEquals(unknown / unknown, unknown)
-        self.assertEquals(true / True, 1)
-        self.assertEquals(true / False, unknown)
-        self.assertEquals(false / True, 0)
-        self.assertEquals(false / False, unknown)
-        self.assertEquals(true / None, unknown)
-        self.assertEquals(false / None, unknown)
-        self.assertEquals(unknown / True, unknown)
-        self.assertEquals(unknown / False, unknown)
-        self.assertEquals(unknown / None, unknown)
-        self.assertEquals(True / true, 1)
-        self.assertEquals(True / false, unknown)
-        self.assertEquals(False / true, 0)
-        self.assertEquals(False / false, unknown)
-        self.assertEquals(True / unknown, unknown)
-        self.assertEquals(False / unknown, unknown)
-        self.assertEquals(None / true, unknown)
-        self.assertEquals(None / false, unknown)
-        self.assertEquals(None / unknown, unknown)
+        self.assertEqual(true / true, 1)
+        self.assertEqual(true / false, unknown)
+        self.assertEqual(false / true, 0)
+        self.assertEqual(false / false, unknown)
+        self.assertEqual(true / unknown, unknown)
+        self.assertEqual(false / unknown, unknown)
+        self.assertEqual(unknown / true, unknown)
+        self.assertEqual(unknown / false, unknown)
+        self.assertEqual(unknown / unknown, unknown)
+        self.assertEqual(true / True, 1)
+        self.assertEqual(true / False, unknown)
+        self.assertEqual(false / True, 0)
+        self.assertEqual(false / False, unknown)
+        self.assertEqual(true / None, unknown)
+        self.assertEqual(false / None, unknown)
+        self.assertEqual(unknown / True, unknown)
+        self.assertEqual(unknown / False, unknown)
+        self.assertEqual(unknown / None, unknown)
+        self.assertEqual(True / true, 1)
+        self.assertEqual(True / false, unknown)
+        self.assertEqual(False / true, 0)
+        self.assertEqual(False / false, unknown)
+        self.assertEqual(True / unknown, unknown)
+        self.assertEqual(False / unknown, unknown)
+        self.assertEqual(None / true, unknown)
+        self.assertEqual(None / false, unknown)
+        self.assertEqual(None / unknown, unknown)
 
         t = true
         t /= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t /= false
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f /= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f /= false
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = true
         t /= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f /= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u /= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u /= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u /= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t /= True
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t /= False
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f /= True
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f /= False
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = true
         t /= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f /= None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u /= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u /= False
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u /= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t /= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = True
         t /= false
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f /= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = False
         f /= false
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = True
         t /= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f /= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u /= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u /= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u /= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
 
-        self.assertEquals(true // true, 1)
-        self.assertEquals(true // false, unknown)
-        self.assertEquals(false // true, 0)
-        self.assertEquals(false // false, unknown)
-        self.assertEquals(true // unknown, unknown)
-        self.assertEquals(false // unknown, unknown)
-        self.assertEquals(unknown // true, unknown)
-        self.assertEquals(unknown // false, unknown)
-        self.assertEquals(unknown // unknown, unknown)
-        self.assertEquals(true // True, 1)
-        self.assertEquals(true // False, unknown)
-        self.assertEquals(false // True, 0)
-        self.assertEquals(false // False, unknown)
-        self.assertEquals(true // None, unknown)
-        self.assertEquals(false // None, unknown)
-        self.assertEquals(unknown // True, unknown)
-        self.assertEquals(unknown // False, unknown)
-        self.assertEquals(unknown // None, unknown)
-        self.assertEquals(True // true, 1)
-        self.assertEquals(True // false, unknown)
-        self.assertEquals(False // true, 0)
-        self.assertEquals(False // false, unknown)
-        self.assertEquals(True // unknown, unknown)
-        self.assertEquals(False // unknown, unknown)
-        self.assertEquals(None // true, unknown)
-        self.assertEquals(None // false, unknown)
-        self.assertEquals(None // unknown, unknown)
+        self.assertEqual(true // true, 1)
+        self.assertEqual(true // false, unknown)
+        self.assertEqual(false // true, 0)
+        self.assertEqual(false // false, unknown)
+        self.assertEqual(true // unknown, unknown)
+        self.assertEqual(false // unknown, unknown)
+        self.assertEqual(unknown // true, unknown)
+        self.assertEqual(unknown // false, unknown)
+        self.assertEqual(unknown // unknown, unknown)
+        self.assertEqual(true // True, 1)
+        self.assertEqual(true // False, unknown)
+        self.assertEqual(false // True, 0)
+        self.assertEqual(false // False, unknown)
+        self.assertEqual(true // None, unknown)
+        self.assertEqual(false // None, unknown)
+        self.assertEqual(unknown // True, unknown)
+        self.assertEqual(unknown // False, unknown)
+        self.assertEqual(unknown // None, unknown)
+        self.assertEqual(True // true, 1)
+        self.assertEqual(True // false, unknown)
+        self.assertEqual(False // true, 0)
+        self.assertEqual(False // false, unknown)
+        self.assertEqual(True // unknown, unknown)
+        self.assertEqual(False // unknown, unknown)
+        self.assertEqual(None // true, unknown)
+        self.assertEqual(None // false, unknown)
+        self.assertEqual(None // unknown, unknown)
 
         t = true
         t //= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t //= false
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f //= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f //= false
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = true
         t //= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f //= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u //= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u //= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u //= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t //= True
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t //= False
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f //= True
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f //= False
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = true
         t //= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f //= None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u //= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u //= False
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u //= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t //= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = True
         t //= false
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f //= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = False
         f //= false
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = True
         t //= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f //= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u //= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u //= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u //= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
     def test_shift(self):
         "<< and >>"
         true = Logical(True)
         false = Logical(False)
         unknown = Logical(None)
 
-        self.assertEquals(true >> true, 0)
-        self.assertEquals(true >> false, 1)
-        self.assertEquals(false >> true, 0)
-        self.assertEquals(false >> false, 0)
-        self.assertEquals(true >> unknown, unknown)
-        self.assertEquals(false >> unknown, unknown)
-        self.assertEquals(unknown >> true, unknown)
-        self.assertEquals(unknown >> false, unknown)
-        self.assertEquals(unknown >> unknown, unknown)
-        self.assertEquals(true >> True, 0)
-        self.assertEquals(true >> False, 1)
-        self.assertEquals(false >> True, 0)
-        self.assertEquals(false >> False, 0)
-        self.assertEquals(true >> None, unknown)
-        self.assertEquals(false >> None, unknown)
-        self.assertEquals(unknown >> True, unknown)
-        self.assertEquals(unknown >> False, unknown)
-        self.assertEquals(unknown >> None, unknown)
-        self.assertEquals(True >> true, 0)
-        self.assertEquals(True >> false, 1)
-        self.assertEquals(False >> true, 0)
-        self.assertEquals(False >> false, 0)
-        self.assertEquals(True >> unknown, unknown)
-        self.assertEquals(False >> unknown, unknown)
-        self.assertEquals(None >> true, unknown)
-        self.assertEquals(None >> false, unknown)
-        self.assertEquals(None >> unknown, unknown)
+        self.assertEqual(true >> true, 0)
+        self.assertEqual(true >> false, 1)
+        self.assertEqual(false >> true, 0)
+        self.assertEqual(false >> false, 0)
+        self.assertEqual(true >> unknown, unknown)
+        self.assertEqual(false >> unknown, unknown)
+        self.assertEqual(unknown >> true, unknown)
+        self.assertEqual(unknown >> false, unknown)
+        self.assertEqual(unknown >> unknown, unknown)
+        self.assertEqual(true >> True, 0)
+        self.assertEqual(true >> False, 1)
+        self.assertEqual(false >> True, 0)
+        self.assertEqual(false >> False, 0)
+        self.assertEqual(true >> None, unknown)
+        self.assertEqual(false >> None, unknown)
+        self.assertEqual(unknown >> True, unknown)
+        self.assertEqual(unknown >> False, unknown)
+        self.assertEqual(unknown >> None, unknown)
+        self.assertEqual(True >> true, 0)
+        self.assertEqual(True >> false, 1)
+        self.assertEqual(False >> true, 0)
+        self.assertEqual(False >> false, 0)
+        self.assertEqual(True >> unknown, unknown)
+        self.assertEqual(False >> unknown, unknown)
+        self.assertEqual(None >> true, unknown)
+        self.assertEqual(None >> false, unknown)
+        self.assertEqual(None >> unknown, unknown)
 
-        self.assertEquals(true << true, 2)
-        self.assertEquals(true << false, 1)
-        self.assertEquals(false << true, 0)
-        self.assertEquals(false << false, 0)
-        self.assertEquals(true << unknown, unknown)
-        self.assertEquals(false << unknown, unknown)
-        self.assertEquals(unknown << true, unknown)
-        self.assertEquals(unknown << false, unknown)
-        self.assertEquals(unknown << unknown, unknown)
-        self.assertEquals(true << True, 2)
-        self.assertEquals(true << False, 1)
-        self.assertEquals(false << True, 0)
-        self.assertEquals(false << False, 0)
-        self.assertEquals(true << None, unknown)
-        self.assertEquals(false << None, unknown)
-        self.assertEquals(unknown << True, unknown)
-        self.assertEquals(unknown << False, unknown)
-        self.assertEquals(unknown << None, unknown)
-        self.assertEquals(True << true, 2)
-        self.assertEquals(True << false, 1)
-        self.assertEquals(False << true, 0)
-        self.assertEquals(False << false, 0)
-        self.assertEquals(True << unknown, unknown)
-        self.assertEquals(False << unknown, unknown)
-        self.assertEquals(None << true, unknown)
-        self.assertEquals(None << false, unknown)
-        self.assertEquals(None << unknown, unknown)
+        self.assertEqual(true << true, 2)
+        self.assertEqual(true << false, 1)
+        self.assertEqual(false << true, 0)
+        self.assertEqual(false << false, 0)
+        self.assertEqual(true << unknown, unknown)
+        self.assertEqual(false << unknown, unknown)
+        self.assertEqual(unknown << true, unknown)
+        self.assertEqual(unknown << false, unknown)
+        self.assertEqual(unknown << unknown, unknown)
+        self.assertEqual(true << True, 2)
+        self.assertEqual(true << False, 1)
+        self.assertEqual(false << True, 0)
+        self.assertEqual(false << False, 0)
+        self.assertEqual(true << None, unknown)
+        self.assertEqual(false << None, unknown)
+        self.assertEqual(unknown << True, unknown)
+        self.assertEqual(unknown << False, unknown)
+        self.assertEqual(unknown << None, unknown)
+        self.assertEqual(True << true, 2)
+        self.assertEqual(True << false, 1)
+        self.assertEqual(False << true, 0)
+        self.assertEqual(False << false, 0)
+        self.assertEqual(True << unknown, unknown)
+        self.assertEqual(False << unknown, unknown)
+        self.assertEqual(None << true, unknown)
+        self.assertEqual(None << false, unknown)
+        self.assertEqual(None << unknown, unknown)
 
         t = true
         t >>= true
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = true
         t >>= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f >>= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f >>= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t >>= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f >>= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u >>= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u >>= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u >>= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t >>= True
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = true
         t >>= False
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f >>= True
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f >>= False
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t >>= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f >>= None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u >>= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u >>= False
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u >>= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t >>= true
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = True
         t >>= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = False
         f >>= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = False
         f >>= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = True
         t >>= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f >>= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u >>= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u >>= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u >>= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
         t = true
         t <<= true
-        self.assertEquals(t, 2)
+        self.assertEqual(t, 2)
         t = true
         t <<= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f <<= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f <<= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t <<= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f <<= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u <<= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u <<= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u <<= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t <<= True
-        self.assertEquals(t, 2)
+        self.assertEqual(t, 2)
         t = true
         t <<= False
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f <<= True
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f <<= False
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = true
         t <<= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f <<= None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u <<= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u <<= False
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u <<= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t <<= true
-        self.assertEquals(t, 2)
+        self.assertEqual(t, 2)
         t = True
         t <<= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = False
         f <<= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = False
         f <<= false
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         t = True
         t <<= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f <<= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u <<= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u <<= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u <<= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
     def test_pow(self):
         "**"
@@ -1889,115 +1886,115 @@ class Test_Logical(unittest.TestCase):
         false = Logical(False)
         unknown = Logical(None)
 
-        self.assertEquals(true ** true, 1)
-        self.assertEquals(true ** false, 1)
-        self.assertEquals(false ** true, 0)
-        self.assertEquals(false ** false, 1)
-        self.assertEquals(true ** unknown, unknown)
-        self.assertEquals(false ** unknown, unknown)
-        self.assertEquals(unknown ** true, unknown)
-        self.assertEquals(unknown ** false, 1)
-        self.assertEquals(unknown ** unknown, unknown)
-        self.assertEquals(true ** True, 1)
-        self.assertEquals(true ** False, 1)
-        self.assertEquals(false ** True, 0)
-        self.assertEquals(false ** False, 1)
-        self.assertEquals(true ** None, unknown)
-        self.assertEquals(false ** None, unknown)
-        self.assertEquals(unknown ** True, unknown)
-        self.assertEquals(unknown ** False, 1)
-        self.assertEquals(unknown ** None, unknown)
-        self.assertEquals(True ** true, 1)
-        self.assertEquals(True ** false, 1)
-        self.assertEquals(False ** true, 0)
-        self.assertEquals(False ** false, 1)
-        self.assertEquals(True ** unknown, unknown)
-        self.assertEquals(False ** unknown, unknown)
-        self.assertEquals(None ** true, unknown)
-        self.assertEquals(None ** false, 1)
-        self.assertEquals(None ** unknown, unknown)
+        self.assertEqual(true ** true, 1)
+        self.assertEqual(true ** false, 1)
+        self.assertEqual(false ** true, 0)
+        self.assertEqual(false ** false, 1)
+        self.assertEqual(true ** unknown, unknown)
+        self.assertEqual(false ** unknown, unknown)
+        self.assertEqual(unknown ** true, unknown)
+        self.assertEqual(unknown ** false, 1)
+        self.assertEqual(unknown ** unknown, unknown)
+        self.assertEqual(true ** True, 1)
+        self.assertEqual(true ** False, 1)
+        self.assertEqual(false ** True, 0)
+        self.assertEqual(false ** False, 1)
+        self.assertEqual(true ** None, unknown)
+        self.assertEqual(false ** None, unknown)
+        self.assertEqual(unknown ** True, unknown)
+        self.assertEqual(unknown ** False, 1)
+        self.assertEqual(unknown ** None, unknown)
+        self.assertEqual(True ** true, 1)
+        self.assertEqual(True ** false, 1)
+        self.assertEqual(False ** true, 0)
+        self.assertEqual(False ** false, 1)
+        self.assertEqual(True ** unknown, unknown)
+        self.assertEqual(False ** unknown, unknown)
+        self.assertEqual(None ** true, unknown)
+        self.assertEqual(None ** false, 1)
+        self.assertEqual(None ** unknown, unknown)
 
         t = true
         t **= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t **= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f **= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f **= false
-        self.assertEquals(f, 1)
+        self.assertEqual(f, 1)
         t = true
         t **= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f **= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u **= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u **= false
-        self.assertEquals(u, 1)
+        self.assertEqual(u, 1)
         u = unknown
         u **= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t **= True
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = true
         t **= False
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = false
         f **= True
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f **= False
-        self.assertEquals(f, 1)
+        self.assertEqual(f, 1)
         t = true
         t **= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f **= None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u **= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u **= False
-        self.assertEquals(u, 1)
+        self.assertEqual(u, 1)
         u = unknown
         u **= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t **= true
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         t = True
         t **= false
-        self.assertEquals(t, 1)
+        self.assertEqual(t, 1)
         f = False
         f **= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = False
         f **= false
-        self.assertEquals(f, 1)
+        self.assertEqual(f, 1)
         t = True
         t **= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f **= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u **= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u **= false
-        self.assertEquals(u, 1)
+        self.assertEqual(u, 1)
         u = None
         u **= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
     def test_mod(self):
         "%"
@@ -2005,115 +2002,115 @@ class Test_Logical(unittest.TestCase):
         false = Logical(False)
         unknown = Logical(None)
 
-        self.assertEquals(true % true, 0)
-        self.assertEquals(true % false, unknown)
-        self.assertEquals(false % true, 0)
-        self.assertEquals(false % false, unknown)
-        self.assertEquals(true % unknown, unknown)
-        self.assertEquals(false % unknown, unknown)
-        self.assertEquals(unknown % true, unknown)
-        self.assertEquals(unknown % false, unknown)
-        self.assertEquals(unknown % unknown, unknown)
-        self.assertEquals(true % True, 0)
-        self.assertEquals(true % False, unknown)
-        self.assertEquals(false % True, 0)
-        self.assertEquals(false % False, unknown)
-        self.assertEquals(true % None, unknown)
-        self.assertEquals(false % None, unknown)
-        self.assertEquals(unknown % True, unknown)
-        self.assertEquals(unknown % False, unknown)
-        self.assertEquals(unknown % None, unknown)
-        self.assertEquals(True % true, 0)
-        self.assertEquals(True % false, unknown)
-        self.assertEquals(False % true, 0)
-        self.assertEquals(False % false, unknown)
-        self.assertEquals(True % unknown, unknown)
-        self.assertEquals(False % unknown, unknown)
-        self.assertEquals(None % true, unknown)
-        self.assertEquals(None % false, unknown)
-        self.assertEquals(None % unknown, unknown)
+        self.assertEqual(true % true, 0)
+        self.assertEqual(true % false, unknown)
+        self.assertEqual(false % true, 0)
+        self.assertEqual(false % false, unknown)
+        self.assertEqual(true % unknown, unknown)
+        self.assertEqual(false % unknown, unknown)
+        self.assertEqual(unknown % true, unknown)
+        self.assertEqual(unknown % false, unknown)
+        self.assertEqual(unknown % unknown, unknown)
+        self.assertEqual(true % True, 0)
+        self.assertEqual(true % False, unknown)
+        self.assertEqual(false % True, 0)
+        self.assertEqual(false % False, unknown)
+        self.assertEqual(true % None, unknown)
+        self.assertEqual(false % None, unknown)
+        self.assertEqual(unknown % True, unknown)
+        self.assertEqual(unknown % False, unknown)
+        self.assertEqual(unknown % None, unknown)
+        self.assertEqual(True % true, 0)
+        self.assertEqual(True % false, unknown)
+        self.assertEqual(False % true, 0)
+        self.assertEqual(False % false, unknown)
+        self.assertEqual(True % unknown, unknown)
+        self.assertEqual(False % unknown, unknown)
+        self.assertEqual(None % true, unknown)
+        self.assertEqual(None % false, unknown)
+        self.assertEqual(None % unknown, unknown)
 
         t = true
         t %= true
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = true
         t %= false
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f %= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f %= false
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = true
         t %= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f %= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u %= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u %= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u %= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = true
         t %= True
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = true
         t %= False
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f %= True
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = false
         f %= False
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = true
         t %= None
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = false
         f %= None
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = unknown
         u %= True
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u %= False
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = unknown
         u %= None
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         t = True
         t %= true
-        self.assertEquals(t, 0)
+        self.assertEqual(t, 0)
         t = True
         t %= false
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f %= true
-        self.assertEquals(f, 0)
+        self.assertEqual(f, 0)
         f = False
         f %= false
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         t = True
         t %= unknown
-        self.assertEquals(t, unknown)
+        self.assertEqual(t, unknown)
         f = False
         f %= unknown
-        self.assertEquals(f, unknown)
+        self.assertEqual(f, unknown)
         u = None
         u %= true
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u %= false
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
         u = None
         u %= unknown
-        self.assertEquals(u, unknown)
+        self.assertEqual(u, unknown)
 
     def test_divmod(self):
         "divmod()"
@@ -2121,39 +2118,43 @@ class Test_Logical(unittest.TestCase):
         false = Logical(False)
         unknown = Logical(None)
 
-        self.assertEquals(divmod(true, true), (1, 0))
-        self.assertEquals(divmod(true, false), (unknown, unknown))
-        self.assertEquals(divmod(false, true), (0, 0))
-        self.assertEquals(divmod(false, false), (unknown, unknown))
-        self.assertEquals(divmod(true, unknown), (unknown, unknown))
-        self.assertEquals(divmod(false, unknown), (unknown, unknown))
-        self.assertEquals(divmod(unknown, true), (unknown, unknown))
-        self.assertEquals(divmod(unknown, false), (unknown, unknown))
-        self.assertEquals(divmod(unknown, unknown), (unknown, unknown))
-        self.assertEquals(divmod(true, True), (1, 0))
-        self.assertEquals(divmod(true, False), (unknown, unknown))
-        self.assertEquals(divmod(false, True), (0, 0))
-        self.assertEquals(divmod(false, False), (unknown, unknown))
-        self.assertEquals(divmod(true, None), (unknown, unknown))
-        self.assertEquals(divmod(false, None), (unknown, unknown))
-        self.assertEquals(divmod(unknown, True), (unknown, unknown))
-        self.assertEquals(divmod(unknown, False), (unknown, unknown))
-        self.assertEquals(divmod(unknown, None), (unknown, unknown))
-        self.assertEquals(divmod(True, true), (1, 0))
-        self.assertEquals(divmod(True, false), (unknown, unknown))
-        self.assertEquals(divmod(False, true), (0, 0))
-        self.assertEquals(divmod(False, false), (unknown, unknown))
-        self.assertEquals(divmod(True, unknown), (unknown, unknown))
-        self.assertEquals(divmod(False, unknown), (unknown, unknown))
-        self.assertEquals(divmod(None, true), (unknown, unknown))
-        self.assertEquals(divmod(None, false), (unknown, unknown))
-        self.assertEquals(divmod(None, unknown), (unknown, unknown))
+        self.assertEqual(divmod(true, true), (1, 0))
+        self.assertEqual(divmod(true, false), (unknown, unknown))
+        self.assertEqual(divmod(false, true), (0, 0))
+        self.assertEqual(divmod(false, false), (unknown, unknown))
+        self.assertEqual(divmod(true, unknown), (unknown, unknown))
+        self.assertEqual(divmod(false, unknown), (unknown, unknown))
+        self.assertEqual(divmod(unknown, true), (unknown, unknown))
+        self.assertEqual(divmod(unknown, false), (unknown, unknown))
+        self.assertEqual(divmod(unknown, unknown), (unknown, unknown))
+        self.assertEqual(divmod(true, True), (1, 0))
+        self.assertEqual(divmod(true, False), (unknown, unknown))
+        self.assertEqual(divmod(false, True), (0, 0))
+        self.assertEqual(divmod(false, False), (unknown, unknown))
+        self.assertEqual(divmod(true, None), (unknown, unknown))
+        self.assertEqual(divmod(false, None), (unknown, unknown))
+        self.assertEqual(divmod(unknown, True), (unknown, unknown))
+        self.assertEqual(divmod(unknown, False), (unknown, unknown))
+        self.assertEqual(divmod(unknown, None), (unknown, unknown))
+        self.assertEqual(divmod(True, true), (1, 0))
+        self.assertEqual(divmod(True, false), (unknown, unknown))
+        self.assertEqual(divmod(False, true), (0, 0))
+        self.assertEqual(divmod(False, false), (unknown, unknown))
+        self.assertEqual(divmod(True, unknown), (unknown, unknown))
+        self.assertEqual(divmod(False, unknown), (unknown, unknown))
+        self.assertEqual(divmod(None, true), (unknown, unknown))
+        self.assertEqual(divmod(None, false), (unknown, unknown))
+        self.assertEqual(divmod(None, unknown), (unknown, unknown))
 
-class Test_Quantum(unittest.TestCase):
+class TestQuantum(unittest.TestCase):
     "Testing Quantum"
     def test_exceptions(self):
         "errors"
         self.assertRaises(ValueError, Quantum, 'wrong')
+        if py_ver >= (2, 5):
+            self.assertRaises(TypeError, lambda : (0, 1, 2)[On])
+            self.assertRaises(TypeError, lambda : (0, 1, 2)[Off])
+            self.assertRaises(TypeError, lambda : (0, 1, 2)[Other])
 
     def test_other(self):
         "Other"
@@ -2162,56 +2163,42 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)
 
         huh = Quantum('?')
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)
 
         huh = Quantum(' ')
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)
 
         huh = Quantum(None)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)
 
         huh = Quantum(Null())
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)
 
         huh = Quantum(Other)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)
 
         huh = Quantum(Unknown)
         self.assertEqual(huh is dbf.Other, True)
         self.assertEqual((huh != huh) is unknown, True)
         self.assertEqual((huh != True) is unknown, True)
         self.assertEqual((huh != False) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 2)
 
     def test_true(self):
         "true"
@@ -2220,8 +2207,6 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual(huh, True)
         self.assertNotEqual(huh, False)
         self.assertEqual((huh != None) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 1)
 
         huh = Quantum('yes')
         unknown = Quantum('?')
@@ -2260,8 +2245,6 @@ class Test_Quantum(unittest.TestCase):
         self.assertEqual(huh, False)
         self.assertNotEqual(huh, True)
         self.assertEqual((huh != None) is unknown, True)
-        if py_ver >= (2, 5):
-            self.assertEqual((0, 1, 2)[huh], 0)
 
         huh = Quantum('No')
         unknown = Quantum('?')
@@ -2301,212 +2284,212 @@ class Test_Quantum(unittest.TestCase):
         ack = Quantum([])
         unk = Quantum('?')
         bla = Quantum(None)
-        self.assertEquals(heh is hah, True)
-        self.assertEquals(ick is ack, True)
-        self.assertEquals(unk is bla, True)
+        self.assertEqual(heh is hah, True)
+        self.assertEqual(ick is ack, True)
+        self.assertEqual(unk is bla, True)
 
     def test_or(self):
         "or"
         true = Quantum(True)
         false = Quantum(False)
         unknown = Quantum(None)
-        self.assertEquals(true + true, true)
-        self.assertEquals(true + false, true)
-        self.assertEquals(false + true, true)
-        self.assertEquals(false + false, false)
-        self.assertEquals(true + unknown, true)
-        self.assertEquals(false + unknown is unknown, True)
-        self.assertEquals(unknown + unknown is unknown, True)
-        self.assertEquals(true | true, true)
-        self.assertEquals(true | false, true)
-        self.assertEquals(false | true, true)
-        self.assertEquals(false | false, false)
-        self.assertEquals(true | unknown, true)
-        self.assertEquals(false | unknown is unknown, True)
-        self.assertEquals(unknown | unknown is unknown, True)
-        self.assertEquals(true + True, true)
-        self.assertEquals(true + False, true)
-        self.assertEquals(false + True, true)
-        self.assertEquals(false + False, false)
-        self.assertEquals(true + None, true)
-        self.assertEquals(false + None is unknown, True)
-        self.assertEquals(unknown + None is unknown, True)
-        self.assertEquals(true | True, true)
-        self.assertEquals(true | False, true)
-        self.assertEquals(false | True, true)
-        self.assertEquals(false | False, false)
-        self.assertEquals(true | None, true)
-        self.assertEquals(false | None is unknown, True)
-        self.assertEquals(unknown | None is unknown, True)
-        self.assertEquals(True + true, true)
-        self.assertEquals(True + false, true)
-        self.assertEquals(False + true, true)
-        self.assertEquals(False + false, false)
-        self.assertEquals(True + unknown, true)
-        self.assertEquals(False + unknown is unknown, True)
-        self.assertEquals(None + unknown is unknown, True)
-        self.assertEquals(True | true, true)
-        self.assertEquals(True | false, true)
-        self.assertEquals(False | true, true)
-        self.assertEquals(False | false, false)
-        self.assertEquals(True | unknown, true)
-        self.assertEquals(False | unknown is unknown, True)
-        self.assertEquals(None | unknown is unknown, True)
+        self.assertEqual(true + true, true)
+        self.assertEqual(true + false, true)
+        self.assertEqual(false + true, true)
+        self.assertEqual(false + false, false)
+        self.assertEqual(true + unknown, true)
+        self.assertEqual(false + unknown is unknown, True)
+        self.assertEqual(unknown + unknown is unknown, True)
+        self.assertEqual(true | true, true)
+        self.assertEqual(true | false, true)
+        self.assertEqual(false | true, true)
+        self.assertEqual(false | false, false)
+        self.assertEqual(true | unknown, true)
+        self.assertEqual(false | unknown is unknown, True)
+        self.assertEqual(unknown | unknown is unknown, True)
+        self.assertEqual(true + True, true)
+        self.assertEqual(true + False, true)
+        self.assertEqual(false + True, true)
+        self.assertEqual(false + False, false)
+        self.assertEqual(true + None, true)
+        self.assertEqual(false + None is unknown, True)
+        self.assertEqual(unknown + None is unknown, True)
+        self.assertEqual(true | True, true)
+        self.assertEqual(true | False, true)
+        self.assertEqual(false | True, true)
+        self.assertEqual(false | False, false)
+        self.assertEqual(true | None, true)
+        self.assertEqual(false | None is unknown, True)
+        self.assertEqual(unknown | None is unknown, True)
+        self.assertEqual(True + true, true)
+        self.assertEqual(True + false, true)
+        self.assertEqual(False + true, true)
+        self.assertEqual(False + false, false)
+        self.assertEqual(True + unknown, true)
+        self.assertEqual(False + unknown is unknown, True)
+        self.assertEqual(None + unknown is unknown, True)
+        self.assertEqual(True | true, true)
+        self.assertEqual(True | false, true)
+        self.assertEqual(False | true, true)
+        self.assertEqual(False | false, false)
+        self.assertEqual(True | unknown, true)
+        self.assertEqual(False | unknown is unknown, True)
+        self.assertEqual(None | unknown is unknown, True)
     def test_and(self):
         "and"
         true = Quantum(True)
         false = Quantum(False)
         unknown = Quantum(None)
-        self.assertEquals(true * true, true)
-        self.assertEquals(true * false, false)
-        self.assertEquals(false * true, false)
-        self.assertEquals(false * false, false)
-        self.assertEquals(true * unknown is unknown, True)
-        self.assertEquals(false * unknown, false)
-        self.assertEquals(unknown * unknown is unknown, True)
-        self.assertEquals(true & true, true)
-        self.assertEquals(true & false, false)
-        self.assertEquals(false & true, false)
-        self.assertEquals(false & false, false)
-        self.assertEquals(true & unknown is unknown, True)
-        self.assertEquals(false & unknown, false)
-        self.assertEquals(unknown & unknown is unknown, True)
-        self.assertEquals(true * True, true)
-        self.assertEquals(true * False, false)
-        self.assertEquals(false * True, false)
-        self.assertEquals(false * False, false)
-        self.assertEquals(true * None is unknown, True)
-        self.assertEquals(false * None, false)
-        self.assertEquals(unknown * None is unknown, True)
-        self.assertEquals(true & True, true)
-        self.assertEquals(true & False, false)
-        self.assertEquals(false & True, false)
-        self.assertEquals(false & False, false)
-        self.assertEquals(true & None is unknown, True)
-        self.assertEquals(false & None, false)
-        self.assertEquals(unknown & None is unknown, True)
-        self.assertEquals(True * true, true)
-        self.assertEquals(True * false, false)
-        self.assertEquals(False * true, false)
-        self.assertEquals(False * false, false)
-        self.assertEquals(True * unknown is unknown, True)
-        self.assertEquals(False * unknown, false)
-        self.assertEquals(None * unknown is unknown, True)
-        self.assertEquals(True & true, true)
-        self.assertEquals(True & false, false)
-        self.assertEquals(False & true, false)
-        self.assertEquals(False & false, false)
-        self.assertEquals(True & unknown is unknown, True)
-        self.assertEquals(False & unknown, false)
-        self.assertEquals(None & unknown is unknown, True)
+        self.assertEqual(true * true, true)
+        self.assertEqual(true * false, false)
+        self.assertEqual(false * true, false)
+        self.assertEqual(false * false, false)
+        self.assertEqual(true * unknown is unknown, True)
+        self.assertEqual(false * unknown, false)
+        self.assertEqual(unknown * unknown is unknown, True)
+        self.assertEqual(true & true, true)
+        self.assertEqual(true & false, false)
+        self.assertEqual(false & true, false)
+        self.assertEqual(false & false, false)
+        self.assertEqual(true & unknown is unknown, True)
+        self.assertEqual(false & unknown, false)
+        self.assertEqual(unknown & unknown is unknown, True)
+        self.assertEqual(true * True, true)
+        self.assertEqual(true * False, false)
+        self.assertEqual(false * True, false)
+        self.assertEqual(false * False, false)
+        self.assertEqual(true * None is unknown, True)
+        self.assertEqual(false * None, false)
+        self.assertEqual(unknown * None is unknown, True)
+        self.assertEqual(true & True, true)
+        self.assertEqual(true & False, false)
+        self.assertEqual(false & True, false)
+        self.assertEqual(false & False, false)
+        self.assertEqual(true & None is unknown, True)
+        self.assertEqual(false & None, false)
+        self.assertEqual(unknown & None is unknown, True)
+        self.assertEqual(True * true, true)
+        self.assertEqual(True * false, false)
+        self.assertEqual(False * true, false)
+        self.assertEqual(False * false, false)
+        self.assertEqual(True * unknown is unknown, True)
+        self.assertEqual(False * unknown, false)
+        self.assertEqual(None * unknown is unknown, True)
+        self.assertEqual(True & true, true)
+        self.assertEqual(True & false, false)
+        self.assertEqual(False & true, false)
+        self.assertEqual(False & false, false)
+        self.assertEqual(True & unknown is unknown, True)
+        self.assertEqual(False & unknown, false)
+        self.assertEqual(None & unknown is unknown, True)
     def test_xor(self):
         "xor"
         true = Quantum(True)
         false = Quantum(False)
         unknown = Quantum(None)
-        self.assertEquals(true ^ true, false)
-        self.assertEquals(true ^ false, true)
-        self.assertEquals(false ^ true, true)
-        self.assertEquals(false ^ false, false)
-        self.assertEquals(true ^ unknown is unknown, True)
-        self.assertEquals(false ^ unknown is unknown, True)
-        self.assertEquals(unknown ^ unknown is unknown, True)
-        self.assertEquals(true ^ True, false)
-        self.assertEquals(true ^ False, true)
-        self.assertEquals(false ^ True, true)
-        self.assertEquals(false ^ False, false)
-        self.assertEquals(true ^ None is unknown, True)
-        self.assertEquals(false ^ None is unknown, True)
-        self.assertEquals(unknown ^ None is unknown, True)
-        self.assertEquals(True ^ true, false)
-        self.assertEquals(True ^ false, true)
-        self.assertEquals(False ^ true, true)
-        self.assertEquals(False ^ false, false)
-        self.assertEquals(True ^ unknown is unknown, True)
-        self.assertEquals(False ^ unknown is unknown, True)
-        self.assertEquals(None ^ unknown is unknown, True)
+        self.assertEqual(true ^ true, false)
+        self.assertEqual(true ^ false, true)
+        self.assertEqual(false ^ true, true)
+        self.assertEqual(false ^ false, false)
+        self.assertEqual(true ^ unknown is unknown, True)
+        self.assertEqual(false ^ unknown is unknown, True)
+        self.assertEqual(unknown ^ unknown is unknown, True)
+        self.assertEqual(true ^ True, false)
+        self.assertEqual(true ^ False, true)
+        self.assertEqual(false ^ True, true)
+        self.assertEqual(false ^ False, false)
+        self.assertEqual(true ^ None is unknown, True)
+        self.assertEqual(false ^ None is unknown, True)
+        self.assertEqual(unknown ^ None is unknown, True)
+        self.assertEqual(True ^ true, false)
+        self.assertEqual(True ^ false, true)
+        self.assertEqual(False ^ true, true)
+        self.assertEqual(False ^ false, false)
+        self.assertEqual(True ^ unknown is unknown, True)
+        self.assertEqual(False ^ unknown is unknown, True)
+        self.assertEqual(None ^ unknown is unknown, True)
     def test_implication_material(self):
         "implication, material"
         true = Quantum(True)
         false = Quantum(False)
         unknown = Quantum(None)
-        self.assertEquals(true >> true, true)
-        self.assertEquals(true >> false, false)
-        self.assertEquals(false >> true, true)
-        self.assertEquals(false >> false, true)
-        self.assertEquals(true >> unknown is unknown, True)
-        self.assertEquals(false >> unknown, true)
-        self.assertEquals(unknown >> unknown is unknown, True)
-        self.assertEquals(true >> True, true)
-        self.assertEquals(true >> False, false)
-        self.assertEquals(false >> True, true)
-        self.assertEquals(false >> False, true)
-        self.assertEquals(true >> None is unknown, True)
-        self.assertEquals(false >> None, true)
-        self.assertEquals(unknown >> None is unknown, True)
-        self.assertEquals(True >> true, true)
-        self.assertEquals(True >> false, false)
-        self.assertEquals(False >> true, true)
-        self.assertEquals(False >> false, true)
-        self.assertEquals(True >> unknown is unknown, True)
-        self.assertEquals(False >> unknown, true)
-        self.assertEquals(None >> unknown is unknown, True)
+        self.assertEqual(true >> true, true)
+        self.assertEqual(true >> false, false)
+        self.assertEqual(false >> true, true)
+        self.assertEqual(false >> false, true)
+        self.assertEqual(true >> unknown is unknown, True)
+        self.assertEqual(false >> unknown, true)
+        self.assertEqual(unknown >> unknown is unknown, True)
+        self.assertEqual(true >> True, true)
+        self.assertEqual(true >> False, false)
+        self.assertEqual(false >> True, true)
+        self.assertEqual(false >> False, true)
+        self.assertEqual(true >> None is unknown, True)
+        self.assertEqual(false >> None, true)
+        self.assertEqual(unknown >> None is unknown, True)
+        self.assertEqual(True >> true, true)
+        self.assertEqual(True >> false, false)
+        self.assertEqual(False >> true, true)
+        self.assertEqual(False >> false, true)
+        self.assertEqual(True >> unknown is unknown, True)
+        self.assertEqual(False >> unknown, true)
+        self.assertEqual(None >> unknown is unknown, True)
     def test_implication_relevant(self):
         "implication, relevant"
         true = Quantum(True)
         false = Quantum(False)
         unknown = Quantum(None)
         Quantum.set_implication('relevant')
-        self.assertEquals(true >> true, true)
-        self.assertEquals(true >> false, false)
-        self.assertEquals(false >> true is unknown, True)
-        self.assertEquals(false >> false is unknown, True)
-        self.assertEquals(true >> unknown is unknown, True)
-        self.assertEquals(false >> unknown is unknown, True)
-        self.assertEquals(unknown >> unknown is unknown, True)
-        self.assertEquals(true >> True, true)
-        self.assertEquals(true >> False, false)
-        self.assertEquals(false >> True is unknown, True)
-        self.assertEquals(false >> False is unknown, True)
-        self.assertEquals(true >> None is unknown, True)
-        self.assertEquals(false >> None is unknown, True)
-        self.assertEquals(unknown >> None is unknown, True)
-        self.assertEquals(True >> true, true)
-        self.assertEquals(True >> false, false)
-        self.assertEquals(False >> true is unknown, True)
-        self.assertEquals(False >> false is unknown, True)
-        self.assertEquals(True >> unknown is unknown, True)
-        self.assertEquals(False >> unknown is unknown, True)
-        self.assertEquals(None >> unknown is unknown, True)
+        self.assertEqual(true >> true, true)
+        self.assertEqual(true >> false, false)
+        self.assertEqual(false >> true is unknown, True)
+        self.assertEqual(false >> false is unknown, True)
+        self.assertEqual(true >> unknown is unknown, True)
+        self.assertEqual(false >> unknown is unknown, True)
+        self.assertEqual(unknown >> unknown is unknown, True)
+        self.assertEqual(true >> True, true)
+        self.assertEqual(true >> False, false)
+        self.assertEqual(false >> True is unknown, True)
+        self.assertEqual(false >> False is unknown, True)
+        self.assertEqual(true >> None is unknown, True)
+        self.assertEqual(false >> None is unknown, True)
+        self.assertEqual(unknown >> None is unknown, True)
+        self.assertEqual(True >> true, true)
+        self.assertEqual(True >> false, false)
+        self.assertEqual(False >> true is unknown, True)
+        self.assertEqual(False >> false is unknown, True)
+        self.assertEqual(True >> unknown is unknown, True)
+        self.assertEqual(False >> unknown is unknown, True)
+        self.assertEqual(None >> unknown is unknown, True)
     def test_nand(self):
         "negative and"
         true = Quantum(True)
         false = Quantum(False)
         unknown = Quantum(None)
-        self.assertEquals(true.D(true), false)
-        self.assertEquals(true.D(false), true)
-        self.assertEquals(false.D(true), true)
-        self.assertEquals(false.D(false), true)
-        self.assertEquals(true.D(unknown) is unknown, True)
-        self.assertEquals(false.D(unknown), true)
-        self.assertEquals(unknown.D(unknown) is unknown, True)
-        self.assertEquals(true.D(True), false)
-        self.assertEquals(true.D(False), true)
-        self.assertEquals(false.D(True), true)
-        self.assertEquals(false.D(False), true)
-        self.assertEquals(true.D(None) is unknown, True)
-        self.assertEquals(false.D(None), true)
-        self.assertEquals(unknown.D(None) is unknown, True)
+        self.assertEqual(true.D(true), false)
+        self.assertEqual(true.D(false), true)
+        self.assertEqual(false.D(true), true)
+        self.assertEqual(false.D(false), true)
+        self.assertEqual(true.D(unknown) is unknown, True)
+        self.assertEqual(false.D(unknown), true)
+        self.assertEqual(unknown.D(unknown) is unknown, True)
+        self.assertEqual(true.D(True), false)
+        self.assertEqual(true.D(False), true)
+        self.assertEqual(false.D(True), true)
+        self.assertEqual(false.D(False), true)
+        self.assertEqual(true.D(None) is unknown, True)
+        self.assertEqual(false.D(None), true)
+        self.assertEqual(unknown.D(None) is unknown, True)
     def test_negation(self):
         "negation"
         true = Quantum(True)
         false = Quantum(False)
         none = Quantum(None)
-        self.assertEquals(-true, false)
-        self.assertEquals(-false, true)
-        self.assertEquals(-none is none, True)
+        self.assertEqual(-true, false)
+        self.assertEqual(-false, true)
+        self.assertEqual(-none is none, True)
 
-class Test_Exceptions(unittest.TestCase):
+class TestExceptions(unittest.TestCase):
     def test_bad_field_specs_on_creation(self):
         self.assertRaises(FieldSpecError, Table, 'blah', 'age N(3,2)', on_disk=False)
         self.assertRaises(FieldSpecError, Table, 'blah', 'name C(300)', on_disk=False)
@@ -2534,6 +2517,12 @@ class Test_Exceptions(unittest.TestCase):
         fields = []
         for i in range(254):
             fields.append('a%03d C(10) null' % i)
+        table = Table(':test:', ';'.join(fields), dbf_type='vfp', on_disk=False)
+        table.open()
+        self.assertRaises(DbfError, table.add_fields, 'a255 C(10)')
+        fields = []
+        for i in range(254):
+            fields.append('a%03d C(10) NULL' % i)
         table = Table(':test:', ';'.join(fields), dbf_type='vfp', on_disk=False)
         table.open()
         self.assertRaises(DbfError, table.add_fields, 'a255 C(10)')
@@ -2575,7 +2564,7 @@ class Test_Exceptions(unittest.TestCase):
         table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
         self.assertRaises(BadDataError, Table, os.path.join(tempdir, 'temptable'))
 
-class Test_IndexLocation(unittest.TestCase):
+class TestIndexLocation(unittest.TestCase):
     def test_false(self):
         self.assertFalse(IndexLocation(0, False))
         self.assertFalse(IndexLocation(42, False))
@@ -2583,7 +2572,7 @@ class Test_IndexLocation(unittest.TestCase):
         self.assertTrue(IndexLocation(0, True))
         self.assertTrue(IndexLocation(42, True))
 
-class Test_Dbf_Creation(unittest.TestCase):
+class TestDbfCreation(unittest.TestCase):
     "Testing table creation..."
     def test_db3_memory_tables(self):
         "dbf tables in memory"
@@ -2608,7 +2597,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                     last_byte = table.read()[-1]
                 finally:
                     table.close()
-                self.assertEqual(last_byte, '\x1a')
+                self.assertEqual(last_byte, EOF)
     def test_clp_memory_tables(self):
         "clp tables in memory"
         fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
@@ -2634,7 +2623,7 @@ class Test_Dbf_Creation(unittest.TestCase):
                     last_byte = table.read()[-1]
                 finally:
                     table.close()
-                self.assertEqual(last_byte, '\x1a')
+                self.assertEqual(last_byte, EOF)
     def test_fp_memory_tables(self):
         "fp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
@@ -2683,8 +2672,12 @@ class Test_Dbf_Creation(unittest.TestCase):
         table = Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); male L; fired D null', dbf_type='vfp')
         self.assertEqual(dbf.default_codepage, 'ascii')
         self.assertEqual(table.codepage, dbf.CodePage('ascii'))
+        table.close()
+        table.open()
+        table.close()
         table = Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); male L; fired D null', dbf_type='vfp', codepage='cp850')
         self.assertEqual(table.codepage, dbf.CodePage('cp850'))
+
         newtable = table.new('tempvfp2', codepage='cp437')
         self.assertEqual(newtable.codepage, dbf.CodePage('cp437'))
         newtable.open()
@@ -2721,7 +2714,7 @@ class Test_Dbf_Creation(unittest.TestCase):
         with table:
             self.assertEqual(table[0].wisdom, '')
 
-class Test_Dbf_Records(unittest.TestCase):
+class TestDbfRecords(unittest.TestCase):
     "Testing records"
     def setUp(self):
         #if not os.path.exists(tempdir):
@@ -2747,7 +2740,7 @@ class Test_Dbf_Records(unittest.TestCase):
         table = self.dbf_table
         table.open()
         table.append(('myself', True, 5.97, dbf.Date(2012, 5, 21), 'really cool'))
-        self.assertEquals(table.first_record['name':'qty'], table[0][:3])
+        self.assertEqual(table.first_record['name':'qty'], table[0][:3])
     def test_dbf_adding_records(self):
         "dbf table:  adding records"
         table = self.dbf_table
@@ -2763,20 +2756,23 @@ class Test_Dbf_Records(unittest.TestCase):
             qty = floats[i]
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
-            namelist.append(unicode(name))
+            namelist.append(name)
             paidlist.append(paid)
             qtylist.append(qty)
             orderlist.append(orderdate)
             desclist.append(desc)
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
             record = table[-1]
-            last_byte = open(table.filename, 'rb').read()[-1]
-            self.assertEqual(last_byte, '\x1a')
-            self.assertEqual(record.name.strip(), unicode(name))
+
+            t = open(table.filename, 'rb')
+            last_byte = t.read()[-1]
+            t.close()
+            self.assertEqual(last_byte, EOF)
+            self.assertEqual(record.name.strip(), name)
             self.assertEqual(record.paid, paid)
-            self.assertEqual(record.qty, qty)
+            self.assertEqual(record.qty, round(qty, 5))
             self.assertEqual(record.orderdate, orderdate)
-            self.assertEqual(record.desc.strip(), unicode(desc))
+            self.assertEqual(record.desc.strip(), desc)
         # plus a blank record
         namelist.append('')
         paidlist.append(None)
@@ -2788,8 +2784,10 @@ class Test_Dbf_Records(unittest.TestCase):
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
         table.close()
-        last_byte = open(table.filename, 'rb').read()[-1]
-        self.assertEqual(last_byte, '\x1a')
+        t = open(table.filename, 'rb')
+        last_byte = t.read()[-1]
+        t.close()
+        self.assertEqual(last_byte, EOF)
         table = Table(table.filename, dbf_type='db3')
         table.open()
         self.assertEqual(len(table), len(floats)+1)
@@ -2850,14 +2848,14 @@ class Test_Dbf_Records(unittest.TestCase):
             age = numbers[i]
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1, \
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
-            misc = ' '.join(words[i:i+50:3])
-            photo = ' '.join(words[i:i+50:7])
+            misc = (' '.join(words[i:i+50:3])).encode('ascii')
+            photo = (' '.join(words[i:i+50:7])).encode('ascii')
             price = Decimal(round(floats[i] * 2.182737, 4))
-            namelist.append(unicode(name))
+            namelist.append(name)
             paidlist.append(paid)
             qtylist.append(qty)
             orderlist.append(orderdate)
-            desclist.append(unicode(desc))
+            desclist.append(desc)
             masslist.append(mass)
             weightlist.append(weight)
             agelist.append(age)
@@ -2867,19 +2865,19 @@ class Test_Dbf_Records(unittest.TestCase):
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc, \
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
             record = table[-1]
-            self.assertEqual(record.name.strip(), unicode(name))
+            self.assertEqual(record.name.strip(), name)
             self.assertEqual(record.paid, paid)
-            self.assertEqual(record.qty, qty)
+            self.assertEqual(record.qty, round(qty, 5))
             self.assertEqual(record.orderdate, orderdate)
-            self.assertEqual(record.desc.strip(), unicode(desc))
+            self.assertEqual(record.desc.strip(), desc)
             self.assertEqual(record.mass, mass)
-            self.assertEqual(record.weight, weight)
+            self.assertEqual(record.weight, round(weight, 3))
             self.assertEqual(record.age, age)
             self.assertEqual(record.meeting, meeting)
             self.assertEqual(record.misc, misc)
             self.assertEqual(record.photo, photo)
         # plus a blank record
-        namelist.append(' ' * 25)
+        namelist.append('')
         paidlist.append(Unknown)
         qtylist.append(None)
         orderlist.append(NullDate)
@@ -2888,8 +2886,8 @@ class Test_Dbf_Records(unittest.TestCase):
         weightlist.append(None)
         agelist.append(0)
         meetlist.append(NullDateTime)
-        misclist.append('')
-        photolist.append('')
+        misclist.append(''.encode('ascii'))
+        photolist.append(''.encode('ascii'))
         pricelist.append(Decimal('0.0'))
         table.append()
         table.close()
@@ -2911,8 +2909,8 @@ class Test_Dbf_Records(unittest.TestCase):
             self.assertEqual(record.desc.strip(), desclist[i])
             self.assertEqual(record.mass, masslist[i])
             self.assertEqual(table[i].mass, masslist[i])
-            self.assertEqual(record.weight, weightlist[i])
-            self.assertEqual(table[i].weight, weightlist[i])
+            self.assertEqual(record.weight, round(weightlist[i], 3))
+            self.assertEqual(table[i].weight, round(weightlist[i], 3))
             self.assertEqual(record.age, agelist[i])
             self.assertEqual(table[i].age, agelist[i])
             self.assertEqual(record.meeting, meetlist[i])
@@ -2924,8 +2922,8 @@ class Test_Dbf_Records(unittest.TestCase):
             i += 1
         record = table[-1]
         self.assertEqual(dbf.recno(record), i)
-        self.assertEqual(table[i].name, namelist[i])
-        self.assertEqual(record.name, namelist[i])
+        self.assertEqual(table[i].name.strip(), namelist[i])
+        self.assertEqual(record.name.strip(), namelist[i])
         self.assertEqual(table[i].paid is None, True)
         self.assertEqual(record.paid is None, True)
         self.assertEqual(table[i].qty, None)
@@ -3153,7 +3151,10 @@ class Test_Dbf_Records(unittest.TestCase):
         table = Table(':memory:', 'data C(50); memo M', codepage='cp437', dbf_type='vfp', on_disk=False)
         table.open()
         decoder = codecs.getdecoder('cp437')
-        high_ascii = decoder(''.join(chr(c) for c in range(128, 128+50)))[0]
+        if py_ver < (3, 0):
+            high_ascii = decoder(''.join(chr(c) for c in range(128, 128+50)))[0]
+        else:
+            high_ascii = bytes(range(128, 128+50)).decode('cp437')
         table.append(dict(data=high_ascii, memo=high_ascii))
         self.assertEqual(table[0].data, high_ascii)
         self.assertEqual(table[0].memo, high_ascii)
@@ -3163,10 +3164,13 @@ class Test_Dbf_Records(unittest.TestCase):
         "check non-ascii text to bytes"
         table = Table(':memory:', 'bindata C(50) binary; binmemo M binary', codepage='cp1252', dbf_type='vfp', on_disk=False)
         table.open()
-        high_ascii = ''.join(chr(c) for c in range(128, 128+50))
+        if py_ver < (3, 0):
+            high_ascii = ''.join(chr(c) for c in range(128, 128+50))
+        else:
+            high_ascii = bytes(range(128, 128+50))
         table.append(dict(bindata=high_ascii, binmemo=high_ascii))
-        self.assertEqual(table[0].bindata, ''.join(chr(c) for c in range(128, 128+50)))
-        self.assertEqual(table[0].binmemo, ''.join(chr(c) for c in range(128, 128+50)))
+        self.assertEqual(table[0].bindata, high_ascii)
+        self.assertEqual(table[0].binmemo, high_ascii)
         table.close()
 
     def test_add_null_field(self):
@@ -3245,7 +3249,7 @@ class Test_Dbf_Records(unittest.TestCase):
             qty = floats[i]
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
-            namelist.append(unicode(name))
+            namelist.append(name)
             paidlist.append(paid)
             qtylist.append(qty)
             orderlist.append(orderdate)
@@ -3392,7 +3396,7 @@ class Test_Dbf_Records(unittest.TestCase):
                     ))
         self.assertNotEqual(old_data, dbf.scatter(record))
 
-class Test_Dbf_Functions(unittest.TestCase):
+class TestDbfFunctions(unittest.TestCase):
     def setUp(self):
         "create a dbf and vfp table"
         self.dbf_table = table = Table(
@@ -3444,20 +3448,12 @@ class Test_Dbf_Functions(unittest.TestCase):
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
             mass = floats[i] * floats[i] / 2.0
-            weight = floats[i] * 3
-            age = numbers[i]
-            name = words[i]
-            paid = len(words[i]) % 3 == 0
-            qty = floats[i]
-            orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
-            desc = ' '.join(words[i:i+50])
-            mass = floats[i] * floats[i] / 2.0
-            weight = floats[i] * 3
+            weight = round(floats[i] * 3, 3)
             age = numbers[i]
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1, \
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
-            misc = ' '.join(words[i:i+50:3])
-            photo = ' '.join(words[i:i+50:7])
+            misc = ' '.join(words[i:i+50:3]).encode('latin1')
+            photo = ' '.join(words[i:i+50:7]).encode('latin1')
             namelist.append('%-25s' % name)
             paidlist.append(paid)
             qtylist.append(qty)
@@ -3471,8 +3467,6 @@ class Test_Dbf_Functions(unittest.TestCase):
             photolist.append(photo)
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1,
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
-            misc = ' '.join(words[i:i+50:3])
-            photo = ' '.join(words[i:i+50:7])
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
         table.close()
@@ -3849,8 +3843,8 @@ class Test_Dbf_Functions(unittest.TestCase):
         for record in table:
             unordered.append(record.name)
         for word in unordered:                                  # returns records
-            records = table.query("select * where name == %r" % word)
-            self.assertEqual(len(records), unordered.count(word))
+            # records = table.query("select * where name == %r" % word)
+            # self.assertEqual(len(records), unordered.count(word))
             records = [rec for rec in table if rec.name == word]
             self.assertEqual(len(records), unordered.count(word))
 
@@ -3868,10 +3862,10 @@ class Test_Dbf_Functions(unittest.TestCase):
         for word in unordered:
             records = name_index.search(match=word)
             self.assertEqual(len(records), unordered.count(word), "num records: %d\nnum words: %d\nfailure with %r" % (len(records), unordered.count(word), word))
-            records = table.query("select * where name == %r" % word)
-            self.assertEqual(len(records), unordered.count(word))
-            records = dbf.pql(table, "select * where name == %r" % word)
-            self.assertEqual(len(records), unordered.count(word))
+            # records = table.query("select * where name == %r" % word)
+            # self.assertEqual(len(records), unordered.count(word))
+            # records = dbf.pql(table, "select * where name == %r" % word)
+            # self.assertEqual(len(records), unordered.count(word))
 
         # ordering by two fields
         ordered = unordered[:]
@@ -4235,8 +4229,12 @@ class Test_Dbf_Functions(unittest.TestCase):
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
         table.open()
         field_info = table.field_info('name')
-        self.assertEqual(field_info, ('C', 20, 0, Char))
-        self.assertEqual(field_info.dbf_type, 'C')
+        if py_ver < (3, 0):
+            self.assertEqual(field_info, ('C', 20, 0, Char))
+            self.assertEqual(field_info.field_type, 'C')
+        else:
+            self.assertEqual(field_info, (dbf.FieldType.CHAR, 20, 0, Char))
+            self.assertEqual(field_info.field_type, dbf.FieldType.CHAR)
         self.assertEqual(field_info.length, 20)
         self.assertEqual(field_info.decimal, 0)
         self.assertEqual(field_info.py_type, Char)
@@ -4337,7 +4335,7 @@ class Test_Dbf_Functions(unittest.TestCase):
         self.assertEqual(sorted.index_search('jul', partial=True), 9)
         self.assertTrue(sorted.index_search('jul', partial=True))
 
-class Test_Dbf_Navigation(unittest.TestCase):
+class TestDbfNavigation(unittest.TestCase):
     def setUp(self):
         "create a dbf and vfp table"
         self.dbf_table = table = Table(
@@ -4391,18 +4389,10 @@ class Test_Dbf_Navigation(unittest.TestCase):
             mass = floats[i] * floats[i] / 2.0
             weight = floats[i] * 3
             age = numbers[i]
-            name = words[i]
-            paid = len(words[i]) % 3 == 0
-            qty = floats[i]
-            orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
-            desc = ' '.join(words[i:i+50])
-            mass = floats[i] * floats[i] / 2.0
-            weight = floats[i] * 3
-            age = numbers[i]
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1, \
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
-            misc = ' '.join(words[i:i+50:3])
-            photo = ' '.join(words[i:i+50:7])
+            misc = ' '.join(words[i:i+50:3]).encode('ascii')
+            photo = ' '.join(words[i:i+50:7]).encode('ascii')
             namelist.append('%-25s' % name)
             paidlist.append(paid)
             qtylist.append(qty)
@@ -4416,8 +4406,6 @@ class Test_Dbf_Navigation(unittest.TestCase):
             photolist.append(photo)
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1,
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
-            misc = ' '.join(words[i:i+50:3])
-            photo = ' '.join(words[i:i+50:7])
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
         table.close()
@@ -4442,9 +4430,9 @@ class Test_Dbf_Navigation(unittest.TestCase):
         table.top()
         list.top()
         index.top()
-        self.assertEquals(table.current, -1)
-        self.assertEquals(list.current, -1)
-        self.assertEquals(index.current, -1)
+        self.assertEqual(table.current, -1)
+        self.assertEqual(list.current, -1)
+        self.assertEqual(index.current, -1)
 
     def test_bottom(self):
         "bottom, current in Tables, Lists, and Indexes"
@@ -4463,9 +4451,9 @@ class Test_Dbf_Navigation(unittest.TestCase):
         table.bottom()
         list.bottom()
         index.bottom()
-        self.assertEquals(table.current, total)
-        self.assertEquals(list.current, total)
-        self.assertEquals(index.current, total)
+        self.assertEqual(table.current, total)
+        self.assertEqual(list.current, total)
+        self.assertEqual(index.current, total)
 
     def test_goto(self):
         "goto, current in Tables, Lists, and Indexes"
@@ -4478,30 +4466,30 @@ class Test_Dbf_Navigation(unittest.TestCase):
         table.goto(mid)
         list.goto(mid)
         index.goto(mid)
-        self.assertEquals(table.current, mid)
-        self.assertEquals(list.current, mid)
-        self.assertEquals(index.current, mid)
+        self.assertEqual(table.current, mid)
+        self.assertEqual(list.current, mid)
+        self.assertEqual(index.current, mid)
         table.goto('top')
         list.goto('top')
         index.goto('top')
-        self.assertEquals(table.current, -1)
-        self.assertEquals(list.current, -1)
-        self.assertEquals(index.current, -1)
+        self.assertEqual(table.current, -1)
+        self.assertEqual(list.current, -1)
+        self.assertEqual(index.current, -1)
         table.goto('bottom')
         list.goto('bottom')
         index.goto('bottom')
-        self.assertEquals(table.current, total)
-        self.assertEquals(list.current, total)
-        self.assertEquals(index.current, total)
+        self.assertEqual(table.current, total)
+        self.assertEqual(list.current, total)
+        self.assertEqual(index.current, total)
         dbf.delete(table[10])
         self.assertTrue(dbf.is_deleted(list[10]))
         self.assertTrue(dbf.is_deleted(index[10]))
         table.goto(10)
         list.goto(10)
         index.goto(10)
-        self.assertEquals(table.current, 10)
-        self.assertEquals(list.current, 10)
-        self.assertEquals(index.current, 10)
+        self.assertEqual(table.current, 10)
+        self.assertEqual(list.current, 10)
+        self.assertEqual(index.current, 10)
         table.close()
 
     def test_skip(self):
@@ -4512,21 +4500,21 @@ class Test_Dbf_Navigation(unittest.TestCase):
         index = Index(table, key=lambda rec: dbf.recno(rec))
         total = len(table)
         mid = total // 2
-        self.assertEquals(table.current, -1)
-        self.assertEquals(list.current, -1)
-        self.assertEquals(index.current, -1)
+        self.assertEqual(table.current, -1)
+        self.assertEqual(list.current, -1)
+        self.assertEqual(index.current, -1)
         table.skip(1)
         list.skip(1)
         index.skip(1)
-        self.assertEquals(table.current, 0)
-        self.assertEquals(list.current, 0)
-        self.assertEquals(index.current, 0)
+        self.assertEqual(table.current, 0)
+        self.assertEqual(list.current, 0)
+        self.assertEqual(index.current, 0)
         table.skip(10)
         list.skip(10)
         index.skip(10)
-        self.assertEquals(table.current, 10)
-        self.assertEquals(list.current, 10)
-        self.assertEquals(index.current, 10)
+        self.assertEqual(table.current, 10)
+        self.assertEqual(list.current, 10)
+        self.assertEqual(index.current, 10)
         table.close()
 
     def test_first_record(self):
@@ -4647,7 +4635,7 @@ class Test_Dbf_Navigation(unittest.TestCase):
         self.assertTrue(index.last_record is table[-1])
         table.close()
 
-class Test_Dbf_Lists(unittest.TestCase):
+class TestDbfLists(unittest.TestCase):
     "DbfList tests"
     def setUp(self):
         "create a dbf table"
@@ -4660,7 +4648,7 @@ class Test_Dbf_Lists(unittest.TestCase):
         for i in range(len(floats)):
             name = words[i]
             paid = len(words[i]) % 3 == 0
-            qty = floats[i]
+            qty = round(floats[i], 5)
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
             data = {'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc}
@@ -4815,7 +4803,7 @@ class TestWhatever(unittest.TestCase):
         for i in range(len(floats)):
             name = '%-25s' % words[i]
             paid = len(words[i]) % 3 == 0
-            qty = floats[i]
+            qty = round(floats[i], 5)
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
             namelist.append(name)
@@ -4847,24 +4835,16 @@ class TestWhatever(unittest.TestCase):
         for i in range(len(floats)):
             name = words[i]
             paid = len(words[i]) % 3 == 0
-            qty = floats[i]
+            qty = round(floats[i], 5)
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
             mass = floats[i] * floats[i] / 2.0
-            weight = floats[i] * 3
-            age = numbers[i]
-            name = words[i]
-            paid = len(words[i]) % 3 == 0
-            qty = floats[i]
-            orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
-            desc = ' '.join(words[i:i+50])
-            mass = floats[i] * floats[i] / 2.0
-            weight = floats[i] * 3
+            weight = round(floats[i] * 3, 3)
             age = numbers[i]
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1, \
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
-            misc = ' '.join(words[i:i+50:3])
-            photo = ' '.join(words[i:i+50:7])
+            misc = ' '.join(words[i:i+50:3]).encode('ascii')
+            photo = ' '.join(words[i:i+50:7]).encode('ascii')
             namelist.append('%-25s' % name)
             paidlist.append(paid)
             qtylist.append(qty)
@@ -4878,8 +4858,6 @@ class TestWhatever(unittest.TestCase):
             photolist.append(photo)
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1,
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
-            misc = ' '.join(words[i:i+50:3])
-            photo = ' '.join(words[i:i+50:7])
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
         table.close()

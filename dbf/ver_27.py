@@ -970,20 +970,23 @@ class DateTime(object):
 
     __slots__ = ['_datetime']
 
-    def __new__(cls, year=None, month=0, day=0, hour=0, minute=0, second=0, microsec=0):
+    def __new__(cls, year=None, month=0, day=0, hour=0, minute=0, second=0, microsecond=0):
         """year may be a datetime.datetime"""
         if year is None or year is Null:
             return cls._null_datetime
         ndt = object.__new__(cls)
         if isinstance(year, basestring):
             return DateTime.strptime(year)
-        elif isinstance(year, (datetime.datetime)):
-            ndt._datetime = year
         elif isinstance(year, (DateTime)):
             ndt._datetime = year._datetime
+        elif isinstance(year, (datetime.datetime)):
+            microsecond = year.microsecond // 1000 * 1000
+            hour, minute, second = year.hour, year.minute, year.second
+            year, month, day = year.year, year.month, year.day
+            ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond)
         elif year is not None:
-            microsec = microsec // 1000 * 1000
-            ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsec)
+            microsecond = microsecond // 1000 * 1000
+            ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond)
         return ndt
 
     def __add__(self, other):
@@ -1292,7 +1295,7 @@ class Time(object):
 
     __slots__ = ['_time']
 
-    def __new__(cls, hour=None, minute=0, second=0, microsec=0):
+    def __new__(cls, hour=None, minute=0, second=0, microsecond=0):
         """
         hour may be a datetime.time or a str(Time)
         """
@@ -1300,15 +1303,16 @@ class Time(object):
             return cls._null_time
         nt = object.__new__(cls)
         if isinstance(hour, basestring):
-            return Time.strptime(hour)
-        elif isinstance(hour, (datetime.time)):
-            microsec = hour.microsecond
-            hour, minute, second = hour.hour, hour.minute, hour.second
-        elif isinstance(hour, (Time)):
+            hour = Time.strptime(hour)
+        if isinstance(hour, (Time)):
             nt._time = hour._time
+        elif isinstance(hour, (datetime.time)):
+            microsecond = hour.microsecond // 1000 * 1000
+            hour, minute, second = hour.hour, hour.minute, hour.second
+            nt._time = datetime.time(hour, minute, second, microsecond)
         elif hour is not None:
-            microsec = microsec // 1000 * 1000
-            nt._time = datetime.time(hour, minute, second, microsec)
+            microsecond = microsecond // 1000 * 1000
+            nt._time = datetime.time(hour, minute, second, microsecond)
         return nt
 
     def __add__(self, other):
@@ -1498,7 +1502,7 @@ class Time(object):
         "only accurate to milliseconds"
         return DateTime.now().time()
 
-    def replace(self, hour=None, minute=None, second=None, microsecond= None, delta_hour=0, delta_minute=0, delta_second=0):
+    def replace(self, hour=None, minute=None, second=None, microsecond=None, delta_hour=0, delta_minute=0, delta_second=0):
         if not self:
             return self.__class__._null_time
         old_hour, old_minute, old_second, old_micro = self.hour, self.minute, self.second, self.microsecond
@@ -1981,11 +1985,9 @@ class Logical(object):
         return hash(x.value)
 
     def __index__(x):
-        if x.value is False:
-            return 0
-        elif x.value is True:
-            return 1
-        return 2
+        if x.value is None:
+            raise ValueError("unable to return index of %r" % x)
+        return x.value
 
     def __repr__(x):
         return "Logical(%r)" % x.string
@@ -2178,14 +2180,6 @@ class Quantum(object):
 
     def __hash__(x):
         return hash(x.value)
-
-    def __index__(x):
-        if x.value is False:
-            return 0
-        if x.value is True:
-            return 1
-        if x.value is None:
-            return 2
 
     def __ne__(x, y):
         if not isinstance(y, (x.__class__, bool, NullType, type(None))):
@@ -4063,7 +4057,7 @@ class FieldInfo(tuple):
         return tuple.__new__(cls, args)
 
     @property
-    def dbf_type(self):
+    def field_type(self):
         return self[0]
 
     @property
@@ -5564,7 +5558,7 @@ class Table(_Navigation):
         for candidate in chosen:
             if candidate not in self._meta.user_fields:
                 raise DbfError("field %s not in table -- resize aborted" % candidate)
-            elif self.field_info(candidate).dbf_type != 'C':
+            elif self.field_info(candidate).field_type != 'C':
                 raise DbfError("field %s is not Character -- resize aborted" % candidate)
         if self:
             old_table = self.create_backup()

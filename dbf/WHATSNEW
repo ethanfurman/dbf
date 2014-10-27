@@ -1,6 +1,16 @@
 What's New
 ==========
 
+0.96.000
+--------
+
+add support for Python 3
+convert from module to package layout
+remove pql
+fix Time and DateTime signatures: microsec --> microseconds
+fix Time and DateTime .now() to truncate microseconds past thousands
+
+
 0.95.014
 --------
 

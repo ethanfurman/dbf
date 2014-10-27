@@ -1,6 +1,7 @@
 from distutils.core import setup
 from glob import glob
 import os
+import sys
 
 #html_docs = glob('dbf/html/*')
 
@@ -12,15 +13,20 @@ Not supported: index files (but can create tempory non-file indexes), auto-incre
 Latest release has many backwards incompatibilities, as well as some documentation.  Hopefully the latter will make the former bareable.
 """
 
+if sys.version_info[:2] < (3, 4):
+    requirements = ['enum34']
+else:
+    requirements = []
+
 setup( name='dbf',
-       version= '0.95.014',
+       version= '0.96.000',
        license='BSD License',
        description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
        long_description=long_desc,
-       url='http://groups.google.com/group/python-dbase',
-       py_modules=['dbf', 'dbf_test'],
+       url='https://pypi.python.org/pypi/dbf'
+       packages=['dbf', ],
        provides=['dbf'],
-       install_requires=['enum34'],
+       install_requires=requirements,
        author='Ethan Furman',
        author_email='ethan@stoneleaf.us',
        classifiers=[
@@ -33,6 +39,7 @@ setup( name='dbf',
             'Programming Language :: Python :: 2.5',
             'Programming Language :: Python :: 2.6',
             'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3',
             ],
     )
 

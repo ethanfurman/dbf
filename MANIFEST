@@ -1,10 +1,9 @@
 setup.py
 dbf/__init__.py
 dbf/tests.py
-dbf/ver_2
-dbf/ver_27
-dbf/ver_3
-dbf/ver_33
+dbf/ver_2.py
+dbf/ver_32.py
+dbf/ver_33.py
 dbf/README
 dbf/WHATSNEW
 dbf/README.md

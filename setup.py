@@ -3,7 +3,6 @@ from glob import glob
 import os
 import sys
 
-
 #html_docs = glob('dbf/html/*')
 
 long_desc="""
@@ -11,7 +10,9 @@ Currently supports dBase III, FoxPro, and Visual FoxPro tables. Text is returned
 
 Not supported: index files (but can create tempory non-file indexes), auto-incrementing fields, and Varchar fields.
 
-Latest release has many backwards incompatibilities, as well as some documentation.  Hopefully the latter will make the former bareable.
+Installation:  `pip install dbf`
+
+There may be messages about byte-compiling failures -- you can safely ignore them (this is a multi-version release, and 2 and 3 don't like some of each other's code).
 """
 
 if sys.version_info[:2] < (3, 4):
@@ -20,7 +21,7 @@ else:
     requirements = []
 
 setup( name='dbf',
-       version= '0.96.000',
+       version= '0.96.001',
        license='BSD License',
        description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
        long_description=long_desc,

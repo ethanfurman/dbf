@@ -77,8 +77,6 @@ pql_user_functions = dict()
 # signature:_meta of template records
 _Template_Records = dict()
 
-baseinteger = int, long
-
 # dec jan feb mar apr may jun jul aug sep oct nov dec jan
 days_per_month = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
 days_per_leap_month = [31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
@@ -697,6 +695,9 @@ class Char(unicode):
     def __add__(self, other):
         result = self.__class__(unicode(self) + other)
         return result
+
+basestring = str, unicode, Char
+baseinteger = int, long
 
 class Date(object):
     """

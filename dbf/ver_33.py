@@ -50,29 +50,10 @@ from math import floor
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 import types
 
-version = (0, 98, 0)
-
-__all__ = (
-        'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
-        'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
-        'recno', 'source_table', 'reset', 'scatter', 'undelete',
-        'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
-        'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
-        'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
-        'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
-        'NullDate', 'NullDateTime', 'NullTime', 'Vapor', 'Period',
-        'Process', 'Templates',
-        'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal', 'IndexLocation',
-        'guess_table_type', 'table_type',
-        'add_fields', 'delete_fields', 'get_fields', 'rename_field',
-        'export', 'first_record', 'from_csv', 'info', 'structure',
-        )
-
+version = (0, 96, 0)
 module = globals()
 
 NoneType = type(None)
-
-py_ver = sys.version_info[:2]
 
 # Flag for behavior if bad data is encountered in a logical field
 # Return None if True, else raise BadDataError
@@ -592,9 +573,6 @@ class NullType:
 
     def __bool__(self):
         return False
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __repr__(self):
         return '<null>'
@@ -693,21 +671,14 @@ class Char(str):
         ignores trailing whitespace
         """
         return bool(str(self))
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __add__(self, other):
         result = self.__class__(str(self) + other)
         result.field_size = self.field_size
         return result
 
-if py_ver < (3, 0):
-    Integer = int, long
-    String = unicode, Char
-else:
-    Integer = int
-    String = str, Char
+Integer = int
+String = str, Char
 
 class Date:
     """
@@ -836,9 +807,6 @@ class Date:
 
     def __bool__(self):
         return self._date is not None
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     __radd__ = __add__
 
@@ -1102,9 +1070,6 @@ class DateTime:
 
     def __bool__(self):
         return self._datetime is not None
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     __radd__ = __add__
 
@@ -1419,9 +1384,6 @@ class Time:
 
     def __bool__(self):
         return self._time is not None
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     __radd__ = __add__
 
@@ -1893,9 +1855,6 @@ class Logical:
     def __bool__(x):
         "boolean value of Unknown is assumed False"
         return x.value is True
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __eq__(x, y):
         if isinstance(y, x.__class__):
@@ -2168,9 +2127,6 @@ class Quantum(object):
         if x is Other:
             raise TypeError('True/False value of %r is unknown' % x)
         return x.value is True
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __repr__(x):
         return "Quantum(%r)" % x.string
@@ -3109,9 +3065,6 @@ class RecordVaporWare(object):
         Vapor records are always False
         """
         return False
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __setattr__(self, name, value):
         if name in self.__slots__:
@@ -3358,9 +3311,6 @@ class _DeadObject(object):
 
     def __bool__(self):
         return False
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
 _DeadObject = _DeadObject()
 
@@ -4036,9 +3986,6 @@ class IndexLocation(int):
 
     def __bool__(self):
         return self.found
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
 
 class FieldInfo(tuple):
@@ -4134,9 +4081,6 @@ class Iter(_Navigation):
             return record
         self._exhausted = True
         raise StopIteration
-    if py_ver < (3, 0):
-        next = __next__
-        del __next__
 
 
 class Table(_Navigation):
@@ -4916,9 +4860,6 @@ class Table(_Navigation):
         True if table has any records
         """
         return self._meta.header.record_count != 0
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __repr__(self):
         return __name__ + ".Table(%r, status=%r)" % (self._meta.filename, self._meta.status)
@@ -6433,9 +6374,6 @@ class List(_Navigation):
     def __bool__(self):
         self._still_valid_check()
         return len(self) > 0
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __radd__(self, other):
         self._still_valid_check()
@@ -7773,37 +7711,3 @@ def scatter(record, as_type=create_template, _mappings=getattr(collections, 'Map
         return as_type(zip(field_names(record), record))
     else:
         return as_type(record)
-
-
-# from dbf.api import *
-
-class fake_module(object):
-
-    def __init__(self, name, *args):
-        self.name = name
-        self.__all__ = []
-        all_objects = globals()
-        for name in args:
-            # TODO: change this back to "all_objects[name]"
-            self.__dict__[name] = all_objects.get(name)
-            self.__all__.append(name)
-
-    def register(self):
-        sys.modules["%s.%s" % (__name__, self.name)] = self
-
-fake_module('api',
-    'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time',
-    'Logical', 'Quantum', 'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
-    'recno', 'source_table', 'reset', 'scatter', 'undelete',
-    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor', 'Period',
-    'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
-    'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
-    'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
-    'DbfWarning', 'Eof', 'Bof', 'DoNotIndex', 'IndexLocation',
-    'Process', 'Templates',
-    ).register()
-
-dbf = fake_module('dbf', *__all__)
-
-
-

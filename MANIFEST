@@ -1,6 +1,10 @@
-dbf.py
-dbf_test.py
 setup.py
-dbf.README
-dbf.WHATSNEW
-README.md
+dbf/__init__.py
+dbf/tests.py
+dbf/ver_2
+dbf/ver_27
+dbf/ver_3
+dbf/ver_33
+dbf/README
+dbf/WHATSNEW
+dbf/README.md

@@ -2690,29 +2690,41 @@ class TestDbfCreation(unittest.TestCase):
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='db3', ignore_memos=True)
-        with table:
+        table.open()
+        try:
             self.assertEqual(table[0].wisdom, '')
+        finally:
+            table.close()
     def test_fp_ignore_memos(self):
         table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='fp').open()
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='fp', ignore_memos=True)
-        with table:
+        table.open()
+        try:
             self.assertEqual(table[0].wisdom, '')
+        finally:
+            table.close()
     def test_vfp_ignore_memos(self):
         table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='vfp').open()
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='vfp', ignore_memos=True)
-        with table:
+        table.open()
+        try:
             self.assertEqual(table[0].wisdom, '')
+        finally:
+            table.close()
     def test_clp_ignore_memos(self):
         table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='clp').open()
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='clp', ignore_memos=True)
-        with table:
+        table.open()
+        try:
             self.assertEqual(table[0].wisdom, '')
+        finally:
+            table.close()
 
 class TestDbfRecords(unittest.TestCase):
     "Testing records"
@@ -3371,7 +3383,7 @@ class TestDbfRecords(unittest.TestCase):
         self.assertEqual(
                 dbf.scatter(record),
                 dict(
-                    name=u'novice                   ',
+                    name=unicode('novice                   '),
                     paid=False,
                     qty=69,
                     orderdate=datetime.date(2011, 1, 1),
@@ -3388,7 +3400,7 @@ class TestDbfRecords(unittest.TestCase):
         self.assertEqual(
                 dbf.scatter(record),
                 dict(
-                    name=u'novice                   ',
+                    name=unicode('novice                   '),
                     paid=False,
                     qty=69,
                     orderdate=datetime.date(2011, 1, 1),
@@ -3645,7 +3657,7 @@ class TestDbfFunctions(unittest.TestCase):
         table.add_fields('desc M; paid L; mass B')
         i = 0
         for record in table:
-            self.assertEqual(record.desc, u'')
+            self.assertEqual(record.desc, unicode(''))
             self.assertEqual(record.paid is None, True)
             self.assertEqual(record.mass, 0.0)
             i += 1

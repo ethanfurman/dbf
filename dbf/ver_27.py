@@ -4773,13 +4773,7 @@ class Table(_Navigation):
             elif case == ['l','u','u','u']:
                 meta.memoname = base + self._memoext.upper()
             else:
-                ext = ''
-                for i, c in enumerate(self._memoext):
-                    if case[i] == 'l':
-                        ext += c.lower()
-                    else:
-                        ext += c.upper()
-                meta.memoname = base + ext
+                meta.memoname = base + ''.join([c.lower() if case[i] == 'l' else c.upper() for i, c in enumerate(self._memoext)])
             meta.location = ON_DISK
         if codepage is not None:
             header.codepage(codepage)

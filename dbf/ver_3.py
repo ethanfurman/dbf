@@ -50,29 +50,11 @@ from math import floor
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 import types
 
-version = (0, 98, 0)
-
-__all__ = (
-        'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',
-        'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
-        'recno', 'source_table', 'reset', 'scatter', 'undelete',
-        'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
-        'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
-        'DbfWarning', 'Eof', 'Bof', 'DoNotIndex',
-        'Null', 'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum',
-        'NullDate', 'NullDateTime', 'NullTime', 'Vapor', 'Period',
-        'Process', 'Templates',
-        'Truth', 'Falsth', 'Unknown', 'NoneType', 'Decimal', 'IndexLocation',
-        'guess_table_type', 'table_type',
-        'add_fields', 'delete_fields', 'get_fields', 'rename_field',
-        'export', 'first_record', 'from_csv', 'info', 'structure',
-        )
+version = (0, 96, 0)
 
 module = globals()
 
 NoneType = type(None)
-
-py_ver = sys.version_info[:2]
 
 # Flag for behavior if bad data is encountered in a logical field
 # Return None if True, else raise BadDataError
@@ -592,9 +574,6 @@ class NullType:
 
     def __bool__(self):
         return False
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __repr__(self):
         return '<null>'
@@ -693,21 +672,14 @@ class Char(str):
         ignores trailing whitespace
         """
         return bool(str(self))
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __add__(self, other):
         result = self.__class__(str(self) + other)
         result.field_size = self.field_size
         return result
 
-if py_ver < (3, 0):
-    Integer = int, long
-    String = unicode, Char
-else:
-    Integer = int
-    String = str, Char
+Integer = int
+String = str, Char
 
 class Date:
     """
@@ -836,9 +808,6 @@ class Date:
 
     def __bool__(self):
         return self._date is not None
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     __radd__ = __add__
 
@@ -1102,9 +1071,6 @@ class DateTime:
 
     def __bool__(self):
         return self._datetime is not None
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     __radd__ = __add__
 
@@ -1419,9 +1385,6 @@ class Time:
 
     def __bool__(self):
         return self._time is not None
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     __radd__ = __add__
 
@@ -1893,9 +1856,6 @@ class Logical:
     def __bool__(x):
         "boolean value of Unknown is assumed False"
         return x.value is True
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __eq__(x, y):
         if isinstance(y, x.__class__):
@@ -2168,9 +2128,6 @@ class Quantum(object):
         if x is Other:
             raise TypeError('True/False value of %r is unknown' % x)
         return x.value is True
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __repr__(x):
         return "Quantum(%r)" % x.string
@@ -2605,7 +2562,7 @@ class Record(object):
         return '\n'.join(result)
 
     def __repr__(self):
-        return self._data.tobytes().decode('latin1')
+        return self._data.tostring().decode('latin1')
 
     def _commit_flux(self):
         """
@@ -3042,7 +2999,7 @@ class RecordTemplate(object):
 
 
     def __repr__(self):
-        return self._data.tobytes()
+        return self._data.tostring()
 
     def __str__(self):
         result = []
@@ -3109,9 +3066,6 @@ class RecordVaporWare(object):
         Vapor records are always False
         """
         return False
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __setattr__(self, name, value):
         if name in self.__slots__:
@@ -3358,9 +3312,6 @@ class _DeadObject(object):
 
     def __bool__(self):
         return False
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
 _DeadObject = _DeadObject()
 
@@ -3476,7 +3427,7 @@ def retrieve_character(bytes, fielddef, memo, decoder):
     """
     Returns the string in bytes as fielddef[CLASS] or fielddef[EMPTY]
     """
-    data = bytes.tobytes()
+    data = bytes.tostring()
     if fielddef[FLAGS] & BINARY:
         return data
     data = fielddef[CLASS](decoder(data)[0])
@@ -3526,7 +3477,7 @@ def retrieve_date(bytes, fielddef, *ignore):
     """
     Returns the ascii coded date as fielddef[CLASS] or fielddef[EMPTY]
     """
-    text = bytes.tobytes()
+    text = bytes.tostring()
     if text == b'        ':
         cls = fielddef[EMPTY]
         if cls is NoneType:
@@ -3594,7 +3545,7 @@ def retrieve_logical(bytes, fielddef, *ignore):
     """
     cls = fielddef[CLASS]
     empty = fielddef[EMPTY]
-    bytes = bytes.tobytes()
+    bytes = bytes.tostring()
     if bytes in b'tTyY':
         return cls(True)
     elif bytes in b'fFnN':
@@ -3625,7 +3576,7 @@ def retrieve_memo(bytes, fielddef, memo, decoder):
     """
     Returns the block of data from a memo file
     """
-    stringval = bytes.tobytes().strip()
+    stringval = bytes.tostring().strip()
     if not stringval or memo is None:
         cls = fielddef[EMPTY]
         if cls is NoneType:
@@ -3664,7 +3615,7 @@ def retrieve_numeric(bytes, fielddef, *ignore):
     Returns the number stored in bytes as integer if field spec for
     decimals is 0, float otherwise
     """
-    string = bytes.tobytes().replace(b'\x00', b'').strip()
+    string = bytes.tostring().replace(b'\x00', b'').strip()
     cls = fielddef[CLASS]
     if not string or string[0:1] == b'*':  # value too big to store (Visual FoxPro idiocy)
         cls = fielddef[EMPTY]
@@ -4036,9 +3987,6 @@ class IndexLocation(int):
 
     def __bool__(self):
         return self.found
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
 
 class FieldInfo(tuple):
@@ -4134,9 +4082,6 @@ class Iter(_Navigation):
             return record
         self._exhausted = True
         raise StopIteration
-    if py_ver < (3, 0):
-        next = __next__
-        del __next__
 
 
 class Table(_Navigation):
@@ -4200,7 +4145,7 @@ class Table(_Navigation):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))
     _dbfTableHeader[10] = 1             # record length -- one for delete flag
     _dbfTableHeader[29] = 0             # code page -- none, using plain ascii
-    _dbfTableHeader = _dbfTableHeader.tobytes()
+    _dbfTableHeader = _dbfTableHeader.tostring()
     _dbfTableHeaderExtra = b''
     _supported_tables = ()
     _pack_count = 0
@@ -4276,7 +4221,7 @@ class Table(_Navigation):
             """
             date = self.packDate(Date.today())
             self._data[1:4] = array('B', date)
-            return self._data.tobytes()
+            return self._data.tostring()
 
         @data.setter
         def data(self, bytes):
@@ -4295,7 +4240,7 @@ class Table(_Navigation):
             else:
                 raise BadDataError("corrupt field structure")
             cr += 33    # skip past CR
-            return self._data[cr:].tobytes()
+            return self._data[cr:].tostring()
 
         @extra.setter
         def extra(self, data):
@@ -4334,7 +4279,7 @@ class Table(_Navigation):
                     break
             else:
                 raise BadDataError("corrupt field structure")
-            return fieldblock[:cr].tobytes()
+            return fieldblock[:cr].tostring()
 
         @fields.setter
         def fields(self, block):
@@ -4362,7 +4307,7 @@ class Table(_Navigation):
             """
             number of records (maximum 16,777,215)
             """
-            return unpack_long_int(self._data[4:8].tobytes())
+            return unpack_long_int(self._data[4:8].tostring())
 
         @record_count.setter
         def record_count(self, count):
@@ -4373,7 +4318,7 @@ class Table(_Navigation):
             """
             length of a record (read_only) (max of 65,535)
             """
-            return unpack_short_int(self._data[10:12].tobytes())
+            return unpack_short_int(self._data[10:12].tostring())
 
         @record_length.setter
         def record_length(self, length):
@@ -4387,7 +4332,7 @@ class Table(_Navigation):
             """
             starting position of first record in file (must be within first 64K)
             """
-            return unpack_short_int(self._data[8:10].tobytes())
+            return unpack_short_int(self._data[8:10].tostring())
 
         @start.setter
         def start(self, pos):
@@ -4398,7 +4343,7 @@ class Table(_Navigation):
             """
             date of last table modification (read-only)
             """
-            return self.unpackDate(self._data[1:4].tobytes())
+            return self.unpackDate(self._data[1:4].tostring())
 
         @property
         def version(self):
@@ -4546,7 +4491,7 @@ class Table(_Navigation):
                     none,               # empty
                     )
             meta['_nullflags'] = nullflags
-        header.fields = fieldblock.tobytes()
+        header.fields = fieldblock.tostring()
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
@@ -4916,9 +4861,6 @@ class Table(_Navigation):
         True if table has any records
         """
         return self._meta.header.record_count != 0
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __repr__(self):
         return __name__ + ".Table(%r, status=%r)" % (self._meta.filename, self._meta.status)
@@ -5681,7 +5623,7 @@ class Db3Table(Table):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))
     _dbfTableHeader[10] = 1        # record length -- one for delete flag
     _dbfTableHeader[29] = 3        # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tobytes()
+    _dbfTableHeader = _dbfTableHeader.tostring()
     _dbfTableHeaderExtra = b''
     _supported_tables = (0x03, 0x83)
 
@@ -5824,7 +5766,7 @@ class ClpTable(Db3Table):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))
     _dbfTableHeader[10] = 1         # record length -- one for delete flag
     _dbfTableHeader[29] = 3         # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tobytes()
+    _dbfTableHeader = _dbfTableHeader.tostring()
     _dbfTableHeaderExtra = b''
     _supported_tables = (0x03, 0x83)
 
@@ -5843,7 +5785,7 @@ class ClpTable(Db3Table):
                     break
             else:
                 raise BadDataError("corrupt field structure")
-            return fieldblock[:cr].tobytes()
+            return fieldblock[:cr].tostring()
         
         @fields.setter
         def fields(self, block):
@@ -5938,7 +5880,7 @@ class ClpTable(Db3Table):
                     none,               # empty
                     )
             meta['_nullflags'] = nullflags
-        header.fields = fieldblock.tobytes()
+        header.fields = fieldblock.tostring()
         header.record_length = total_length
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
@@ -6075,7 +6017,7 @@ class FpTable(Table):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33 + 263))
     _dbfTableHeader[10] = 1         # record length -- one for delete flag
     _dbfTableHeader[29] = 3         # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tobytes()
+    _dbfTableHeader = _dbfTableHeader.tostring()
     _dbfTableHeaderExtra = b'\x00' * 263
 
     def _check_memo_integrity(self):
@@ -6263,7 +6205,7 @@ class VfpTable(FpTable):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33 + 263))
     _dbfTableHeader[10] = 1         # record length -- one for delete flag
     _dbfTableHeader[29] = 3         # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tobytes()
+    _dbfTableHeader = _dbfTableHeader.tostring()
     _dbfTableHeaderExtra = b'\x00' * 263
 
     def _initialize_fields(self):
@@ -6433,9 +6375,6 @@ class List(_Navigation):
     def __bool__(self):
         self._still_valid_check()
         return len(self) > 0
-    if py_ver < (3, 0):
-        __nonzero__ = __bool__
-        del __bool__
 
     def __radd__(self, other):
         self._still_valid_check()
@@ -7773,37 +7712,3 @@ def scatter(record, as_type=create_template, _mappings=getattr(collections, 'Map
         return as_type(zip(field_names(record), record))
     else:
         return as_type(record)
-
-
-# from dbf.api import *
-
-class fake_module(object):
-
-    def __init__(self, name, *args):
-        self.name = name
-        self.__all__ = []
-        all_objects = globals()
-        for name in args:
-            # TODO: change this back to "all_objects[name]"
-            self.__dict__[name] = all_objects.get(name)
-            self.__all__.append(name)
-
-    def register(self):
-        sys.modules["%s.%s" % (__name__, self.name)] = self
-
-fake_module('api',
-    'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time',
-    'Logical', 'Quantum', 'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
-    'recno', 'source_table', 'reset', 'scatter', 'undelete',
-    'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor', 'Period',
-    'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
-    'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
-    'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
-    'DbfWarning', 'Eof', 'Bof', 'DoNotIndex', 'IndexLocation',
-    'Process', 'Templates',
-    ).register()
-
-dbf = fake_module('dbf', *__all__)
-
-
-

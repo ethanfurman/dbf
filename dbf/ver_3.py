@@ -50,8 +50,6 @@ from math import floor
 from os import SEEK_SET, SEEK_CUR, SEEK_END
 import types
 
-version = (0, 96, 0)
-
 module = globals()
 
 NoneType = type(None)
@@ -611,7 +609,7 @@ class Char(str):
     """
 
     def __new__(cls, text=''):
-        if not isinstance(text, (String, cls)):
+        if not isinstance(text, (basestring, cls)):
             raise ValueError("Unable to automatically coerce %r to Char" % text)
         result = str.__new__(cls, text.rstrip())
         result.field_size = len(text)
@@ -623,7 +621,7 @@ class Char(str):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, String)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return str(self) == other.rstrip()
 
@@ -631,7 +629,7 @@ class Char(str):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, String)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return str(self) >= other.rstrip()
 
@@ -639,7 +637,7 @@ class Char(str):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, String)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return str(self) > other.rstrip()
 
@@ -647,7 +645,7 @@ class Char(str):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, String)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return str(self) <= other.rstrip()
 
@@ -655,7 +653,7 @@ class Char(str):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, String)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return str(self) < other.rstrip()
 
@@ -663,7 +661,7 @@ class Char(str):
         """
         ignores trailing whitespace
         """
-        if not isinstance(other, (self.__class__, String)):
+        if not isinstance(other, (self.__class__, basestring)):
             return NotImplemented
         return str(self) != other.rstrip()
 
@@ -678,8 +676,8 @@ class Char(str):
         result.field_size = self.field_size
         return result
 
-Integer = int
-String = str, Char
+baseinteger = int
+basestring = str, Char
 
 class Date:
     """
@@ -696,7 +694,7 @@ class Date:
         if year is None or year is Null:
             return cls._null_date
         nd = object.__new__(cls)
-        if isinstance(year, String):
+        if isinstance(year, basestring):
             return Date.strptime(year)
         elif isinstance(year, (datetime.date)):
             nd._date = year
@@ -939,7 +937,7 @@ class DateTime:
         if year is None or year is Null:
             return cls._null_datetime
         ndt = object.__new__(cls)
-        if isinstance(year, String):
+        if isinstance(year, basestring):
             return DateTime.strptime(year)
         elif isinstance(year, DateTime):
             ndt._datetime = year._datetime
@@ -1250,7 +1248,7 @@ class Time:
         if hour is None or hour is Null:
             return cls._null_time
         nt = object.__new__(cls)
-        if isinstance(hour, String):
+        if isinstance(hour, basestring):
             hour = Time.strptime(hour)
         if isinstance(hour, Time):
             nt._time = hour._time
@@ -1554,7 +1552,7 @@ class Logical:
     def __new__(cls, value=None):
         if value is None or value is Null or value is Other or value is Unknown:
             return cls.unknown
-        elif isinstance(value, String):
+        elif isinstance(value, basestring):
             if value.lower() in ('t', 'true', 'y', 'yes', 'on'):
                 return cls.true
             elif value.lower() in ('f', 'false', 'n', 'no', 'off'):
@@ -1709,7 +1707,7 @@ class Logical:
         return i % int(y)
 
     def __pow__(x, y):
-        if not isinstance(y, (x.__class__, bool, type(None), Integer)):
+        if not isinstance(y, (x.__class__, bool, type(None), baseinteger)):
             return NotImplemented
         if isinstance(y, type(None)) or y is Unknown:
             return Unknown
@@ -1723,7 +1721,7 @@ class Logical:
     __ipow__ = __pow__
 
     def __rpow__(y, x):
-        if not isinstance(x, (y.__class__, bool, type(None), Integer)):
+        if not isinstance(x, (y.__class__, bool, type(None), baseinteger)):
             return NotImplemented
         if y is Unknown:
             return Unknown
@@ -1802,7 +1800,7 @@ class Logical:
         False iff at least one of x, y is False
         Unknown otherwise
         """
-        if (isinstance(x, Integer) and not isinstance(x, bool)) or (isinstance(y, Integer) and not isinstance(y, bool)):
+        if (isinstance(x, baseinteger) and not isinstance(x, bool)) or (isinstance(y, baseinteger) and not isinstance(y, bool)):
             if x == 0 or y == 0:
                 return 0
             elif x is Unknown or y is Unknown:
@@ -1820,7 +1818,7 @@ class Logical:
 
     def __or__(x, y):
         "OR (disjunction): x | y => True iff at least one of x, y is True"
-        if (isinstance(x, Integer) and not isinstance(x, bool)) or (isinstance(y, Integer) and not isinstance(y, bool)):
+        if (isinstance(x, baseinteger) and not isinstance(x, bool)) or (isinstance(y, baseinteger) and not isinstance(y, bool)):
             if x is Unknown or y is Unknown:
                 return Unknown
             return int(x) | int(y)
@@ -1836,7 +1834,7 @@ class Logical:
 
     def __xor__(x, y):
         "XOR (parity) x ^ y: True iff only one of x,y is True"
-        if (isinstance(x, Integer) and not isinstance(x, bool)) or (isinstance(y, Integer) and not isinstance(y, bool)):
+        if (isinstance(x, baseinteger) and not isinstance(x, bool)) or (isinstance(y, baseinteger) and not isinstance(y, bool)):
             if x is Unknown or y is Unknown:
                 return Unknown
             return int(x) ^ int(y)
@@ -1860,7 +1858,7 @@ class Logical:
     def __eq__(x, y):
         if isinstance(y, x.__class__):
             return x.value == y.value
-        elif isinstance(y, (bool, NoneType, Integer)):
+        elif isinstance(y, (bool, NoneType, baseinteger)):
             return x.value == y
         return NotImplemented
 
@@ -1869,7 +1867,7 @@ class Logical:
             return x.value == None
         elif isinstance(y, x.__class__):
             return x.value >= y.value
-        elif isinstance(y, (bool, Integer)):
+        elif isinstance(y, (bool, baseinteger)):
             return x.value >= y
         return NotImplemented
 
@@ -1878,7 +1876,7 @@ class Logical:
             return False
         elif isinstance(y, x.__class__):
             return x.value > y.value
-        elif isinstance(y, (bool, Integer)):
+        elif isinstance(y, (bool, baseinteger)):
             return x.value > y
         return NotImplemented
 
@@ -1887,7 +1885,7 @@ class Logical:
             return x.value == None
         elif isinstance(y, x.__class__):
             return x.value <= y.value
-        elif isinstance(y, (bool, Integer)):
+        elif isinstance(y, (bool, baseinteger)):
             return x.value <= y
         return NotImplemented
 
@@ -1896,14 +1894,14 @@ class Logical:
             return False
         elif isinstance(y, x.__class__):
             return x.value < y.value
-        elif isinstance(y, (bool, Integer)):
+        elif isinstance(y, (bool, baseinteger)):
             return x.value < y
         return NotImplemented
 
     def __ne__(x, y):
         if isinstance(y, x.__class__):
             return x.value != y.value
-        elif isinstance(y, (bool, type(None), Integer)):
+        elif isinstance(y, (bool, type(None), baseinteger)):
             return x.value != y
         return NotImplemented
 
@@ -1945,7 +1943,7 @@ class Quantum(object):
     def __new__(cls, value=None):
         if value is None or value is Null or value is Other or value is Unknown:
             return cls.unknown
-        elif isinstance(value, String):
+        elif isinstance(value, basestring):
             if value.lower() in ('t', 'true', 'y', 'yes', 'on'):
                 return cls.true
             elif value.lower() in ('f', 'false', 'n', 'no', 'off'):
@@ -2076,7 +2074,7 @@ class Quantum(object):
     @classmethod
     def set_implication(cls, method):
         "sets IMP to material or relevant"
-        if not isinstance(method, String) or method.lower() not in ('material', 'relevant'):
+        if not isinstance(method, basestring) or method.lower() not in ('material', 'relevant'):
             raise ValueError("method should be 'material' (for strict boolean) or 'relevant', not %r'" % method)
         if method.lower() == 'material':
             cls.C = cls._C_material
@@ -2281,7 +2279,7 @@ class _Navigation(object):
         """
         self._nav_check()
         max = len(self)
-        if isinstance(where, Integer):
+        if isinstance(where, baseinteger):
             if not -max <= where < max:
                 raise IndexError("Record %d does not exist" % where)
             if where < 0:
@@ -2463,7 +2461,7 @@ class Record(object):
             raise
 
     def __getitem__(self, item):
-        if isinstance(item, Integer):
+        if isinstance(item, baseinteger):
             fields = self._meta.user_fields
             field_count = len(fields)
             if not -field_count <= item < field_count:
@@ -2474,12 +2472,12 @@ class Record(object):
             return self[field]
         elif isinstance(item, slice):
             sequence = []
-            if isinstance(item.start, String) or isinstance(item.stop, String):
+            if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
                 field_names = dbf.field_names(self)
                 start, stop, step = item.start, item.stop, item.step
                 if start not in field_names or stop not in field_names:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int, not %r" % type(step))
                 start = field_names.index(start)
                 stop = field_names.index(stop) + 1
@@ -2487,7 +2485,7 @@ class Record(object):
             for index in self._meta.fields[item]:
                 sequence.append(self[index])
             return sequence
-        elif isinstance(item, String):
+        elif isinstance(item, basestring):
             return self.__getattr__(item)
         else:
             raise TypeError("%r is not a field name" % item)
@@ -2530,18 +2528,18 @@ class Record(object):
             raise DbfError("%s not in read/write mode" % self._meta.filename)
         if self._write_to_disk:
             raise DbfError("unable to modify fields individually except in `with` or `Process()`")
-        if isinstance(name, String):
+        if isinstance(name, basestring):
             self.__setattr__(name, value)
-        elif isinstance(name, Integer):
+        elif isinstance(name, baseinteger):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
             field_names = dbf.field_names(self)
-            if isinstance(name.start, String) or isinstance(name.stop, String):
+            if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = name.start, name.stop, name.step
                 if start not in field_names or stop not in field_names:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int, not %r" % type(step))
                 start = field_names.index(start)
                 stop = field_names.index(stop) + 1
@@ -2915,7 +2913,7 @@ class RecordTemplate(object):
 
     def __getitem__(self, item):
         fields = self._meta.user_fields
-        if isinstance(item, Integer):
+        if isinstance(item, baseinteger):
             field_count = len(fields)
             if not -field_count <= item < field_count:
                 raise NotFoundError("Field offset %d is not in record" % item)
@@ -2925,11 +2923,11 @@ class RecordTemplate(object):
             return self[field]
         elif isinstance(item, slice):
             sequence = []
-            if isinstance(item.start, String) or isinstance(item.stop, String):
+            if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
                 start, stop, step = item.start, item.stop, item.step
                 if start not in fields or stop not in fields:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int, not %r" % type(step))
                 start = fields.index(start)
                 stop = fields.index(stop) + 1
@@ -2937,7 +2935,7 @@ class RecordTemplate(object):
             for index in self._meta.fields[item]:
                 sequence.append(self[index])
             return sequence
-        elif isinstance(item, String):
+        elif isinstance(item, basestring):
             return self.__getattr__(item)
         else:
             raise TypeError("%r is not a field name" % item)
@@ -2972,18 +2970,18 @@ class RecordTemplate(object):
             raise err_cls(message, data)
 
     def __setitem__(self, name, value):
-        if isinstance(name, String):
+        if isinstance(name, basestring):
             self.__setattr__(name, value)
-        elif isinstance(name, Integer):
+        elif isinstance(name, baseinteger):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
             field_names = dbf.field_names(self)
-            if isinstance(name.start, String) or isinstance(name.stop, String):
+            if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = name.start, name.stop, name.step
                 if start not in field_names or stop not in field_names:
                     raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
-                if step is not None and not isinstance(step, Integer):
+                if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an int, not %r" % type(step))
                 start = field_names.index(start)
                 stop = field_names.index(stop) + 1
@@ -3044,11 +3042,11 @@ class RecordVaporWare(object):
             return Vapor
 
     def __getitem__(self, item):
-        if isinstance(item, Integer):
+        if isinstance(item, baseinteger):
             return Vapor
         elif isinstance(item, slice):
             raise TypeError('slice notation not allowed on Vapor records')
-        elif isinstance(item, String):
+        elif isinstance(item, basestring):
             return self.__getattr__(item)
         else:
             raise TypeError("%r is not a field name" % item)
@@ -3074,7 +3072,7 @@ class RecordVaporWare(object):
         raise TypeError("cannot change Vapor record")
 
     def __setitem__(self, name, value):
-        if isinstance(name, (String, Integer)):
+        if isinstance(name, (basestring, baseinteger)):
             raise TypeError("cannot change Vapor record")
         elif isinstance(name, slice):
             raise TypeError("slice notation not allowed on Vapor records")
@@ -3450,7 +3448,7 @@ def update_character(string, fielddef, memo, decoder, encoder):
             raise ValueError('binary field: %r not in bytes format' % string)
         return string
     else:
-        if not isinstance(string, String):
+        if not isinstance(string, basestring):
             raise ValueError("unable to coerce %r(%r) to string" % (type(string), string))
         string = encoder(string.strip())[0]
         return string
@@ -3602,7 +3600,7 @@ def update_memo(string, fielddef, memo, decoder, encoder):
     else:
         if string == None:
             string = ''
-        if not isinstance(string, String):
+        if not isinstance(string, basestring):
             raise ValueError("unable to coerce %r(%r) to string" % (type(string), string))
         string = encoder(string)[0]
     block = memo.put_memo(string)
@@ -3733,7 +3731,7 @@ def update_vfp_memo(string, fielddef, memo, decoder, encoder):
     else:
         # if string == None:
         #     string = ''
-        if not isinstance(string, String):
+        if not isinstance(string, basestring):
             raise ValueError("unable to coerce %r(%r) to string" % (type(string), string))
         string = encoder(string)[0]
     block = memo.put_memo(string)
@@ -3950,12 +3948,12 @@ class Tables(object):
     context manager for multiple tables and/or indices
     """
     def __init__(yo, *tables):
-        if len(tables) == 1 and not isinstance(tables[0], (Table, String)):
+        if len(tables) == 1 and not isinstance(tables[0], (Table, basestring)):
             tables = tables[0]
         yo._tables = []
         yo._entered = []
         for table in tables:
-            if isinstance(table, String):
+            if isinstance(table, basestring):
                 table = Table(table)
             yo._tables.append(table)
     def __enter__(yo):
@@ -4545,7 +4543,7 @@ class Table(_Navigation):
         """
         if specs is None:
             specs = self.field_names
-        elif isinstance(specs, String):
+        elif isinstance(specs, basestring):
             specs = specs.strip(sep).split(sep)
         else:
             specs = list(specs)
@@ -4642,7 +4640,7 @@ class Table(_Navigation):
         return object.__getattribute__(self, name)
 
     def __getitem__(self, value):
-        if isinstance(value, Integer):
+        if isinstance(value, baseinteger):
             if not -self._meta.header.record_count <= value < self._meta.header.record_count:
                 raise NotFoundError("Record %d is not in table %s." % (value, self.filename))
             return self._table[value]
@@ -6332,7 +6330,7 @@ class List(_Navigation):
 
     def __delitem__(self, key):
         self._still_valid_check()
-        if isinstance(key, Integer):
+        if isinstance(key, baseinteger):
             item = self._list.pop[key]
             self._set.remove(item[2])
         elif isinstance(key, slice):
@@ -6347,7 +6345,7 @@ class List(_Navigation):
 
     def __getitem__(self, key):
         self._still_valid_check()
-        if isinstance(key, Integer):
+        if isinstance(key, baseinteger):
             count = len(self._list)
             if not -count <= key < count:
                 raise NotFoundError("Record %d is not in list." % key)
@@ -6680,7 +6678,7 @@ class Index(_Navigation):
         '''if key is an integer, returns the matching record;
         if key is a [slice | string | tuple | record] returns a List;
         raises NotFoundError on failure'''
-        if isinstance(key, Integer):
+        if isinstance(key, baseinteger):
             count = len(self._values)
             if not -count <= key < count:
                 raise NotFoundError("Record %d is not in list." % key)
@@ -6698,10 +6696,10 @@ class Index(_Navigation):
                 record = self._table[self._rec_by_val[loc]]
                 result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
             return result
-        elif isinstance (key, (String, tuple, Record, RecordTemplate)):
+        elif isinstance (key, (basestring, tuple, Record, RecordTemplate)):
             if isinstance(key, (Record, RecordTemplate)):
                 key = self.key(key)
-            elif isinstance(key, String):
+            elif isinstance(key, basestring):
                 key = (key, )
             lo = self._search(key, where='left')
             hi = self._search(key, where='right')
@@ -6753,7 +6751,7 @@ class Index(_Navigation):
 
     def _partial_match(self, target, match):
         target = target[:len(match)]
-        if isinstance(match[-1], String):
+        if isinstance(match[-1], basestring):
             target = list(target)
             target[-1] = target[-1][:len(match[-1])]
             target = tuple(target)
@@ -6878,12 +6876,12 @@ class Relation(object):
         src_table, src_field = src
         tgt_table, tgt_field = tgt
         try:
-            if isinstance(src_field, Integer):
+            if isinstance(src_field, baseinteger):
                 table, field = src_table, src_field
                 src_field = table.field_names[field]
             else:
                 src_table.field_names.index(src_field)
-            if isinstance(tgt_field, Integer):
+            if isinstance(tgt_field, baseinteger):
                 table, field = tgt_table, tgt_field
                 tgt_field = table.field_names[field]
             else:
@@ -7006,7 +7004,7 @@ class Relation(object):
     def one_or_many(yo, table):
         yo.index    # make sure yo._tables has been populated
         try:
-            if isinstance(table, String):
+            if isinstance(table, basestring):
                 table = (yo._src_table, yo._tgt_table)[yo._tgt_table_name == table]
             return yo._tables[table]
         except IndexError:
@@ -7258,7 +7256,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
         filename = table.filename
     if field_names is None:
         field_names = table.field_names
-    if isinstance(field_names, String):
+    if isinstance(field_names, basestring):
         field_names = [f.strip() for f in field_names.split(',')]
     format = format.lower()
     if format not in ('csv', 'tab', 'fixed'):
@@ -7555,7 +7553,7 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
     """
     reader = csv.reader(codecs.open(csvfile, 'r', encoding='latin-1', errors=errors))
     if field_names:
-        if isinstance(field_names, String):
+        if isinstance(field_names, basestring):
             field_names = field_names.split()
         if ' ' not in field_names[0]:
             field_names = ['%s M' % fn for fn in field_names]

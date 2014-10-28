@@ -1,14 +1,18 @@
 import sys as _sys
 
-_version_info = _sys.version_info[:2]
-if _version_info >= (3, 3):
+version = (0, 96, 0)
+
+py_ver = _sys.version_info[:2]
+if py_ver >= (3, 3):
     from dbf import ver_33 as _dbf
-elif _version_info[:2] == (3, 2):
+elif py_ver[:2] == (3, 2):
     from dbf import ver_32 as _dbf
-elif (2, 5) <= _version_info[:2] < (3, 0):
+elif (2, 5) <= py_ver[:2] < (3, 0):
     from dbf import ver_2 as _dbf
 else:
-    raise ImportError('dbf does not support Python %d.%d' % _version_info[:2])
+    raise ImportError('dbf does not support Python %d.%d' % py_ver[:2])
+
+del py_ver
 
 __all__ = (
         'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Date', 'DateTime', 'Time',

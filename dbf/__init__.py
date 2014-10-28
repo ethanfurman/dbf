@@ -6,8 +6,6 @@ if _version_info >= (3, 3):
 elif _version_info[:2] == (3, 2):
     from dbf import ver_32 as _dbf
 elif (2, 5) <= _version_info[:2] < (3, 0):
-    from dbf import ver_27 as _dbf
-elif _version_info[0] == 2:
     from dbf import ver_2 as _dbf
 else:
     raise ImportError('dbf does not support Python %d.%d' % _version_info[:2])

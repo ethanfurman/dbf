@@ -2560,7 +2560,7 @@ class Record(object):
         return '\n'.join(result)
 
     def __repr__(self):
-        return self._data.tostring().decode('latin1')
+        return self._data.tobytes().decode('latin1')
 
     def _commit_flux(self):
         """
@@ -2694,8 +2694,7 @@ class Record(object):
         if nullable:
             byte, bit = divmod(index, 8)
             null_def = self._meta['_nullflags']
-            null_data = self._data[null_def[START]:null_def[END]] #.tostring()
-            # null_data = [ord(c) for c in null_data]
+            null_data = self._data[null_def[START]:null_def[END]]
             if value is Null:
                 null_data[byte] |= 1 << bit
                 value = None
@@ -2812,8 +2811,7 @@ class RecordTemplate(object):
         if nullable:
             byte, bit = divmod(index, 8)
             null_def = self._meta['_nullflags']
-            null_data = self._data[null_def[START]:null_def[END]] #.tostring()
-            # null_data = [ord(c) for c in null_data]
+            null_data = self._data[null_def[START]:null_def[END]]
             if value is Null:
                 null_data[byte] |= 1 << bit
                 value = None
@@ -2997,7 +2995,7 @@ class RecordTemplate(object):
 
 
     def __repr__(self):
-        return self._data.tostring()
+        return self._data.tobytes()
 
     def __str__(self):
         result = []
@@ -3425,7 +3423,7 @@ def retrieve_character(bytes, fielddef, memo, decoder):
     """
     Returns the string in bytes as fielddef[CLASS] or fielddef[EMPTY]
     """
-    data = bytes.tostring()
+    data = bytes.tobytes()
     if fielddef[FLAGS] & BINARY:
         return data
     data = fielddef[CLASS](decoder(data)[0])
@@ -3475,7 +3473,7 @@ def retrieve_date(bytes, fielddef, *ignore):
     """
     Returns the ascii coded date as fielddef[CLASS] or fielddef[EMPTY]
     """
-    text = bytes.tostring()
+    text = bytes.tobytes()
     if text == b'        ':
         cls = fielddef[EMPTY]
         if cls is NoneType:
@@ -3543,7 +3541,7 @@ def retrieve_logical(bytes, fielddef, *ignore):
     """
     cls = fielddef[CLASS]
     empty = fielddef[EMPTY]
-    bytes = bytes.tostring()
+    bytes = bytes.tobytes()
     if bytes in b'tTyY':
         return cls(True)
     elif bytes in b'fFnN':
@@ -3574,7 +3572,7 @@ def retrieve_memo(bytes, fielddef, memo, decoder):
     """
     Returns the block of data from a memo file
     """
-    stringval = bytes.tostring().strip()
+    stringval = bytes.tobytes().strip()
     if not stringval or memo is None:
         cls = fielddef[EMPTY]
         if cls is NoneType:
@@ -3613,7 +3611,7 @@ def retrieve_numeric(bytes, fielddef, *ignore):
     Returns the number stored in bytes as integer if field spec for
     decimals is 0, float otherwise
     """
-    string = bytes.tostring().replace(b'\x00', b'').strip()
+    string = bytes.tobytes().replace(b'\x00', b'').strip()
     cls = fielddef[CLASS]
     if not string or string[0:1] == b'*':  # value too big to store (Visual FoxPro idiocy)
         cls = fielddef[EMPTY]
@@ -4143,7 +4141,7 @@ class Table(_Navigation):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))
     _dbfTableHeader[10] = 1             # record length -- one for delete flag
     _dbfTableHeader[29] = 0             # code page -- none, using plain ascii
-    _dbfTableHeader = _dbfTableHeader.tostring()
+    _dbfTableHeader = _dbfTableHeader.tobytes()
     _dbfTableHeaderExtra = b''
     _supported_tables = ()
     _pack_count = 0
@@ -4219,7 +4217,7 @@ class Table(_Navigation):
             """
             date = self.packDate(Date.today())
             self._data[1:4] = array('B', date)
-            return self._data.tostring()
+            return self._data.tobytes()
 
         @data.setter
         def data(self, bytes):
@@ -4238,7 +4236,7 @@ class Table(_Navigation):
             else:
                 raise BadDataError("corrupt field structure")
             cr += 33    # skip past CR
-            return self._data[cr:].tostring()
+            return self._data[cr:].tobytes()
 
         @extra.setter
         def extra(self, data):
@@ -4277,7 +4275,7 @@ class Table(_Navigation):
                     break
             else:
                 raise BadDataError("corrupt field structure")
-            return fieldblock[:cr].tostring()
+            return fieldblock[:cr].tobytes()
 
         @fields.setter
         def fields(self, block):
@@ -4305,7 +4303,7 @@ class Table(_Navigation):
             """
             number of records (maximum 16,777,215)
             """
-            return unpack_long_int(self._data[4:8].tostring())
+            return unpack_long_int(self._data[4:8].tobytes())
 
         @record_count.setter
         def record_count(self, count):
@@ -4316,7 +4314,7 @@ class Table(_Navigation):
             """
             length of a record (read_only) (max of 65,535)
             """
-            return unpack_short_int(self._data[10:12].tostring())
+            return unpack_short_int(self._data[10:12].tobytes())
 
         @record_length.setter
         def record_length(self, length):
@@ -4330,7 +4328,7 @@ class Table(_Navigation):
             """
             starting position of first record in file (must be within first 64K)
             """
-            return unpack_short_int(self._data[8:10].tostring())
+            return unpack_short_int(self._data[8:10].tobytes())
 
         @start.setter
         def start(self, pos):
@@ -4341,7 +4339,7 @@ class Table(_Navigation):
             """
             date of last table modification (read-only)
             """
-            return self.unpackDate(self._data[1:4].tostring())
+            return self.unpackDate(self._data[1:4].tobytes())
 
         @property
         def version(self):
@@ -4489,7 +4487,7 @@ class Table(_Navigation):
                     none,               # empty
                     )
             meta['_nullflags'] = nullflags
-        header.fields = fieldblock.tostring()
+        header.fields = fieldblock.tobytes()
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
@@ -5621,7 +5619,7 @@ class Db3Table(Table):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))
     _dbfTableHeader[10] = 1        # record length -- one for delete flag
     _dbfTableHeader[29] = 3        # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tostring()
+    _dbfTableHeader = _dbfTableHeader.tobytes()
     _dbfTableHeaderExtra = b''
     _supported_tables = (0x03, 0x83)
 
@@ -5764,7 +5762,7 @@ class ClpTable(Db3Table):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))
     _dbfTableHeader[10] = 1         # record length -- one for delete flag
     _dbfTableHeader[29] = 3         # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tostring()
+    _dbfTableHeader = _dbfTableHeader.tobytes()
     _dbfTableHeaderExtra = b''
     _supported_tables = (0x03, 0x83)
 
@@ -5783,7 +5781,7 @@ class ClpTable(Db3Table):
                     break
             else:
                 raise BadDataError("corrupt field structure")
-            return fieldblock[:cr].tostring()
+            return fieldblock[:cr].tobytes()
         
         @fields.setter
         def fields(self, block):
@@ -5878,7 +5876,7 @@ class ClpTable(Db3Table):
                     none,               # empty
                     )
             meta['_nullflags'] = nullflags
-        header.fields = fieldblock.tostring()
+        header.fields = fieldblock.tobytes()
         header.record_length = total_length
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
@@ -6015,7 +6013,7 @@ class FpTable(Table):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33 + 263))
     _dbfTableHeader[10] = 1         # record length -- one for delete flag
     _dbfTableHeader[29] = 3         # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tostring()
+    _dbfTableHeader = _dbfTableHeader.tobytes()
     _dbfTableHeaderExtra = b'\x00' * 263
 
     def _check_memo_integrity(self):
@@ -6203,7 +6201,7 @@ class VfpTable(FpTable):
     _dbfTableHeader[8:10] = array('B', pack_short_int(33 + 263))
     _dbfTableHeader[10] = 1         # record length -- one for delete flag
     _dbfTableHeader[29] = 3         # code page -- 437 US-MS DOS
-    _dbfTableHeader = _dbfTableHeader.tostring()
+    _dbfTableHeader = _dbfTableHeader.tobytes()
     _dbfTableHeaderExtra = b'\x00' * 263
 
     def _initialize_fields(self):
@@ -7551,60 +7549,61 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
     field_names default to f0, f1, f2, etc, unless specified (list)
     extra_fields can be used to add additional fields -- should be normal field specifiers (list)
     """
-    reader = csv.reader(codecs.open(csvfile, 'r', encoding='latin-1', errors=errors))
-    if field_names:
-        if isinstance(field_names, basestring):
-            field_names = field_names.split()
-        if ' ' not in field_names[0]:
-            field_names = ['%s M' % fn for fn in field_names]
-    else:
-        field_names = ['f0 M']
-    mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
-    mtable.open()
-    fields_so_far = 1
-    #for row in reader:
-    while reader:
-        try:
-            row = next(reader)
-        except UnicodeEncodeError:
-            row = ['']
-        except StopIteration:
-            break
-        while fields_so_far < len(row):
-            if fields_so_far == len(field_names):
-                field_names.append('f%d M' % fields_so_far)
-            mtable.add_fields(field_names[fields_so_far])
-            fields_so_far += 1
-        mtable.append(tuple(row))
-    if filename:
-        to_disk = True
-    if not to_disk:
-        if extra_fields:
-            mtable.add_fields(extra_fields)
-    else:
-        if not filename:
-            filename = os.path.splitext(csvfile)[0]
-        length = [min_field_size] * len(field_names)
-        for record in mtable:
-            for i in index(mtable.field_names):
-                length[i] = max(length[i], len(record[i]))
-        fields = mtable.field_names
-        fielddef = []
-        for i in index(length):
-            if length[i] < 255:
-                fielddef.append('%s C(%d)' % (fields[i], length[i]))
-            else:
-                fielddef.append('%s M' % (fields[i]))
-        if extra_fields:
-            fielddef.extend(extra_fields)
-        csvtable = Table(filename, fielddef, dbf_type=dbf_type, codepage=encoding)
-        csvtable.open()
-        for record in mtable:
-            csvtable.append(scatter(record))
-        csvtable.close()
-        return csvtable
-    mtable.close()
-    return mtable
+    with codecs.open(csvfile, 'r', encoding='latin-1', errors=errors) as fd:
+        reader = csv.reader(fd)
+        if field_names:
+            if isinstance(field_names, basestring):
+                field_names = field_names.split()
+            if ' ' not in field_names[0]:
+                field_names = ['%s M' % fn for fn in field_names]
+        else:
+            field_names = ['f0 M']
+        mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
+        mtable.open()
+        fields_so_far = 1
+        #for row in reader:
+        while reader:
+            try:
+                row = next(reader)
+            except UnicodeEncodeError:
+                row = ['']
+            except StopIteration:
+                break
+            while fields_so_far < len(row):
+                if fields_so_far == len(field_names):
+                    field_names.append('f%d M' % fields_so_far)
+                mtable.add_fields(field_names[fields_so_far])
+                fields_so_far += 1
+            mtable.append(tuple(row))
+        if filename:
+            to_disk = True
+        if not to_disk:
+            if extra_fields:
+                mtable.add_fields(extra_fields)
+        else:
+            if not filename:
+                filename = os.path.splitext(csvfile)[0]
+            length = [min_field_size] * len(field_names)
+            for record in mtable:
+                for i in index(mtable.field_names):
+                    length[i] = max(length[i], len(record[i]))
+            fields = mtable.field_names
+            fielddef = []
+            for i in index(length):
+                if length[i] < 255:
+                    fielddef.append('%s C(%d)' % (fields[i], length[i]))
+                else:
+                    fielddef.append('%s M' % (fields[i]))
+            if extra_fields:
+                fielddef.extend(extra_fields)
+            csvtable = Table(filename, fielddef, dbf_type=dbf_type, codepage=encoding)
+            csvtable.open()
+            for record in mtable:
+                csvtable.append(scatter(record))
+            csvtable.close()
+            return csvtable
+        mtable.close()
+        return mtable
 
 def get_fields(table_name):
     """

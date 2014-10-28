@@ -3,9 +3,9 @@ import sys as _sys
 _version_info = _sys.version_info[:2]
 if _version_info >= (3, 3):
     from dbf import ver_33 as _dbf
-elif _version_info[0] == 3:
-    from dbf import ver_3 as _dbf
-elif _version_info[:2] >= (2, 5):
+elif _version_info[:2] == (3, 2):
+    from dbf import ver_32 as _dbf
+elif (2, 5) <= _version_info[:2] < (3, 0):
     from dbf import ver_27 as _dbf
 elif _version_info[0] == 2:
     from dbf import ver_2 as _dbf

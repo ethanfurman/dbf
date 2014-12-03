@@ -21,7 +21,7 @@ else:
     requirements = []
 
 setup( name='dbf',
-       version= '0.96.002',
+       version= '0.96.003',
        license='BSD License',
        description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
        long_description=long_desc,

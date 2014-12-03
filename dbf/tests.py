@@ -270,6 +270,24 @@ class TestDateTime(unittest.TestCase):
         datetime3 = Date.fromordinal(300000)
         self.compareTimes(nodatetime1, nodatetime2, datetime1, datetime2, datetime3)
 
+    def test_datetime_replace(self):
+        "DateTime replacements"
+        datetime_target = DateTime(2001, 5, 31, 23, 59, 59, 999000)
+        datetime1 = datetime.datetime(2001, 5, 31, 23, 59, 59, 999230)
+        datetime2 = datetime.datetime(2001, 5, 31, 23, 59, 59, 999500)
+        datetime3 = datetime.datetime(2001, 5, 31, 23, 59, 59, 999728)
+        original_datetime = datetime.datetime
+        for dt in (datetime1, datetime2, datetime3):
+            class DateTimeNow(datetime.datetime):
+                @classmethod
+                def now(self):
+                    datetime.datetime = original_datetime
+                    return dt
+            datetime.datetime = DateTimeNow
+            result = DateTime.now()
+            self.assertEqual(result, datetime_target, 'in: %r  out: %r  desired: %r' % (dt, result, datetime_target))
+        
+
     def test_time_creation(self):
         "Time creation"
         time0 = Time()
@@ -4879,5 +4897,7 @@ class TestWhatever(unittest.TestCase):
 # main
 if __name__ == '__main__':
     tempdir = tempfile.mkdtemp()
-    unittest.main()
-    shutil.rmtree(tempdir, True)
+    try:
+        unittest.main()
+    finally:
+        shutil.rmtree(tempdir, True)

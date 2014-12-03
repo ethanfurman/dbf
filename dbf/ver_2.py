@@ -395,6 +395,7 @@ class MutableDefault(object):
         return "MutableDefault(%r)" % (result, )
 
 
+
 def none(*args, **kwargs):
     """
     because we can't do `NoneType()`
@@ -1156,16 +1157,7 @@ class DateTime(object):
     @classmethod
     def now(cls):
         "only accurate to milliseconds"
-        now = datetime.datetime.now()
-        milli, micro = divmod(now.microsecond, 1000)
-        odd = milli % 2
-        if micro < 500:
-            pass
-        elif micro > 500:
-            milli += 1
-        elif odd:
-            milli += 1
-        return cls(now).replace(microsecond=milli*1000)
+        return cls(datetime.datetime.now())
 
     def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None,
               delta_year=0, delta_month=0, delta_day=0, delta_hour=0, delta_minute=0, delta_second=0):
@@ -7040,7 +7032,6 @@ class Relation(object):
 
 class IndexFile(_Navigation):
     pass
-
 
 # table meta
 

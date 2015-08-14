@@ -2594,7 +2594,7 @@ class TestDbfCreation(unittest.TestCase):
     "Testing table creation..."
     def test_db3_memory_tables(self):
         "dbf tables in memory"
-        fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
+        fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', fieldlist, dbf_type='db3', on_disk=False)
@@ -2603,7 +2603,7 @@ class TestDbfCreation(unittest.TestCase):
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
     def test_db3_disk_tables(self):
         "dbf table on disk"
-        fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
+        fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3')
@@ -2618,7 +2618,7 @@ class TestDbfCreation(unittest.TestCase):
                 self.assertEqual(last_byte, EOF)
     def test_clp_memory_tables(self):
         "clp tables in memory"
-        fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
+        fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', fieldlist, dbf_type='clp', on_disk=False)
@@ -2629,7 +2629,7 @@ class TestDbfCreation(unittest.TestCase):
         "clp table on disk"
         table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
         self.assertEqual(table.record_length, 20557)
-        fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)']
+        fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='clp')
@@ -2645,7 +2645,7 @@ class TestDbfCreation(unittest.TestCase):
     def test_fp_memory_tables(self):
         "fp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
-                  'litres F(11,5)', 'blob G', 'graphic P']
+                  'litres F(11,5)', 'blob G', 'graphic P', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp', on_disk=False)
@@ -2654,7 +2654,7 @@ class TestDbfCreation(unittest.TestCase):
     def test_fp_disk_tables(self):
         "fp tables on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
-                  'litres F(11,5)', 'blob G', 'graphic P']
+                  'litres F(11,5)', 'blob G', 'graphic P', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'tempfp'), ';'.join(fieldlist), dbf_type='vfp')
@@ -2664,9 +2664,9 @@ class TestDbfCreation(unittest.TestCase):
     def test_vfp_memory_tables(self):
         "vfp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
-                  'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P',
+                  'mass B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P',
                   'menu C(50) binary', 'graduated L null', 'fired D null', 'cipher C(50) nocptrans null',
-                  ]
+                  'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp', on_disk=False)
@@ -2676,9 +2676,9 @@ class TestDbfCreation(unittest.TestCase):
     def test_vfp_disk_tables(self):
         "vfp tables on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
-                  'weight B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P',
+                  'mass B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P',
                   'menu C(50) binary', 'graduated L null', 'fired D null', 'cipher C(50) nocptrans null',
-                  ]
+                  'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'tempvfp'), ';'.join(fieldlist), dbf_type='vfp')

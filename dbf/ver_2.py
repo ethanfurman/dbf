@@ -5237,6 +5237,9 @@ class Table(_Navigation):
             extra = ('_backup', '_BACKUP')[upper]
             new_name = os.path.join(temp_dir or directory, name + extra + ext)
         bkup = Table(new_name, self.structure(), codepage=self.codepage.name, dbf_type=self._versionabbr, on_disk=on_disk)
+        # use same encoder/decoder as current table, which may have been overridden
+        bkup._meta.encoder = self._meta.encoder
+        bkup._meta.decoder = self._meta.decoder
         bkup.open()
         for record in self:
             bkup.append(record)

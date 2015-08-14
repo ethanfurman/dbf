@@ -2700,7 +2700,6 @@ class Record(object):
                 value = None
             else:
                 null_data[byte] &= 0xff ^ 1 << bit
-            # null_data = array('B', [chr(n) for n in null_data])
             self._data[null_def[START]:null_def[END]] = null_data
         if value is not Null:
             bytes = array('B', update(value, fielddef, self._meta.memo, self._meta.input_decoder, self._meta.encoder))
@@ -2811,7 +2810,8 @@ class RecordTemplate(object):
         if nullable:
             byte, bit = divmod(index, 8)
             null_def = self._meta['_nullflags']
-            null_data = self._data[null_def[START]:null_def[END]]
+            null_data = self._data[null_def[START]:null_def[END]] #.tostring()
+            # null_data = [ord(c) for c in null_data]
             if value is Null:
                 null_data[byte] |= 1 << bit
                 value = None
@@ -4113,7 +4113,7 @@ class Table(_Navigation):
                         'Type':'Memo', 'Init':add_memo, 'Blank':lambda x: b'          ', 'Retrieve':retrieve_memo, 'Update':update_memo,
                         'Class':str, 'Empty':str, 'flags':tuple(),
                         },
-                NUMERIC: {
+                FLOAT: {
                         'Type':'Numeric', 'Init':add_numeric, 'Blank':lambda x: b' ' * x, 'Retrieve':retrieve_numeric, 'Update':update_numeric,
                         'Class':'default', 'Empty':none, 'flags':tuple(),
                         },
@@ -5594,7 +5594,7 @@ class Db3Table(Table):
                     'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: b'          ', 'Init':add_memo,
                     'Class':str, 'Empty':str, 'flags':tuple(),
                     },
-            NUMERIC: {
+            FLOAT: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_numeric,
                     'Class':'default', 'Empty':none, 'flags':tuple(),
                     } }
@@ -5613,7 +5613,7 @@ class Db3Table(Table):
     _logical_types = (LOGICAL, )
     _memo_types = (MEMO, )
     _numeric_types = (NUMERIC, FLOAT)
-    _variable_types = (CHAR, NUMERIC)
+    _variable_types = (CHAR, NUMERIC, FLOAT)
     _dbfTableHeader = array('B', [0] * 32)
     _dbfTableHeader[0] = 3         # version - dBase III w/o memo's
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))
@@ -5737,7 +5737,7 @@ class ClpTable(Db3Table):
                     'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: b'          ', 'Init':add_memo,
                     'Class':str, 'Empty':str, 'flags':tuple(),
                     },
-            NUMERIC: {
+            FLOAT: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_numeric,
                     'Class':'default', 'Empty':none, 'flags':tuple(),
                     } }
@@ -5756,7 +5756,7 @@ class ClpTable(Db3Table):
     _logical_types = (LOGICAL, )
     _memo_types = (MEMO, )
     _numeric_types = (NUMERIC, FLOAT)
-    _variable_types = (CHAR, NUMERIC)
+    _variable_types = (CHAR, NUMERIC, FLOAT)
     _dbfTableHeader = array('B', [0] * 32)
     _dbfTableHeader[0] = 3          # version - dBase III w/o memo's
     _dbfTableHeader[8:10] = array('B', pack_short_int(33))

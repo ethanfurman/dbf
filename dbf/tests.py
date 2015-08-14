@@ -15,10 +15,14 @@ from dbf.api import *
 
 if py_ver < (3, 0):
     EOF = '\x1a'
+    MISC = ''.join([chr(i) for i in range(256)])
+    PHOTO = ''.join(reversed([chr(i) for i in range(256)]))
 else:
     unicode = str
     xrange = range
     dbf.LatinByte.export_to(module)
+    MISC = ''.join([chr(i) for i in range(256)]).encode('latin-1')
+    PHOTO = ''.join(reversed([chr(i) for i in range(256)])).encode('latin-1')
 
 
 print("\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -2747,8 +2751,6 @@ class TestDbfCreation(unittest.TestCase):
 class TestDbfRecords(unittest.TestCase):
     "Testing records"
     def setUp(self):
-        #if not os.path.exists(tempdir):
-        #    os.mkdir(tempdir)
         self.dbf_table = Table(
                 os.path.join(tempdir, 'dbf_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M',
@@ -2764,7 +2766,6 @@ class TestDbfRecords(unittest.TestCase):
     def tearDown(self):
         self.dbf_table.close()
         self.vfp_table.close()
-        #shutil.rmtree(tempdir)
 
     def test_slicing(self):
         table = self.dbf_table
@@ -3425,6 +3426,54 @@ class TestDbfRecords(unittest.TestCase):
                     desc='guru of some things dbf-y',
                     ))
         self.assertNotEqual(old_data, dbf.scatter(record))
+
+class TestDbfRecordTemplates(unittest.TestCase):
+    "Testing records"
+    def setUp(self):
+        self.dbf_table = Table(
+                os.path.join(tempdir, 'dbf_table'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
+                dbf_type='db3',
+                )
+        self.vfp_table = Table(
+                os.path.join(tempdir, 'vfp_table'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y',
+                dbf_type='vfp',
+                )
+
+    def tearDown(self):
+        self.dbf_table.close()
+        self.vfp_table.close()
+
+    def test_dbf_storage(self):
+        table = self.dbf_table
+        table.open()
+        record = table.create_template()
+        record.name = 'Stoneleaf'
+        record.paid = True
+        record.qty = 1
+        record.orderdate = Date.today()
+        record.desc = 'some Python dude'
+        table.append(record)
+
+    def test_vfp_storage(self):
+        table = self.vfp_table
+        table.open()
+        record = table.create_template()
+        record.name = 'Stoneleaf'
+        record.paid = True
+        record.qty = 1
+        record.orderdate = Date.today()
+        record.desc = 'some Python dude'
+        record.mass = 251.9287
+        record.weight = 971204.39
+        record.age = 29
+        record.meeting = DateTime.now()
+        record.misc = MISC
+        record.photo = PHOTO
+        record.price = 19.99
+        table.append(record)
 
 class TestDbfFunctions(unittest.TestCase):
     def setUp(self):

@@ -2954,7 +2954,6 @@ class RecordTemplate(object):
             raise FieldMissingError(name)
         if name in self._meta.memofields:
             self._memos[name] = value
-            self._dirty = True
             return
         index = self._meta.fields.index(name)
         try:

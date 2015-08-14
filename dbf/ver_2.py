@@ -8130,10 +8130,16 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
                 field_names = ['%s M' % fn for fn in field_names]
         else:
             field_names = ['f0 M']
-        mtable = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
-        mtable.open()
+        if filename:
+            to_disk = True
+        else:
+            filename = os.path.splitext(csvfile)[0]
+        if to_disk:
+            csv_table = Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
+        else:
+            csv_table = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
+        csv_table.open()
         fields_so_far = 1
-        #for row in reader:
         while reader:
             try:
                 row = next(reader)
@@ -8144,38 +8150,13 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
             while fields_so_far < len(row):
                 if fields_so_far == len(field_names):
                     field_names.append('f%d M' % fields_so_far)
-                mtable.add_fields(field_names[fields_so_far])
+                csv_table.add_fields(field_names[fields_so_far])
                 fields_so_far += 1
-            mtable.append(tuple(row))
-        if filename:
-            to_disk = True
-        if not to_disk:
-            if extra_fields:
-                mtable.add_fields(extra_fields)
-        else:
-            if not filename:
-                filename = os.path.splitext(csvfile)[0]
-            length = [min_field_size] * len(field_names)
-            for record in mtable:
-                for i in index(mtable.field_names):
-                    length[i] = max(length[i], len(record[i]))
-            fields = mtable.field_names
-            fielddef = []
-            for i in index(length):
-                if length[i] < 255:
-                    fielddef.append('%s C(%d)' % (fields[i], length[i]))
-                else:
-                    fielddef.append('%s M' % (fields[i]))
-            if extra_fields:
-                fielddef.extend(extra_fields)
-            csvtable = Table(filename, fielddef, dbf_type=dbf_type, codepage=encoding)
-            csvtable.open()
-            for record in mtable:
-                csvtable.append(scatter(record))
-            csvtable.close()
-            return csvtable
-        mtable.close()
-        return mtable
+            csv_table.append(tuple(row))
+        if extra_fields:
+            csv_table.add_fields(extra_fields)
+        csv_table.close()
+        return csv_table
 
 def get_fields(table_name):
     """

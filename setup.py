@@ -1,3 +1,7 @@
+try:
+    import setuptools
+except ImportError:
+    pass
 from distutils.core import setup
 from glob import glob
 import os
@@ -20,27 +24,34 @@ if sys.version_info[:2] < (3, 4):
 else:
     requirements = []
 
-setup( name='dbf',
-       version= '0.96.006',
-       license='BSD License',
-       description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
-       long_description=long_desc,
-       url='https://pypi.python.org/pypi/dbf',
-       packages=['dbf', ],
-       provides=['dbf'],
-       install_requires=requirements,
-       author='Ethan Furman',
-       author_email='ethan@stoneleaf.us',
-       classifiers=[
+data = dict(
+        name='dbf',
+        version= '0.96.005',
+        license='BSD License',
+        description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
+        long_description=long_desc,
+        url='https://pypi.python.org/pypi/dbf',
+        packages=['dbf', ],
+        provides=['dbf'],
+        install_requires=['aenum'],
+        author='Ethan Furman',
+        author_email='ethan@stoneleaf.us',
+        classifiers=[
             'Development Status :: 4 - Beta',
             'Intended Audience :: Developers',
             'License :: OSI Approved :: BSD License',
             'Programming Language :: Python',
             'Topic :: Database',
-            'Programming Language :: Python :: 2.5',
-            'Programming Language :: Python :: 2.6',
+            # 'Programming Language :: Python :: 2.4',
+            # 'Programming Language :: Python :: 2.5',
+            # 'Programming Language :: Python :: 2.6',
             'Programming Language :: Python :: 2.7',
-            'Programming Language :: Python :: 3',
+            'Programming Language :: Python :: 3.3',
+            'Programming Language :: Python :: 3.4',
+            'Programming Language :: Python :: 3.5',
             ],
-    )
+        )
+
+if __name__ == '__main__':
+    setup(**data)
 

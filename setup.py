@@ -26,7 +26,7 @@ else:
 
 data = dict(
         name='dbf',
-        version= '0.96.005',
+        version= '0.96.007',
         license='BSD License',
         description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
         long_description=long_desc,

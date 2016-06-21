@@ -290,7 +290,6 @@ class TestDateTime(unittest.TestCase):
             datetime.datetime = DateTimeNow
             result = DateTime.now()
             self.assertEqual(result, datetime_target, 'in: %r  out: %r  desired: %r' % (dt, result, datetime_target))
-        
 
     def test_time_creation(self):
         "Time creation"
@@ -3941,10 +3940,10 @@ class TestDbfFunctions(unittest.TestCase):
         for word in unordered:
             records = name_index.search(match=word)
             self.assertEqual(len(records), unordered.count(word), "num records: %d\nnum words: %d\nfailure with %r" % (len(records), unordered.count(word), word))
-            # records = table.query("select * where name == %r" % word)
-            # self.assertEqual(len(records), unordered.count(word))
-            # records = dbf.pql(table, "select * where name == %r" % word)
-            # self.assertEqual(len(records), unordered.count(word))
+            records = table.query("select * where name == %r" % word)
+            self.assertEqual(len(records), unordered.count(word))
+            records = dbf.pql(table, "select * where name == %r" % word)
+            self.assertEqual(len(records), unordered.count(word))
 
         # ordering by two fields
         ordered = unordered[:]

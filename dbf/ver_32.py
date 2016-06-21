@@ -72,6 +72,10 @@ temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TMP") or os.environ.get
 # signature:_meta of template records
 _Template_Records = dict()
 
+# user-defined pql functions  (pql == primitive query language)
+# it is not real sql and won't be for a long time (if ever)
+pql_user_functions = dict()
+
 # dec jan feb mar apr may jun jul aug sep oct nov dec jan
 days_per_month = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
 days_per_leap_month = [31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
@@ -132,7 +136,7 @@ class AutoEnum(IntEnum):
         elif args:
             raise TypeError('%s not dealt with -- need custom __init__' % (args,))
 
-        
+
 class IsoDay(IntEnum):
     MONDAY = 1
     TUESDAY = 2
@@ -374,7 +378,7 @@ class LazyAttr:
     def __init__(yo, func=None, doc=None):
         yo.fget = func
         yo.__doc__ = doc or func.__doc__
-    
+
     def __call__(yo, func):
         yo.fget = func
 
@@ -4876,7 +4880,7 @@ class Table(_Navigation):
         Record count:  %d
         Field count:   %d
         Record length: %d """ % (self.filename, version
-            , self.codepage, status, 
+            , self.codepage, status,
             self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
         for i in range(len(self.field_names)):
@@ -5784,7 +5788,7 @@ class ClpTable(Db3Table):
             else:
                 raise BadDataError("corrupt field structure")
             return fieldblock[:cr].tobytes()
-        
+
         @fields.setter
         def fields(self, block):
             fieldblock = self._data[32:]
@@ -5900,7 +5904,7 @@ class ClpTable(Db3Table):
         if len(fieldsdef) % 32 != 0:
             raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
         if len(fieldsdef) // 32 != meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields" 
+            raise BadDataError("Header shows %d fields, but field definition block has %d fields"
                     (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         for i in range(meta.header.field_count):
@@ -5937,7 +5941,7 @@ class ClpTable(Db3Table):
                     empty,
                     )
         if offset != total_length:
-            raise BadDataError("Header shows record length of %d, but calculated record length is %d" 
+            raise BadDataError("Header shows record length of %d, but calculated record length is %d"
                     (total_length, offset))
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
@@ -6058,7 +6062,7 @@ class FpTable(Table):
         if len(fieldsdef) % 32 != 0:
             raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
         if len(fieldsdef) // 32 != meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields" 
+            raise BadDataError("Header shows %d fields, but field definition block has %d fields"
                     (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         for i in range(meta.header.field_count):
@@ -6919,7 +6923,7 @@ class Relation(object):
         and yo.tgt_field == other.tgt_field):
             return True
         return False
-    
+
     def __getitem__(yo, record):
         """
         record should be from the source table
@@ -6929,10 +6933,10 @@ class Relation(object):
             return yo.index[key]
         except NotFoundError:
             return List(desc='%s not found' % key)
-        
+
     def __hash__(yo):
         return hash((yo.src_table, yo.src_field, yo.tgt_table, yo.tgt_field))
-    
+
     def __ne__(yo, other):
         if (yo.src_table != other.src_table
         or  yo.src_field != other.src_field
@@ -6940,49 +6944,49 @@ class Relation(object):
         or  yo.tgt_field != other.tgt_field):
             return True
         return False
-    
+
     def __repr__(yo):
         return "Relation((%r, %r), (%r, %r))" % (yo.src_table_name, yo.src_field, yo.tgt_table_name, yo.tgt_field)
-    
+
     def __str__(yo):
         return "%s:%s --> %s:%s" % (yo.src_table_name, yo.src_field_name, yo.tgt_table_name, yo.tgt_field_name)
-    
+
     @property
     def src_table(yo):
         "name of source table"
         return yo._src_table
-    
+
     @property
     def src_field(yo):
         "name of source field"
         return yo._src_field
-    
+
     @property
     def src_table_name(yo):
         return yo._src_table_name
-    
+
     @property
     def src_field_name(yo):
         return yo._src_field_name
-    
+
     @property
     def tgt_table(yo):
         "name of target table"
         return yo._tgt_table
-    
+
     @property
     def tgt_field(yo):
         "name of target field"
         return yo._tgt_field
-    
+
     @property
     def tgt_table_name(yo):
         return yo._tgt_table_name
-    
+
     @property
     def tgt_field_name(yo):
         return yo._tgt_field_name
-    
+
     @LazyAttr
     def index(yo):
         def index(record, field=yo._tgt_field):
@@ -7000,7 +7004,7 @@ class Relation(object):
         else:
             yo._tables[yo._tgt_table] = 'one'
         return yo.index
-    
+
     def one_or_many(yo, table):
         yo.index    # make sure yo._tables has been populated
         try:
@@ -7108,6 +7112,206 @@ code_pages = {
 
 
 default_codepage = code_pages.get(default_codepage, code_pages.get(0x00))[0]
+
+# SQL functions
+
+def pql_select(records, chosen_fields, condition, field_names):
+    if chosen_fields != '*':
+        field_names = chosen_fields.replace(' ', '').split(',')
+    result = condition(records)
+    result.modified = 0, 'record' + ('', 's')[len(result)>1]
+    result.field_names = field_names
+    return result
+
+def pql_update(records, command, condition, field_names):
+    possible = condition(records)
+    modified = pql_cmd(command, field_names)(possible)
+    possible.modified = modified, 'record' + ('', 's')[modified>1]
+    return possible
+
+def pql_delete(records, dead_fields, condition, field_names):
+    deleted = condition(records)
+    deleted.modified = len(deleted), 'record' + ('', 's')[len(deleted)>1]
+    deleted.field_names = field_names
+    if dead_fields == '*':
+        for record in deleted:
+            record.delete_record()
+            record.write_record()
+    else:
+        keep = [f for f in field_names if f not in dead_fields.replace(' ', '').split(',')]
+        for record in deleted:
+            record.reset_record(keep_fields=keep)
+            record.write_record()
+    return deleted
+
+def pql_recall(records, all_fields, condition, field_names):
+    if all_fields != '*':
+        raise DbfError('SQL RECALL: fields must be * (only able to recover at the record level)')
+    revivified = List()
+    for record in condition(records):
+        if is_deleted(record):
+            revivified.append(record)
+            undelete(record)
+    revivified.modfied = len(revivified), 'record' + ('', 's')[len(revivified)>1]
+    return revivified
+
+def pql_add(records, new_fields, condition, field_names):
+    tables = set()
+    possible = condition(records)
+    for record in possible:
+        tables.add(source_table(record))
+    for table in tables:
+        table.add_fields(new_fields)
+    possible.modified = len(tables), 'table' + ('', 's')[len(tables)>1]
+    possible.field_names = field_names
+    return possible
+
+def pql_drop(records, dead_fields, condition, field_names):
+    tables = set()
+    possible = condition(records)
+    for record in possible:
+        tables.add(source_table(record))
+    for table in tables:
+        table.delete_fields(dead_fields)
+    possible.modified = len(tables), 'table' + ('', 's')[len(tables)>1]
+    possible.field_names = field_names
+    return possible
+
+def pql_pack(records, command, condition, field_names):
+    tables = set()
+    possible = condition(records)
+    for record in possible:
+        tables.add(source_table(record))
+    for table in tables:
+        table.pack()
+    possible.modified = len(tables), 'table' + ('', 's')[len(tables)>1]
+    possible.field_names = field_names
+    return possible
+
+def pql_resize(records, fieldname_newsize, condition, field_names):
+    tables = set()
+    possible = condition(records)
+    for record in possible:
+        tables.add(source_table(record))
+    fieldname, newsize = fieldname_newsize.split()
+    newsize = int(newsize)
+    for table in tables:
+        table.resize_field(fieldname, newsize)
+    possible.modified = len(tables), 'table' + ('', 's')[len(tables)>1]
+    possible.field_names = field_names
+    return possible
+
+def pql_criteria(records, criteria):
+    """
+    creates a function matching the pql criteria
+    """
+    function = """def func(records):
+    '''%s
+    '''
+    _matched = dbf.List()
+    for _rec in records:
+        %s
+
+        if %s:
+            _matched.append(_rec)
+    return _matched"""
+    fields = []
+    for field in field_names(records):
+        if field in criteria:
+            fields.append(field)
+    criteria = criteria.replace('recno()', 'recno(_rec)').replace('is_deleted()', 'is_deleted(_rec)')
+    fields = '\n        '.join(['%s = _rec.%s' % (field, field) for field in fields])
+    g = dict()
+    g['dbf'] = dbf
+    g.update(pql_user_functions)
+    function %= (criteria, fields, criteria)
+    exec(function, g)
+    return g['func']
+
+def pql_cmd(command, field_names):
+    """
+    creates a function matching to apply command to each record in records
+    """
+    function = """def func(records):
+    '''%s
+    '''
+    _changed = 0
+    for _rec in records:
+        _tmp = dbf.create_template(_rec)
+        %s
+
+        %s
+
+        %s
+        if _tmp != _rec:
+            dbf.gather(_rec, _tmp)
+            _changed += 1
+    return _changed"""
+    fields = []
+    for field in field_names:
+        if field in command:
+            fields.append(field)
+    command = command.replace('recno()', 'recno(_rec)').replace('is_deleted()', 'is_deleted(_rec)')
+    pre_fields = '\n        '.join(['%s = _tmp.%s' % (field, field) for field in fields])
+    post_fields = '\n        '.join(['_tmp.%s = %s' % (field, field) for field in fields])
+    g = pql_user_functions.copy()
+    g['dbf'] = dbf
+    g['recno'] = recno
+    g['create_template'] = create_template
+    g['gather'] = gather
+    if ' with ' in command.lower():
+        offset = command.lower().index(' with ')
+        command = command[:offset] + ' = ' + command[offset + 6:]
+    function %= (command, pre_fields, command, post_fields)
+    exec(function, g)
+    return g['func']
+
+def pql(records, command):
+    """
+    recognized pql commands are SELECT, UPDATE | REPLACE, DELETE, RECALL, ADD, DROP
+    """
+    close_table = False
+    if isinstance(records, basestring):
+        records = Table(records)
+        close_table = True
+    try:
+        if not records:
+            return List()
+        pql_command = command
+        if ' where ' in command:
+            command, condition = command.split(' where ', 1)
+            condition = pql_criteria(records, condition)
+        else:
+            def condition(records):
+                return records[:]
+        name, command = command.split(' ', 1)
+        command = command.strip()
+        name = name.lower()
+        fields = field_names(records)
+        if pql_functions.get(name) is None:
+            raise DbfError('unknown SQL command: %s' % name.upper())
+        result = pql_functions[name](records, command, condition, fields)
+        tables = set()
+        for record in result:
+            tables.add(source_table(record))
+    finally:
+        if close_table:
+            records.close()
+    return result
+
+pql_functions = {
+        'select' : pql_select,
+        'update' : pql_update,
+        'replace': pql_update,
+        'insert' : None,
+        'delete' : pql_delete,
+        'recall' : pql_recall,
+        'add'    : pql_add,
+        'drop'   : pql_drop,
+        'count'  : None,
+        'pack'   : pql_pack,
+        'resize' : pql_resize,
+        }
 
 
 def _nop(value):

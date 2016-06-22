@@ -3895,9 +3895,9 @@ def add_vfp_double(format, flags):
     if any(f not in flags for f in format[1:]):
         raise FieldSpecError("Format for Double field creation is 'B%s', not 'B%s'" % field_spec_error_text(format, flags))
     length = 8
-    decimals = 0
+    decimals = int(format[0][1:-1]) if len(format) else 0
     flag = 0
-    for f in format:
+    for f in format[1:]:
         flag |= FIELD_FLAGS[f]
     return length, decimals, flag
 

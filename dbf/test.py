@@ -2758,7 +2758,8 @@ class TestDbfRecords(unittest.TestCase):
         self.vfp_table = Table(
                 os.path.join(tempdir, 'vfp_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
-                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y',
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;' + 
+                ' dist B(2)',
                 dbf_type='vfp',
                 )
 
@@ -2867,6 +2868,7 @@ class TestDbfRecords(unittest.TestCase):
         misclist = []
         photolist = []
         pricelist = []
+        distlist = []
         for i in range(len(floats)):
             name = words[i]
             paid = len(words[i]) % 3 == 0
@@ -2875,6 +2877,7 @@ class TestDbfRecords(unittest.TestCase):
             desc = ' '.join(words[i:i+50])
             mass = floats[i] * floats[i] / 2.0
             weight = floats[i] * 3
+            dist = floats[i] * 2
             age = numbers[i]
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1, \
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
@@ -2887,13 +2890,15 @@ class TestDbfRecords(unittest.TestCase):
             orderlist.append(orderdate)
             desclist.append(desc)
             masslist.append(mass)
+            distlist.append(dist)
             weightlist.append(weight)
             agelist.append(age)
             meetlist.append(meeting)
             misclist.append(misc)
             photolist.append(photo)
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc, \
-                    'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
+                    'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo, \
+                    'dist': dist,})
             record = table[-1]
             self.assertEqual(record.name.strip(), name)
             self.assertEqual(record.paid, paid)
@@ -2901,6 +2906,7 @@ class TestDbfRecords(unittest.TestCase):
             self.assertEqual(record.orderdate, orderdate)
             self.assertEqual(record.desc.strip(), desc)
             self.assertEqual(record.mass, mass)
+            self.assertEqual(record.dist, dist)
             self.assertEqual(record.weight, round(weight, 3))
             self.assertEqual(record.age, age)
             self.assertEqual(record.meeting, meeting)
@@ -2913,6 +2919,7 @@ class TestDbfRecords(unittest.TestCase):
         orderlist.append(NullDate)
         desclist.append('')
         masslist.append(0.0)
+        distlist.append(0.0)
         weightlist.append(None)
         agelist.append(0)
         meetlist.append(NullDateTime)
@@ -2938,6 +2945,7 @@ class TestDbfRecords(unittest.TestCase):
             self.assertEqual(table[i].desc.strip(), desclist[i])
             self.assertEqual(record.desc.strip(), desclist[i])
             self.assertEqual(record.mass, masslist[i])
+            self.assertEqual(record.dist, distlist[i])
             self.assertEqual(table[i].mass, masslist[i])
             self.assertEqual(record.weight, round(weightlist[i], 3))
             self.assertEqual(table[i].weight, round(weightlist[i], 3))
@@ -2964,6 +2972,8 @@ class TestDbfRecords(unittest.TestCase):
         self.assertEqual(record.desc, desclist[i])
         self.assertEqual(record.mass, masslist[i])
         self.assertEqual(table[i].mass, masslist[i])
+        self.assertEqual(record.dist, distlist[i])
+        self.assertEqual(table[i].dist, distlist[i])
         self.assertEqual(record.weight, weightlist[i])
         self.assertEqual(table[i].weight, weightlist[i])
         self.assertEqual(record.age, agelist[i])

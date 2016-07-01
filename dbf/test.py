@@ -139,7 +139,9 @@ def inactive(rec):
         return recno(rec)
     return DoNotIndex
 
+
 class TestChar(unittest.TestCase):
+
     def test_exceptions(self):
         "exceptions"
         self.assertRaises(ValueError, Char, 7)
@@ -149,6 +151,7 @@ class TestChar(unittest.TestCase):
         self.assertRaises(ValueError, Char, type)
         self.assertRaises(ValueError, Char, str)
         self.assertRaises(ValueError, Char, None)
+
     def test_bools_and_none(self):
         "booleans and None"
         empty = Char()
@@ -157,6 +160,7 @@ class TestChar(unittest.TestCase):
         self.assertFalse(bool(one))
         actual = Char('1')
         self.assertTrue(bool(actual))
+
     def test_equality(self):
         "equality"
         a1 = Char('a')
@@ -167,6 +171,7 @@ class TestChar(unittest.TestCase):
         a4 = Char('a ')
         self.assertEqual(a3, a4)
         self.assertEqual(a4, a3)
+
     def test_inequality(self):
         "inequality"
         a1 = Char('ab ')
@@ -177,6 +182,7 @@ class TestChar(unittest.TestCase):
         a4 = Char('a b')
         self.assertNotEqual(a3, a4)
         self.assertNotEqual(a4, a3)
+
     def test_less_than(self):
         "less-than"
         a1 = Char('a')
@@ -191,6 +197,7 @@ class TestChar(unittest.TestCase):
         a6 = 'abce'
         self.assertTrue(a5 < a6)
         self.assertFalse(a6 < a5)
+
     def test_less_than_equal(self):
         "less-than or equal"
         a1 = Char('a')
@@ -205,6 +212,7 @@ class TestChar(unittest.TestCase):
         a6 = 'abce'
         self.assertTrue(a5 <= a6)
         self.assertFalse(a6 <= a5)
+
     def test_greater_than(self):
         "greater-than or equal"
         a1 = Char('a')
@@ -219,6 +227,7 @@ class TestChar(unittest.TestCase):
         a6 = 'abce'
         self.assertFalse(a5 >= a6)
         self.assertTrue(a6 >= a5)
+
     def test_greater_than_equal(self):
         "greater-than"
         a1 = Char('a')
@@ -234,8 +243,10 @@ class TestChar(unittest.TestCase):
         self.assertFalse(a5 > a6)
         self.assertTrue(a6 > a5)
 
+
 class TestDateTime(unittest.TestCase):
     "Testing Date"
+
     def test_date_creation(self):
         "Date creation"
         date0 = Date()
@@ -248,6 +259,7 @@ class TestDateTime(unittest.TestCase):
         self.assertRaises(ValueError, Date.fromymd, '00000')
         self.assertRaises(ValueError, Date.fromymd, '00000000')
         self.assertRaises(ValueError, Date, 0, 0, 0)
+
     def test_date_compare(self):
         "Date comparisons"
         nodate1 = Date()
@@ -265,6 +277,7 @@ class TestDateTime(unittest.TestCase):
         datetime6 = DateTime.today()
         datetime7 = DateTime.max
         datetime8 = DateTime.min
+
     def test_datetime_compare(self):
         "DateTime comparisons"
         nodatetime1 = DateTime()
@@ -297,6 +310,7 @@ class TestDateTime(unittest.TestCase):
         time1 = Time()
         time7 = Time.max
         time8 = Time.min
+
     def test_time_compare(self):
         "Time comparisons"
         notime1 = Time()
@@ -305,6 +319,7 @@ class TestDateTime(unittest.TestCase):
         time2 = Date.fromordinal(2000)
         time3 = Date.fromordinal(3000)
         self.compareTimes(notime1, notime2, time1, time2, time3)
+
     def test_arithmetic(self):
         "Date, DateTime, & Time Arithmetic"
         one_day = datetime.timedelta(1)
@@ -322,6 +337,7 @@ class TestDateTime(unittest.TestCase):
         self.assertEqual(an_appt + displacement, DateTime(2012, 4, 16, 14, 45, 0))
         self.assertEqual(an_appt - displacement, DateTime(2012, 4, 14, 10, 15, 0))
         self.assertEqual(datetime.datetime(2012, 4, 16, 14, 45, 0) - an_appt, displacement)
+
     def test_none_compare(self):
         "comparisons to None"
         empty_date = Date()
@@ -330,6 +346,7 @@ class TestDateTime(unittest.TestCase):
         self.assertEqual(empty_date, None)
         self.assertEqual(empty_time, None)
         self.assertEqual(empty_datetime, None)
+
     def test_singletons(self):
         "singletons"
         empty_date = Date()
@@ -338,6 +355,7 @@ class TestDateTime(unittest.TestCase):
         self.assertTrue(empty_date is NullDate)
         self.assertTrue(empty_time is NullTime)
         self.assertTrue(empty_datetime is NullDateTime)
+
     def test_boolean_value(self):
         "boolean evaluation"
         empty_date = Date()
@@ -352,6 +370,7 @@ class TestDateTime(unittest.TestCase):
         self.assertEqual(bool(actual_date), True)
         self.assertEqual(bool(actual_time), True)
         self.assertEqual(bool(actual_datetime), True)
+
     def compareTimes(self, empty1, empty2, uno, dos, tres):
         self.assertEqual(empty1, empty2)
         self.assertEqual(uno < dos, True)
@@ -393,7 +412,9 @@ class TestDateTime(unittest.TestCase):
         self.assertEqual(dos != dos, False)
         self.assertEqual(tres != tres, False)
 
+
 class TestNull(unittest.TestCase):
+
     def test_all(self):
         null = Null = dbf.Null()
         self.assertTrue(null is dbf.Null())
@@ -502,6 +523,7 @@ class TestNull(unittest.TestCase):
 
 class TestLogical(unittest.TestCase):
     "Testing Logical"
+
     def test_unknown(self):
         "Unknown"
         for unk in '', '?', ' ', None, Null, Unknown, Other:
@@ -514,6 +536,7 @@ class TestLogical(unittest.TestCase):
             self.assertEqual(huh == False, False, "huh is %r from %r, which is not None" % (huh, unk))
             if py_ver >= (2, 5):
                 self.assertRaises(ValueError, lambda : (0, 1, 2)[huh])
+
     def test_true(self):
         "true"
         for true in 'True', 'yes', 't', 'Y', 7, ['blah']:
@@ -526,6 +549,7 @@ class TestLogical(unittest.TestCase):
             self.assertEqual(huh != None, True)
             if py_ver >= (2, 5):
                 self.assertEqual((0, 1, 2)[huh], 1)
+
     def test_false(self):
         "false"
         for false in 'false', 'No', 'F', 'n', 0, []:
@@ -538,6 +562,7 @@ class TestLogical(unittest.TestCase):
             self.assertEqual(huh == None, False)
             if py_ver >= (2, 5):
                 self.assertEqual((0, 1, 2)[huh], 0)
+
     def test_singletons(self):
         "singletons"
         heh = Logical(True)
@@ -549,9 +574,11 @@ class TestLogical(unittest.TestCase):
         self.assertEqual(heh is hah, True)
         self.assertEqual(ick is ack, True)
         self.assertEqual(unk is bla, True)
+
     def test_error(self):
         "errors"
         self.assertRaises(ValueError, Logical, 'wrong')
+
     def test_and(self):
         "and"
         true = Logical(True)
@@ -1026,6 +1053,7 @@ class TestLogical(unittest.TestCase):
         self.assertEqual(-true, -1)
         self.assertEqual(-false, 0)
         self.assertEqual(-none, none)
+
     def test_posation(self):
         "posation"
         true = Logical(True)
@@ -1034,6 +1062,7 @@ class TestLogical(unittest.TestCase):
         self.assertEqual(+true, 1)
         self.assertEqual(+false, 0)
         self.assertEqual(+none, none)
+
     def test_abs(self):
         "abs()"
         true = Logical(True)
@@ -1042,6 +1071,7 @@ class TestLogical(unittest.TestCase):
         self.assertEqual(abs(true), 1)
         self.assertEqual(abs(false), 0)
         self.assertEqual(abs(none), none)
+
     def test_invert(self):
         "~ operator"
         true = Logical(True)
@@ -1335,6 +1365,7 @@ class TestLogical(unittest.TestCase):
         u = None
         u *= unknown
         self.assertEqual(u, unknown)
+
     def test_subtraction(self):
         "subtraction"
         true = Logical(True)
@@ -1675,6 +1706,7 @@ class TestLogical(unittest.TestCase):
         u = None
         u //= unknown
         self.assertEqual(u, unknown)
+
     def test_shift(self):
         "<< and >>"
         true = Logical(True)
@@ -2167,8 +2199,10 @@ class TestLogical(unittest.TestCase):
         self.assertEqual(divmod(None, false), (unknown, unknown))
         self.assertEqual(divmod(None, unknown), (unknown, unknown))
 
+
 class TestQuantum(unittest.TestCase):
     "Testing Quantum"
+
     def test_exceptions(self):
         "errors"
         self.assertRaises(ValueError, Quantum, 'wrong')
@@ -2356,6 +2390,7 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(True | unknown, true)
         self.assertEqual(False | unknown is unknown, True)
         self.assertEqual(None | unknown is unknown, True)
+
     def test_and(self):
         "and"
         true = Quantum(True)
@@ -2403,6 +2438,7 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(True & unknown is unknown, True)
         self.assertEqual(False & unknown, false)
         self.assertEqual(None & unknown is unknown, True)
+
     def test_xor(self):
         "xor"
         true = Quantum(True)
@@ -2429,6 +2465,7 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(True ^ unknown is unknown, True)
         self.assertEqual(False ^ unknown is unknown, True)
         self.assertEqual(None ^ unknown is unknown, True)
+
     def test_implication_material(self):
         "implication, material"
         true = Quantum(True)
@@ -2455,6 +2492,7 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(True >> unknown is unknown, True)
         self.assertEqual(False >> unknown, true)
         self.assertEqual(None >> unknown is unknown, True)
+
     def test_implication_relevant(self):
         "implication, relevant"
         true = Quantum(True)
@@ -2482,6 +2520,7 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(True >> unknown is unknown, True)
         self.assertEqual(False >> unknown is unknown, True)
         self.assertEqual(None >> unknown is unknown, True)
+
     def test_nand(self):
         "negative and"
         true = Quantum(True)
@@ -2501,6 +2540,7 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(true.D(None) is unknown, True)
         self.assertEqual(false.D(None), true)
         self.assertEqual(unknown.D(None) is unknown, True)
+
     def test_negation(self):
         "negation"
         true = Quantum(True)
@@ -2510,7 +2550,9 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(-false, true)
         self.assertEqual(-none is none, True)
 
+
 class TestExceptions(unittest.TestCase):
+
     def test_bad_field_specs_on_creation(self):
         self.assertRaises(FieldSpecError, Table, 'blah', 'age N(3,2)', on_disk=False)
         self.assertRaises(FieldSpecError, Table, 'blah', 'name C(300)', on_disk=False)
@@ -2577,24 +2619,31 @@ class TestExceptions(unittest.TestCase):
         table.pack()
         self.assertEqual(('you', 35), record)
         self.assertRaises(DbfError, dbf.write, record, **{'age':33})
+
     def test_read_only(self):
         table = Table(':ahhh:', 'name C(10)', on_disk=False)
         table.open(mode=dbf.READ_ONLY)
         self.assertRaises(DbfError, table.append, dict(name='uh uh!'))
+
     def test_clipper(self):
         table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
         self.assertRaises(BadDataError, Table, os.path.join(tempdir, 'temptable'))
 
+
 class TestIndexLocation(unittest.TestCase):
+
     def test_false(self):
         self.assertFalse(IndexLocation(0, False))
         self.assertFalse(IndexLocation(42, False))
+
     def test_true(self):
         self.assertTrue(IndexLocation(0, True))
         self.assertTrue(IndexLocation(42, True))
 
+
 class TestDbfCreation(unittest.TestCase):
     "Testing table creation..."
+
     def test_db3_memory_tables(self):
         "dbf tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)']
@@ -2604,6 +2653,7 @@ class TestDbfCreation(unittest.TestCase):
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
+
     def test_db3_disk_tables(self):
         "dbf table on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)']
@@ -2619,6 +2669,7 @@ class TestDbfCreation(unittest.TestCase):
                 finally:
                     table.close()
                 self.assertEqual(last_byte, EOF)
+
     def test_clp_memory_tables(self):
         "clp tables in memory"
         fields = ['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)']
@@ -2628,6 +2679,7 @@ class TestDbfCreation(unittest.TestCase):
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
                 self.assertTrue(all([type(x) is unicode for x in table.field_names]))
+
     def test_clp_disk_tables(self):
         "clp table on disk"
         table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
@@ -2645,6 +2697,7 @@ class TestDbfCreation(unittest.TestCase):
                 finally:
                     table.close()
                 self.assertEqual(last_byte, EOF)
+
     def test_fp_memory_tables(self):
         "fp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
@@ -2654,6 +2707,7 @@ class TestDbfCreation(unittest.TestCase):
                 table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp', on_disk=False)
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
+
     def test_fp_disk_tables(self):
         "fp tables on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
@@ -2664,18 +2718,21 @@ class TestDbfCreation(unittest.TestCase):
                 table = Table(os.path.join(tempdir, 'tempfp'), dbf_type='vfp')
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
+
     def test_vfp_memory_tables(self):
         "vfp tables in memory"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
                   'mass B', 'litres F(11,5)', 'int I', 'birth T', 'blob G', 'graphic P',
                   'menu C(50) binary', 'graduated L null', 'fired D null', 'cipher C(50) nocptrans null',
                   'weight F(7,3)']
+
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp', on_disk=False)
                 actualFields = table.structure()
                 fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
+
     def test_vfp_disk_tables(self):
         "vfp tables on disk"
         fields = ['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)',
@@ -2689,6 +2746,7 @@ class TestDbfCreation(unittest.TestCase):
                 actualFields = table.structure()
                 fieldlist = [f.replace('nocptrans','binary') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
+
     def test_codepage(self):
         table = Table(os.path.join(tempdir, 'tempvfp'), 'name C(25); male L; fired D null', dbf_type='vfp')
         self.assertEqual(dbf.default_codepage, 'ascii')
@@ -2706,6 +2764,7 @@ class TestDbfCreation(unittest.TestCase):
         newtable.close()
         bckup = Table(os.path.join(tempdir, newtable.backup))
         self.assertEqual(bckup.codepage, newtable.codepage)
+
     def test_db3_ignore_memos(self):
         table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='db3').open()
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
@@ -2716,6 +2775,7 @@ class TestDbfCreation(unittest.TestCase):
             self.assertEqual(table[0].wisdom, '')
         finally:
             table.close()
+
     def test_fp_ignore_memos(self):
         table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='fp').open()
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
@@ -2726,6 +2786,7 @@ class TestDbfCreation(unittest.TestCase):
             self.assertEqual(table[0].wisdom, '')
         finally:
             table.close()
+
     def test_vfp_ignore_memos(self):
         table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='vfp').open()
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
@@ -2736,6 +2797,7 @@ class TestDbfCreation(unittest.TestCase):
             self.assertEqual(table[0].wisdom, '')
         finally:
             table.close()
+
     def test_clp_ignore_memos(self):
         table = Table(os.path.join(tempdir, 'tempdb3'), 'name C(25); wisdom M', dbf_type='clp').open()
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
@@ -2747,8 +2809,10 @@ class TestDbfCreation(unittest.TestCase):
         finally:
             table.close()
 
+
 class TestDbfRecords(unittest.TestCase):
     "Testing records"
+
     def setUp(self):
         self.dbf_table = Table(
                 os.path.join(tempdir, 'dbf_table'),
@@ -2758,7 +2822,7 @@ class TestDbfRecords(unittest.TestCase):
         self.vfp_table = Table(
                 os.path.join(tempdir, 'vfp_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
-                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;' + 
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;' +
                 ' dist B(2)',
                 dbf_type='vfp',
                 )
@@ -2772,6 +2836,7 @@ class TestDbfRecords(unittest.TestCase):
         table.open()
         table.append(('myself', True, 5.97, dbf.Date(2012, 5, 21), 'really cool'))
         self.assertEqual(table.first_record['name':'qty'], table[0][:3])
+
     def test_dbf_adding_records(self):
         "dbf table:  adding records"
         table = self.dbf_table
@@ -2852,6 +2917,7 @@ class TestDbfRecords(unittest.TestCase):
         self.assertEqual(record.desc, desclist[i])
         i += 1
         self.assertEqual(i, len(table))
+
     def test_vfp_adding_records(self):
         "vfp table:  adding records"
         table = self.vfp_table
@@ -3016,6 +3082,7 @@ class TestDbfRecords(unittest.TestCase):
         record = table[1]
         self.assertTrue(type(record.text) is NoneType)
         self.assertTrue(type(record.memo) is NoneType)
+
     def test_empty_is_none(self):
         "empty and None values"
         table = Table(':memory:', 'name C(20); born L; married D; appt T; wisdom M', dbf_type='vfp', on_disk=False)
@@ -3049,6 +3116,7 @@ class TestDbfRecords(unittest.TestCase):
         self.assertTrue(record.married is None)
         self.assertTrue(record.appt is None)
         self.assertEqual(record.wisdom, '')
+
     def test_custom_data_type(self):
         "custom data types"
         table = Table(
@@ -3094,6 +3162,7 @@ class TestDbfRecords(unittest.TestCase):
         self.assertTrue(record.married is NullDate)
         self.assertTrue(record.appt is NullDateTime)
         self.assertTrue(type(record.wisdom) is Char, "record.wisdom is %r, but should be Char" % type(record.wisdom))
+
     def test_datatypes_param(self):
         "field_types with normal data type but None on empty"
         table = Table(
@@ -3122,6 +3191,7 @@ class TestDbfRecords(unittest.TestCase):
             )
         self.assertTrue(record.name is None)
         self.assertTrue(record.born is False)
+
     def test_null_type(self):
         "NullType"
         from pprint import pprint
@@ -3395,6 +3465,7 @@ class TestDbfRecords(unittest.TestCase):
             self.assertEqual(datum[0], recordnum[0])
             self.assertTrue(datum[-1] is recordnum[-1] or datum[-1] == recordnum[-1], "name = %s; datum[-1] = %r;  recordnum[-1] = %r" % (datum[0], datum[-1], recordnum[-1]))
         table.close()
+
     def test_flux_internal(self):
         "commit and rollback of flux record (implementation detail)"
         table = self.dbf_table
@@ -3436,8 +3507,10 @@ class TestDbfRecords(unittest.TestCase):
                     ))
         self.assertNotEqual(old_data, dbf.scatter(record))
 
+
 class TestDbfRecordTemplates(unittest.TestCase):
     "Testing records"
+
     def setUp(self):
         self.dbf_table = Table(
                 os.path.join(tempdir, 'dbf_table'),
@@ -3484,7 +3557,9 @@ class TestDbfRecordTemplates(unittest.TestCase):
         record.price = 19.99
         table.append(record)
 
+
 class TestDbfFunctions(unittest.TestCase):
+
     def setUp(self):
         "create a dbf and vfp table"
         self.dbf_table = table = Table(
@@ -3558,6 +3633,7 @@ class TestDbfFunctions(unittest.TestCase):
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
         table.close()
+
     def tearDown(self):
         self.dbf_table.close()
         self.vfp_table.close()
@@ -3642,6 +3718,7 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(record.desc, desclist[i])
             i += 1
         table.close()
+
     def test_add_fields_to_vfp_table(self):
         "vfp table:  adding and deleting fields"
         table = self.vfp_table
@@ -3772,6 +3849,7 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].photo, photolist[i])
             i += 1
         table.close()
+
     def test_len_contains_iter(self):
         "basic function tests - len, contains & iterators"
         table = self.dbf_table
@@ -3989,6 +4067,7 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(len(records), unordered.count(number))
 
         table.close()
+
     def test_scatter_gather_new(self):
         "scattering and gathering fields, and new()"
         table = self.dbf_table
@@ -4035,6 +4114,7 @@ class TestDbfFunctions(unittest.TestCase):
         table3.close()
         table4.close()
         table5.close()
+
     def test_rename_contains_has_key(self):
         "renaming fields, __contains__, has_key"
         table = self.dbf_table
@@ -4141,6 +4221,7 @@ class TestDbfFunctions(unittest.TestCase):
                 self.assertEqual(record[field], samerecord[field])
         table3.close()
         table.close()
+
     def test_slices(self):
         "slices"
         table = self.dbf_table
@@ -4165,6 +4246,7 @@ class TestDbfFunctions(unittest.TestCase):
         slice7 = [table[-1], table[-2], table[-3]]
         self.assertEqual(slice7, list(table[-1:-4:-1]))
         table.close()
+
     def test_record_reset(self):
         "reset record"
         table = self.dbf_table
@@ -4181,6 +4263,7 @@ class TestDbfFunctions(unittest.TestCase):
         dbf.write(table[0], name='Python rocks!')
         self.assertNotEqual(table[0].name, table[1].name)
         table.close()
+
     def test_adding_memos(self):
         "adding memos to existing records"
         table = Table(':memory:', 'name C(50); age N(3,0)', dbf_type='db3', on_disk=False)
@@ -4222,6 +4305,7 @@ class TestDbfFunctions(unittest.TestCase):
         table.open()
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
+
     def test_from_csv(self):
         "from_csv"
         table = self.dbf_table
@@ -4295,6 +4379,7 @@ class TestDbfFunctions(unittest.TestCase):
         new_record = dbf.scatter(table[5])
         self.assertEqual(test_record['orderdate'], new_record['orderdate'])
         table.close()
+
     def test_memos_after_close(self):
         "memos available after close/open"
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
@@ -4312,6 +4397,7 @@ class TestDbfFunctions(unittest.TestCase):
         self.assertEqual(table[0].name, 'Benedict')
         self.assertEqual(table[0].desc, 'brilliant, bombastic, bothered')
         table.close()
+
     def test_field_type(self):
         "table.type(field) == ('C', Char)"
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
@@ -4340,6 +4426,7 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(desclist[i], backup[i].desc)
         backup.close()
         table.close()
+
     def test_write_loop(self):
         "Process loop commits changes"
         table = self.dbf_table
@@ -4349,10 +4436,12 @@ class TestDbfFunctions(unittest.TestCase):
         for record in table:
             self.assertEqual(record.name, '!BRAND NEW NAME!         ')
         table.close()
+
     def test_export(self):
         for table in self.dbf_table, self.vfp_table:
             table.open()
             dbf.export(table, filename='test_export.csv')
+
     def test_index_search(self):
         table = Table("unordered", "icao C(20)", default_data_types=dict(C=Char), on_disk=False).open()
         icao = ("kilo charlie echo golf papa hotel delta tango india sierra juliet lima zulu mike "
@@ -4423,7 +4512,9 @@ class TestDbfFunctions(unittest.TestCase):
         self.assertEqual(sorted.index_search('jul', partial=True), 9)
         self.assertTrue(sorted.index_search('jul', partial=True))
 
+
 class TestDbfNavigation(unittest.TestCase):
+
     def setUp(self):
         "create a dbf and vfp table"
         self.dbf_table = table = Table(
@@ -4497,6 +4588,7 @@ class TestDbfNavigation(unittest.TestCase):
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
         table.close()
+
     def tearDown(self):
         self.dbf_table.close()
         self.vfp_table.close()
@@ -4723,8 +4815,10 @@ class TestDbfNavigation(unittest.TestCase):
         self.assertTrue(index.last_record is table[-1])
         table.close()
 
+
 class TestDbfLists(unittest.TestCase):
     "DbfList tests"
+
     def setUp(self):
         "create a dbf table"
         self.dbf_table = table = Table(
@@ -4751,8 +4845,10 @@ class TestDbfLists(unittest.TestCase):
             self.assertEqual(trec.orderdate, drec['orderdate'])
             self.assertEqual(trec.desc, drec['desc'])
         table.close()
+
     def tearDown(self):
         self.dbf_table.close()
+
     def test_exceptions(self):
         table = self.dbf_table
         table.open()
@@ -4802,6 +4898,7 @@ class TestDbfLists(unittest.TestCase):
         self.assertEqual(33, len(list1 - list2))
         self.assertEqual(17, len(list2 - list1))
         table1.close()
+
     def test_append_extend(self):
         "appending and extending"
         table1 = self.dbf_table
@@ -4818,6 +4915,7 @@ class TestDbfLists(unittest.TestCase):
         self.assertEqual(68, len(list1))
         self.assertEqual(67, len(list2))
         table1.close()
+
     def test_index(self):
         "indexing"
         table1 = self.dbf_table
@@ -4830,6 +4928,7 @@ class TestDbfLists(unittest.TestCase):
         for rec in list3:
             self.assertRaises(ValueError, list1.index, rec )
         table1.close()
+
     def test_sort(self):
         "sorting"
         table1 = self.dbf_table
@@ -4843,6 +4942,7 @@ class TestDbfLists(unittest.TestCase):
         for trec, lrec in zip(index, list4):
             self.assertEqual(dbf.recno(trec), dbf.recno(lrec))
         table1.close()
+
     def test_keys(self):
         "keys"
         table1 = self.dbf_table
@@ -4859,6 +4959,7 @@ class TestDbfLists(unittest.TestCase):
             self.assertTrue(rec[field] in unique)
         self.assertEqual(len(unique), len(list1))
         table1.close()
+
     def test_contains(self):
         table = self.dbf_table
         table.open()
@@ -4874,8 +4975,10 @@ class TestDbfLists(unittest.TestCase):
         self.assertEqual(i, len(list))
         table.close()
 
+
 class TestWhatever(unittest.TestCase):
     "move tests here to run one at a time while debugging"
+
     def setUp(self):
         "create a dbf and vfp table"
         self.dbf_table = table = Table(
@@ -4949,9 +5052,12 @@ class TestWhatever(unittest.TestCase):
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
         table.close()
+
     def tearDown(self):
         self.dbf_table.close()
         self.vfp_table.close()
+
+
 # main
 if __name__ == '__main__':
     tempdir = tempfile.mkdtemp()

@@ -24,7 +24,7 @@ if sys.version_info[:2] < (3, 4):
 else:
     requirements = []
 
-py2_only = ('dbf/ver_2.py')
+py2_only = ('dbf/ver_2.py', )
 py3_only = ('dbf/ver_32.py', 'dbf/ver_33.py')
 make = []
 

@@ -1,6 +1,6 @@
 import sys as _sys
 
-version = 0, 96, 7
+version = 0, 96, 8
 
 py_ver = _sys.version_info[:2]
 if py_ver >= (3, 3):

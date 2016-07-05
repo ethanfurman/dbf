@@ -24,9 +24,13 @@ if sys.version_info[:2] < (3, 4):
 else:
     requirements = []
 
+py2_only = ('dbf/ver_2.py')
+py3_only = ('dbf/ver_32.py', 'dbf/ver_33.py')
+make = []
+
 data = dict(
         name='dbf',
-        version= '0.96.007',
+        version='0.96.007',
         license='BSD License',
         description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
         long_description=long_desc,
@@ -42,9 +46,6 @@ data = dict(
             'License :: OSI Approved :: BSD License',
             'Programming Language :: Python',
             'Topic :: Database',
-            # 'Programming Language :: Python :: 2.4',
-            # 'Programming Language :: Python :: 2.5',
-            # 'Programming Language :: Python :: 2.6',
             'Programming Language :: Python :: 2.7',
             'Programming Language :: Python :: 3.3',
             'Programming Language :: Python :: 3.4',

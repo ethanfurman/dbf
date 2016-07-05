@@ -361,7 +361,7 @@ class LazyAttr(object):
     def __init__(yo, func=None, doc=None):
         yo.fget = func
         yo.__doc__ = doc or func.__doc__
-    
+
     def __call__(yo, func):
         yo.fget = func
 
@@ -4450,7 +4450,9 @@ class Table(_Navigation):
             if not self._max_count:
                 raise IndexError('no records exist')
             self._max_count -= 1
-            return self[self._max_count-1]
+            record = self._weakref_list[self._max_count]
+            del self._weakref_list[self._max_count]
+            return record
 
     def _build_header_fields(self):
         """
@@ -4729,7 +4731,7 @@ class Table(_Navigation):
                     'D' : dbf.Date,
                     'T' : dbf.DateTime,
                     }
-            
+
         self._meta._default_data_types = default_data_types
         if field_data_types is None:
             field_data_types = dict()
@@ -4904,7 +4906,7 @@ class Table(_Navigation):
         Record count:  %d
         Field count:   %d
         Record length: %d """ % (self.filename, version
-            , self.codepage, status, 
+            , self.codepage, status,
             self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
         for i in range(len(self.field_names)):
@@ -5812,7 +5814,7 @@ class ClpTable(Db3Table):
             else:
                 raise BadDataError("corrupt field structure")
             return fieldblock[:cr].tostring()
-        
+
         @fields.setter
         def fields(self, block):
             fieldblock = self._data[32:]
@@ -5928,7 +5930,7 @@ class ClpTable(Db3Table):
         if len(fieldsdef) % 32 != 0:
             raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
         if len(fieldsdef) // 32 != meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields" 
+            raise BadDataError("Header shows %d fields, but field definition block has %d fields"
                     (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         for i in range(meta.header.field_count):
@@ -5965,7 +5967,7 @@ class ClpTable(Db3Table):
                     empty,
                     )
         if offset != total_length:
-            raise BadDataError("Header shows record length of %d, but calculated record length is %d" 
+            raise BadDataError("Header shows record length of %d, but calculated record length is %d"
                     (total_length, offset))
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
@@ -6084,7 +6086,7 @@ class FpTable(Table):
         if len(fieldsdef) % 32 != 0:
             raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
         if len(fieldsdef) // 32 != meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields" 
+            raise BadDataError("Header shows %d fields, but field definition block has %d fields"
                     (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         for i in range(meta.header.field_count):
@@ -6940,7 +6942,7 @@ class Relation(object):
         and yo.tgt_field == other.tgt_field):
             return True
         return False
-    
+
     def __getitem__(yo, record):
         """
         record should be from the source table
@@ -6950,10 +6952,10 @@ class Relation(object):
             return yo.index[key]
         except NotFoundError:
             return List(desc='%s not found' % key)
-        
+
     def __hash__(yo):
         return hash((yo.src_table, yo.src_field, yo.tgt_table, yo.tgt_field))
-    
+
     def __ne__(yo, other):
         if (yo.src_table != other.src_table
         or  yo.src_field != other.src_field
@@ -6961,49 +6963,49 @@ class Relation(object):
         or  yo.tgt_field != other.tgt_field):
             return True
         return False
-    
+
     def __repr__(yo):
         return "Relation((%r, %r), (%r, %r))" % (yo.src_table_name, yo.src_field, yo.tgt_table_name, yo.tgt_field)
-    
+
     def __str__(yo):
         return "%s:%s --> %s:%s" % (yo.src_table_name, yo.src_field_name, yo.tgt_table_name, yo.tgt_field_name)
-    
+
     @property
     def src_table(yo):
         "name of source table"
         return yo._src_table
-    
+
     @property
     def src_field(yo):
         "name of source field"
         return yo._src_field
-    
+
     @property
     def src_table_name(yo):
         return yo._src_table_name
-    
+
     @property
     def src_field_name(yo):
         return yo._src_field_name
-    
+
     @property
     def tgt_table(yo):
         "name of target table"
         return yo._tgt_table
-    
+
     @property
     def tgt_field(yo):
         "name of target field"
         return yo._tgt_field
-    
+
     @property
     def tgt_table_name(yo):
         return yo._tgt_table_name
-    
+
     @property
     def tgt_field_name(yo):
         return yo._tgt_field_name
-    
+
     @LazyAttr
     def index(yo):
         def index(record, field=yo._tgt_field):
@@ -7021,7 +7023,7 @@ class Relation(object):
         else:
             yo._tables[yo._tgt_table] = 'one'
         return yo.index
-    
+
     def one_or_many(yo, table):
         yo.index    # make sure yo._tables has been populated
         try:
@@ -7174,7 +7176,7 @@ class DataBlock(object):
                 field.size = field.fill_to - offset
         total_field_size = field.offset + field.size
         if self.size and total_field_size > self.size:
-            raise DbfError('Fields in %r are using %d bytes, but only %d allocated' % (cls, self.size))
+            raise DbfError('Fields in %r are using %d bytes, but only %d allocated' % (cls, total_field_size, self.size))
         total_field_size = self.size or total_field_size
         cls._data = str('\x00' * total_field_size)
         cls.__len__ = lambda s: len(s._data)

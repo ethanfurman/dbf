@@ -4423,8 +4423,9 @@ class Table(_Navigation):
         def pop(self):
             if not self._max_count:
                 raise IndexError('no records exist')
-            record = self[self._max_count-1]
             self._max_count -= 1
+            record = self._weakref_list[self._max_count]
+            del self._weakref_list[self._max_count]
             return record
 
     def _build_header_fields(self):

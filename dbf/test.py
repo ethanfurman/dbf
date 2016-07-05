@@ -2629,6 +2629,17 @@ class TestExceptions(unittest.TestCase):
         table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
         self.assertRaises(BadDataError, Table, os.path.join(tempdir, 'temptable'))
 
+    def test_data_overflow(self):
+        table = Table(os.path.join(tempdir, 'temptable'), 'mine C(2); yours C(15)')
+        table.open()
+        table.append(('me',))
+        try:
+            table.append(('yours',))
+        except DataOverflowError:
+            pass
+        finally:
+            table.close()
+
 
 class TestIndexLocation(unittest.TestCase):
 

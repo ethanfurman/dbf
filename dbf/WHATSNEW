@@ -1,6 +1,48 @@
 What's New
 ==========
 
+0.96.008
+--------
+
+Handle vfp_double with decimal (Foxpro uses it for display purposes)
+    (thanks, Joshua Adelman!)
+
+
+0.96.007
+--------
+
+rev: 168   rename tests to test
+
+
+0.96.006
+--------
+
+restore pql
+
+
+0.96.005
+--------
+
+fix create_backup to use the active codepage, which may be different from
+the table's codepage
+
+
+0.96.004
+--------
+
+change duplicate NUMERIC to FLOAT
+add Float fields to tests
+change from_csv to write directly to disk if to_disk requested
+fix erronious access to _dirty in RecordTemplate
+
+
+0.96.003
+--------
+
+add 'basestring' to ver_2.py
+add 'basestring' to ver_2.py
+
+
 0.96.000
 --------
 

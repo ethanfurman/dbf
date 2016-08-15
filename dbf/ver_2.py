@@ -46,7 +46,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 import decimal
 from decimal import Decimal
-from enum import Enum, IntEnum
+from aenum import Enum, IntEnum
 from glob import glob
 from math import floor
 import types
@@ -416,7 +416,7 @@ DECIMALS = 4
 FLAGS = 5
 CLASS = 6
 EMPTY = 7
-NULL = 8
+NULL_INDEX = 8
 
 FIELD_FLAGS = {
         'null'      : NULLABLE,
@@ -2442,9 +2442,9 @@ class Record(object):
                 record._data = array('c', kamikaze)
         else:
             raise BadDataError("%r recieved for record data" % kamikaze)
-        if record._data[0] == '\x00':
+        if record._data[0] == '\x00': # the null byte strikes again!
             record._data[0] = ' '
-        if record._data[0] not in (' ', '*', '\x00'): # the null byte strikes again!
+        if record._data[0] not in (' ', '*'):
             raise DbfError("record data not correct -- first character should be a ' ' or a '*'.")
         if not _fromdisk and layout.location == ON_DISK:
             record._update_disk()
@@ -2504,8 +2504,8 @@ class Record(object):
         if name in self._memos:
             return self._memos[name]
         try:
-            index = self._meta.fields.index(name)
-            value = self._retrieve_field_value(index, name)
+            # index = self._meta.fields.index(name)
+            value = self._retrieve_field_value(name)
             return value
         except DbfError:
             error = sys.exc_info()[1]
@@ -2564,9 +2564,8 @@ class Record(object):
             self._memos[name] = value
             self._dirty = True
             return
-        index = self._meta.fields.index(name)
         try:
-            self._update_field_value(index, name, value)
+            self._update_field_value(name, value)
         except DbfError:
             error = sys.exc_info()[1]
             fielddef = self._meta[name]
@@ -2677,33 +2676,31 @@ class Record(object):
         for dbfindex in self._meta.table()._indexen:
             dbfindex(self)
 
-    def _retrieve_field_value(self, index, name):
+    def _retrieve_field_value(self, name):
         """
         calls appropriate routine to convert value stored in field from array
         """
         fielddef = self._meta[name]
-        flags = fielddef[FLAGS]
-        nullable = flags & NULLABLE and '_nullflags' in self._meta
-        binary = flags & BINARY
-        if nullable:
-            byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
-            null_data = self._data[null_def[START]:null_def[END]]
-            try:
-                if ord(null_data[byte]) >> bit & 1:
-                    return Null
-            except IndexError:
-                print(null_data)
-                print(index)
-                print(byte, bit)
-                print(len(self._data), self._data)
-                print(null_def)
-                print(null_data)
-                raise
-
-        record_data = self._data[fielddef[START]:fielddef[END]]
         field_type = fielddef[TYPE]
+        flags = fielddef[FLAGS]
+        binary = flags & BINARY
+        nullable = flags & NULLABLE and '_nullflags' in self._meta
         retrieve = self._meta.fieldtypes[field_type]['Retrieve']
+        if nullable:
+            null_data = self._data[-(len(self._meta.empty_null)):]
+            if null_data != self._meta.empty_null:
+                byte, bit = divmod(fielddef[NULL_INDEX], 8)
+                try:
+                    if ord(null_data[byte]) >> bit & 1:
+                        return Null
+                except IndexError:
+                    print(null_data)
+                    print(byte, bit)
+                    print(len(self._data), self._data)
+                    print(null_def)
+                    print(null_data)
+                    raise
+        record_data = self._data[fielddef[START]:fielddef[END]]
         datum = retrieve(record_data, fielddef, self._meta.memo, self._meta.decoder)
         return datum
 
@@ -2732,7 +2729,7 @@ class Record(object):
         self._old_data = self._data[:]
         self._write_to_disk = False
 
-    def _update_field_value(self, index, name, value):
+    def _update_field_value(self, name, value):
         """
         calls appropriate routine to convert value to ascii bytes, and save it in record
         """
@@ -2743,9 +2740,8 @@ class Record(object):
         nullable = flags & NULLABLE and '_nullflags' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
-            byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
-            null_data = self._data[null_def[START]:null_def[END]].tostring()
+            byte, bit = divmod(fielddef[NULL_INDEX], 8)
+            null_data = self._data[-(len(self._meta.empty_null)):].tostring()
             null_data = [ord(c) for c in null_data]
             if value is Null:
                 null_data[byte] |= 1 << bit
@@ -2753,7 +2749,7 @@ class Record(object):
             else:
                 null_data[byte] &= 0xff ^ 1 << bit
             null_data = array('c', [chr(n) for n in null_data])
-            self._data[null_def[START]:null_def[END]] = null_data
+            self._data[-(len(self._meta.empty_null)):] = null_data
         if value is not Null:
             bytes = array('c', update(value, fielddef, self._meta.memo, self._meta.input_decoder, self._meta.encoder))
             size = fielddef[LENGTH]
@@ -2786,8 +2782,7 @@ class Record(object):
 
     def _write(self):
         for field, value in self._memos.items():
-            index = self._meta.fields.index(field)
-            self._update_field_value(index, field, value)
+            self._update_field_value(field, value)
         self._update_disk()
 
 
@@ -2809,7 +2804,7 @@ class RecordTemplate(object):
         self._old_data = None
         self._write_to_disk = True
 
-    def _retrieve_field_value(self, index, name):
+    def _retrieve_field_value(self, name):
         """
         Calls appropriate routine to convert value stored in field from
         array
@@ -2819,11 +2814,11 @@ class RecordTemplate(object):
         nullable = flags & NULLABLE and '_nullflags' in self._meta
         binary = flags & BINARY
         if nullable:
-            byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
-            null_data = self._data[null_def[START]:null_def[END]]
-            if ord(null_data[byte]) >> bit & 1:
-                return Null
+            null_data = self._data[-(len(self._meta.empty_null)):]
+            if null_data != self._meta.empty_null:
+                byte, bit = divmod(fielddef[NULL_INDEX], 8)
+                if ord(null_data[byte]) >> bit & 1:
+                    return Null
         record_data = self._data[fielddef[START]:fielddef[END]]
         field_type = fielddef[TYPE]
         retrieve = self._meta.fieldtypes[field_type]['Retrieve']
@@ -2850,7 +2845,7 @@ class RecordTemplate(object):
         self._old_data = self._data[:]
         self._write_to_disk = False
 
-    def _update_field_value(self, index, name, value):
+    def _update_field_value(self, name, value):
         """
         calls appropriate routine to convert value to ascii bytes, and save it in record
         """
@@ -2861,9 +2856,8 @@ class RecordTemplate(object):
         nullable = flags & NULLABLE and '_nullflags' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
-            byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
-            null_data = self._data[null_def[START]:null_def[END]].tostring()
+            byte, bit = divmod(fielddef[NULL_INDEX], 8)
+            null_data = self._data[-(len(self._meta.empty_null)):].tostring()
             null_data = [ord(c) for c in null_data]
             if value is Null:
                 null_data[byte] |= 1 << bit
@@ -2871,7 +2865,7 @@ class RecordTemplate(object):
             else:
                 null_data[byte] &= 0xff ^ 1 << bit
             null_data = array('c', [chr(n) for n in null_data])
-            self._data[null_def[START]:null_def[END]] = null_data
+            self._data[-(len(self._meta.empty_null)):] = null_data
         if value is not Null:
             bytes = array('c', update(value, fielddef, self._meta.memo, self._meta.input_decoder, self._meta.encoder))
             size = fielddef[LENGTH]
@@ -2954,8 +2948,8 @@ class RecordTemplate(object):
         if name in self._memos:
             return self._memos[name]
         try:
-            index = self._meta.fields.index(name)
-            value = self._retrieve_field_value(index, name)
+            # index = self._meta.fields.index(name)
+            value = self._retrieve_field_value(name)
             return value
         except DbfError:
             error = sys.exc_info()[1]
@@ -3008,9 +3002,8 @@ class RecordTemplate(object):
         if name in self._meta.memofields:
             self._memos[name] = value
             return
-        index = self._meta.fields.index(name)
         try:
-            self._update_field_value(index, name, value)
+            self._update_field_value(name, value)
         except DbfError:
             error = sys.exc_info()[1]
             fielddef = self._meta[name]
@@ -4215,9 +4208,9 @@ class Table(_Navigation):
         memo = None             # memo object
         memofields = None       # field names of Memo type
         newmemofile = False     # True when memo file needs to be created
-        nulls = None            # non-None when Nullable fields present
         user_fields = None      # not counting SYSTEM fields
         user_field_count = 0    # also not counting SYSTEM fields
+        empty_null = None       # bytes representing a record with no fields nulled
 
     class _TableHeader(object):
         """
@@ -4723,7 +4716,10 @@ class Table(_Navigation):
         meta.header = header = self._TableHeader(self._dbfTableHeader, self._pack_date, self._unpack_date)
         header.extra = self._dbfTableHeaderExtra
         if default_data_types is None:
-            default_data_types = dict()
+            default_data_types = {
+                    'D' : dbf.Date,
+                    'T' : dbf.DateTime,
+                    }
         elif default_data_types == 'enhanced':
             default_data_types = {
                     'C' : dbf.Char,
@@ -5084,45 +5080,9 @@ class Table(_Navigation):
 
     def allow_nulls(self, fields):
         """
-        set fields to allow null values
+        set fields to allow null values -- NO LONGER ALLOWED, MUST BE SET AT TABLE CREATION
         """
-        meta = self._meta
-        if meta.status != READ_WRITE:
-            raise DbfError('%s not in read/write mode, unable to change field types' % meta.filename)
-        elif self._versionabbr in ('db3', ):
-            raise DbfError("Nullable fields are not allowed in %s tables" % self._version)
-        header = meta.header
-        fields = self._list_fields(fields)
-        missing = set(fields) - set(self.field_names)
-        if missing:
-            raise FieldMissingError(', '.join(missing))
-        if len(self.field_names) + 1 > meta.max_fields:
-            raise DbfError(
-                    "Adding the hidden _nullflags field would exceed the limit of %d fields for this table"
-                    % (meta.max_fields, )
-                    )
-        old_table = None
-        if self:
-            old_table = self.create_backup()
-            self.zap()
-        if meta.mfd is not None and not meta.ignorememos:
-            meta.mfd.close()
-            meta.mfd = None
-            meta.memo = None
-        if not meta.ignorememos:
-            meta.newmemofile = True
-        for field in fields:
-            specs = list(meta[field])
-            specs[FLAGS] |= NULLABLE
-            meta[field] = tuple(specs)
-        meta.blankrecord = None
-        self._build_header_fields()
-        self._update_disk()
-        if old_table is not None:
-            old_table.open()
-            for record in old_table:
-                self.append(scatter(record))
-            old_table.close()
+        raise DbfError('fields can only be set to allow NULLs at table creation')
 
     def append(self, data='', drop=False, multiple=1):
         """
@@ -5411,7 +5371,7 @@ class Table(_Navigation):
             raise MissingField(field)
         return bool(self._meta[field][FLAGS] & NULLABLE)
 
-    def open(self, mode=READ_WRITE):
+    def open(self, mode=READ_ONLY):
         """
         (re)opens disk table, (re)initializes data structures
         """
@@ -5700,6 +5660,8 @@ class Db3Table(Table):
         if len(fieldsdef) // 32 != meta.header.field_count:
             raise BadDataError("Header shows %d fields, but field definition block has %d fields" % (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
+        # null fields not allowed in db3 tables
+        null_index = None
         for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
             name = unpack_str(fieldblock[:11])
@@ -5730,6 +5692,7 @@ class Db3Table(Table):
                     flags,
                     cls,
                     empty,
+                    null_index
                     )
         if offset != total_length:
             raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
@@ -5845,7 +5808,7 @@ class ClpTable(Db3Table):
         """
         fieldblock = array('c', '')
         memo = False
-        nulls = False
+        nulls = 0
         meta = self._meta
         header = meta.header
         header.version = chr(ord(header.version) & ord(self._noMemoMask))
@@ -5871,7 +5834,7 @@ class ClpTable(Db3Table):
             if layout[TYPE] in meta.memo_types:
                 memo = True
             if layout[FLAGS] & NULLABLE:
-                nulls = True
+                nulls += 1
         if memo:
             header.version = chr(ord(header.version) | ord(self._yesMemoMask))
             if meta.memo is None:
@@ -5885,11 +5848,11 @@ class ClpTable(Db3Table):
             meta.memo = None
         if nulls:
             start = layout[START] + layout[LENGTH]
-            length, one_more = divmod(len(meta.fields), 8)
+            length, one_more = divmod(nulls, 8)
             if one_more:
                 length += 1
             fielddef = array('c', '\x00' * 32)
-            fielddef[:11] = array('c', pack_str('_nullflags'))
+            fielddef[:11] = array('c', pack_str('_NullFlags'))
             fielddef[11] = '0'
             fielddef[12:16] = array('c', pack_long_int(start))
             fielddef[16] = chr(length)
@@ -5933,6 +5896,7 @@ class ClpTable(Db3Table):
             raise BadDataError("Header shows %d fields, but field definition block has %d fields"
                     (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
+        nulls_found = False
         for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
             name = unpack_str(fieldblock[:11])
@@ -5940,6 +5904,7 @@ class ClpTable(Db3Table):
             if not type in meta.fieldtypes:
                 raise BadDataError("Unknown field type: %s" % type)
             start = offset
+            start = unpack_long_int(fieldblock[12:16])
             length = ord(fieldblock[16])
             decimals = ord(fieldblock[17])
             if type == 'C':
@@ -5947,6 +5912,9 @@ class ClpTable(Db3Table):
             offset += length
             end = start + length
             flags = ord(fieldblock[18])
+            null = flags & NULLABLE
+            if null:
+                nulls_found = True
             if name in meta.fields:
                 raise BadDataError('Duplicate field name found: %s' % name)
             meta.fields.append(name)
@@ -5965,10 +5933,20 @@ class ClpTable(Db3Table):
                     flags,
                     cls,
                     empty,
+                    null
                     )
         if offset != total_length:
             raise BadDataError("Header shows record length of %d, but calculated record length is %d"
                     (total_length, offset))
+        if nulls_found:
+            nullable_fields = [f for f in meta if meta[f][NULL_INDEX]]
+            nullable_fields.sort(key=lambda f: f[START])
+            for i, f in enumerate(nullable_fields):
+                meta[f][NULL_INDEX] = i
+            null_bytes, plus_one = divmod(len(nullable_fields), 8)
+            if plus_one:
+                null_bytes += 1
+            meta.empty_null = array('c', b'\x00' * null_bytes)
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
@@ -6242,7 +6220,7 @@ class VfpTable(FpTable):
         meta.fields[:] = []
         offset = 1
         fieldsdef = meta.header.fields
-        meta.nullflags = None
+        nulls_found = False
         total_length = meta.header.record_length
         for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
@@ -6256,6 +6234,9 @@ class VfpTable(FpTable):
             end = start + length
             decimals = ord(fieldblock[17])
             flags = ord(fieldblock[18])
+            null = flags & NULLABLE
+            if null:
+                nulls_found = True
             if name in meta.fields:
                 raise BadDataError('Duplicate field name found: %s' % name)
             meta.fields.append(name)
@@ -6274,9 +6255,28 @@ class VfpTable(FpTable):
                     flags,
                     cls,
                     empty,
+                    null
                     )
         if offset != total_length:
             raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
+        if nulls_found:
+            nullable_fields = [f for f in meta if meta[f][NULL_INDEX]]
+            nullable_fields.sort(key=lambda f: f[START])
+            for i, f in enumerate(nullable_fields):
+                print meta[f]
+                meta[f] = meta[f][:-1] + (i, )
+                print meta[f]
+                print
+            null_bytes, plus_one = divmod(len(nullable_fields), 8)
+            print '%d nullable fields' % len(nullable_fields)
+            print '\\x00 bytes needed: %d + %d' % (null_bytes, int(bool(plus_one)))
+            print
+            if plus_one:
+                null_bytes += 1
+            print 'creating %d null bytes' % null_bytes
+            meta.empty_null = array('c', b'\x00' * null_bytes)
+            print meta.empty_null
+            print
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)

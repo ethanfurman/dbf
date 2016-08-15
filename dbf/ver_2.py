@@ -1,6 +1,4 @@
-from __future__ import with_statement
 """
-=========
 Copyright
 =========
 
@@ -31,6 +29,7 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+from __future__ import with_statement
 
 import codecs
 import collections
@@ -46,6 +45,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 import decimal
 from decimal import Decimal
+from functools import partial
 from aenum import Enum, IntEnum
 from glob import glob
 from math import floor
@@ -3963,6 +3963,14 @@ def ezip(*iters):
             continue
         break
 
+def unicode_error_handler(decoder, encoder, errors):
+    if errors in ('ignore', 'replace'):
+        decoder = partial(decoder, errors=errors)
+        encoder = partial(encoder, errors=errors)
+    elif errors in ('xmlcharrefreplace', 'backslashreplace'):
+        decoder = partial(decoder, errors='replace')
+        encoder = partial(encoder, errors=errors)
+    return decoder, encoder
 
 # Public classes
 
@@ -4675,7 +4683,7 @@ class Table(_Navigation):
 
     def __init__(self, filename, field_specs=None, memo_size=128, ignore_memos=False,
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
-                 dbf_type=None, on_disk=True,
+                 dbf_type=None, on_disk=True, unicode_errors='strict'
                  ):
         """
         open/create dbf file
@@ -4713,6 +4721,7 @@ class Table(_Navigation):
         meta.memo_size = memo_size
         meta.input_decoder = codecs.getdecoder(input_decoding)      # from ascii to unicode
         meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
+        # meta.input_decoder, meta.output_encoder = unicode_error_handler(input_decoder, output_encoder, unicode_errors)
         meta.header = header = self._TableHeader(self._dbfTableHeader, self._pack_date, self._unpack_date)
         header.extra = self._dbfTableHeaderExtra
         if default_data_types is None:
@@ -4720,6 +4729,9 @@ class Table(_Navigation):
                     'D' : dbf.Date,
                     'T' : dbf.DateTime,
                     }
+            for k in default_data_types.keys():
+                if k not in fieldtypes:
+                    del default_data_types[k]
         elif default_data_types == 'enhanced':
             default_data_types = {
                     'C' : dbf.Char,
@@ -4727,11 +4739,13 @@ class Table(_Navigation):
                     'D' : dbf.Date,
                     'T' : dbf.DateTime,
                     }
-
-        self._meta._default_data_types = default_data_types
+            for k in default_data_types.keys():
+                if k not in fieldtypes:
+                    del default_data_types[k]
+        meta._default_data_types = default_data_types
         if field_data_types is None:
             field_data_types = dict()
-        self._meta._field_data_types = field_data_types
+        meta._field_data_types = field_data_types
         for field, types in default_data_types.items():
             if not isinstance(types, tuple):
                 types = (types, )
@@ -4766,8 +4780,7 @@ class Table(_Navigation):
         if codepage is not None:
             header.codepage(codepage)
             cp, sd, ld = _codepage_lookup(codepage)
-            self._meta.decoder = codecs.getdecoder(sd)
-            self._meta.encoder = codecs.getencoder(sd)
+            self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
         if field_specs:
             if meta.location == ON_DISK:
                 meta.dfd = open(meta.filename, 'w+b')
@@ -4775,8 +4788,7 @@ class Table(_Navigation):
             if codepage is None:
                 header.codepage(default_codepage)
                 cp, sd, ld = _codepage_lookup(header.codepage())
-                meta.decoder = codecs.getdecoder(sd)
-                meta.encoder = codecs.getencoder(sd)
+                self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
             meta.status = READ_WRITE
             self.add_fields(field_specs)
         else:
@@ -4797,8 +4809,7 @@ class Table(_Navigation):
                     ord(header.version)))
             if codepage is None:
                 cp, sd, ld = _codepage_lookup(header.codepage())
-                self._meta.decoder = codecs.getdecoder(sd)
-                self._meta.encoder = codecs.getencoder(sd)
+                self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
             fieldblock = dfd.read(header.start - 32)
             for i in range(len(fieldblock) // 32 + 1):
                 fieldend = i * 32
@@ -4849,7 +4860,7 @@ class Table(_Navigation):
 
     def __new__(cls, filename, field_specs=None, memo_size=128, ignore_memos=False,
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
-                 dbf_type=None, on_disk=True,
+                 dbf_type=None, on_disk=True, unicode_errors='strict',
                  ):
         if dbf_type is None and isinstance(filename, Table):
             return filename
@@ -4924,8 +4935,7 @@ class Table(_Navigation):
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to change codepage' % meta.filename)
         meta.header.codepage(codepage.code)
-        meta.decoder = codecs.getdecoder(codepage.name)
-        meta.encoder = codecs.getencoder(codepage.name)
+        meta.decoder, meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
         self._update_disk(headeronly=True)
 
     @property
@@ -5202,7 +5212,7 @@ class Table(_Navigation):
         # use same encoder/decoder as current table, which may have been overridden
         bkup._meta.encoder = self._meta.encoder
         bkup._meta.decoder = self._meta.decoder
-        bkup.open()
+        bkup.open(READ_WRITE)
         for record in self:
             bkup.append(record)
         bkup.close()
@@ -6263,20 +6273,11 @@ class VfpTable(FpTable):
             nullable_fields = [f for f in meta if meta[f][NULL_INDEX]]
             nullable_fields.sort(key=lambda f: f[START])
             for i, f in enumerate(nullable_fields):
-                print meta[f]
                 meta[f] = meta[f][:-1] + (i, )
-                print meta[f]
-                print
             null_bytes, plus_one = divmod(len(nullable_fields), 8)
-            print '%d nullable fields' % len(nullable_fields)
-            print '\\x00 bytes needed: %d + %d' % (null_bytes, int(bool(plus_one)))
-            print
             if plus_one:
                 null_bytes += 1
-            print 'creating %d null bytes' % null_bytes
             meta.empty_null = array('c', b'\x00' * null_bytes)
-            print meta.empty_null
-            print
         meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
@@ -8143,7 +8144,7 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
             csv_table = Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
         else:
             csv_table = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
-        csv_table.open()
+        csv_table.open(READ_WRITE)
         fields_so_far = 1
         while reader:
             try:

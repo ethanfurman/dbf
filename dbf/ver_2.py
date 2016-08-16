@@ -7839,8 +7839,11 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
     if format == 'fixed':
         format = 'txt'
     if encoding is None:
-        encoding = table.codepage.name
-    encoder = codecs.getencoder(encoding)
+        encoder = table._meta.encoder
+    else:
+        encoder = codecs.getencoder(encoding)
+    #     encoding = table.codepage.name
+    # encoder = codecs.getencoder(encoding)
     if isinstance(field_names[0], unicode):
         header_names = [encoder(f) for f in field_names]
     else:

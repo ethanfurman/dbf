@@ -4,7 +4,6 @@ try:
 except ImportError:
     pass
 from distutils.core import setup
-import sys
 
 #html_docs = glob('dbf/html/*')
 
@@ -16,18 +15,13 @@ Not supported: index files (but can create tempory non-file indexes), auto-incre
 Installation:  `pip install dbf`
 """
 
-if sys.version_info[:2] < (3, 4):
-    requirements = ['enum34']
-else:
-    requirements = []
-
 py2_only = ()
 py3_only = ()
 make = []
 
 data = dict(
         name='dbf',
-        version='0.96.9a1',
+        version='0.97.0a1',
         license='BSD License',
         description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
         long_description=long_desc,

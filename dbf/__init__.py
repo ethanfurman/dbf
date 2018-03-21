@@ -3551,8 +3551,9 @@ class _Db3Memo(_DbfMemo):
                 self.meta.mfd = open(self.meta.memoname, 'w+b')
                 self.meta.mfd.write(pack_long_int(1) + b'\x00' * 508)
             else:
+                mode = ('rb', 'r+b')[self.meta.status is READ_WRITE]
                 try:
-                    self.meta.mfd = open(self.meta.memoname, 'r+b')
+                    self.meta.mfd = open(self.meta.memoname, mode)
                     self.meta.mfd.seek(0)
                     next = self.meta.mfd.read(4)
                     self.nextmemo = unpack_long_int(next)
@@ -3628,8 +3629,9 @@ class _VfpMemo(_DbfMemo):
                 self.meta.mfd.write(pack_long_int(nextmemo, bigendian=True) + b'\x00\x00' + \
                         pack_short_int(self.meta.memo_size, bigendian=True) + b'\x00' * 504)
             else:
+                mode = ('rb', 'r+b')[self.meta.status is READ_WRITE]
                 try:
-                    self.meta.mfd = open(self.meta.memoname, 'r+b')
+                    self.meta.mfd = open(self.meta.memoname, mode)
                     self.meta.mfd.seek(0)
                     header = self.meta.mfd.read(512)
                     self.nextmemo = unpack_long_int(header[:4], bigendian=True)
@@ -4598,6 +4600,7 @@ class Table(_Navigation):
         user_fields = None        # not counting SYSTEM fields
         user_field_count = 0      # also not counting SYSTEM fields
         unicode_errors = 'strict' # default to strict unicode translations
+        status = CLOSED           # until we open it
 
     class _TableHeader(object):
         """
@@ -5160,6 +5163,7 @@ class Table(_Navigation):
             cp, sd, ld = _codepage_lookup(codepage)
             self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
         if field_specs:
+            meta.status = READ_WRITE
             if meta.location == ON_DISK:
                 meta.dfd = open(meta.filename, 'w+b')
                 meta.newmemofile = True
@@ -5167,11 +5171,11 @@ class Table(_Navigation):
                 header.codepage(default_codepage)
                 cp, sd, ld = _codepage_lookup(header.codepage())
                 self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
-            meta.status = READ_WRITE
             self.add_fields(field_specs)
         else:
+            meta.status = READ_ONLY
             try:
-                dfd = meta.dfd = open(meta.filename, 'r+b')
+                dfd = meta.dfd = open(meta.filename, 'rb')
             except IOError:
                 e= sys.exc_info()[1]
                 raise DbfError(unicode(e)).from_None()
@@ -5221,7 +5225,6 @@ class Table(_Navigation):
                     ):
                 classes.append(result_type)
             meta[field] = meta[field][:Field.CLASS] + tuple(classes) + meta[field][Field.NUL:]
-        meta.status = READ_ONLY
         self.close()
 
     def __iter__(self):
@@ -5582,8 +5585,9 @@ class Table(_Navigation):
             if self._meta.mfd is not None:
                 self._meta.mfd.close()
                 self._meta.mfd = None
-            self._meta.dfd.close()
-            self._meta.dfd = None
+            if self._meta.dfd is not None:
+                self._meta.dfd.close()
+                self._meta.dfd = None
         self._meta.status = CLOSED
 
     def create_backup(self, new_name=None, on_disk=None):
@@ -5790,7 +5794,8 @@ class Table(_Navigation):
             return self
         if '_table' in dir(self):
             del self._table
-        dfd = meta.dfd = open(meta.filename, 'r+b')
+        mode = ('rb', 'r+b')[meta.status is READ_WRITE]
+        dfd = meta.dfd = open(meta.filename, mode)
         dfd.seek(0)
         header = meta.header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
         if not header.version in self._supported_tables:

@@ -1,10 +1,18 @@
 What's New
 ==========
 
+0.97.001
+--------
+
+Can now open dbf files as read-only when lacking write permissions.
+
+
 0.97.000
 --------
 
 Moved to a single 2/3 code base.
+Opening a database now defaults to dbf.READ_ONLY; can also use dbf.READ_WRITE;
+the corresponding strings are no longer supported.
 
 
 0.96.008

@@ -1,10 +1,11 @@
 import codecs
+import datetime
 import os
 import sys
 import unittest
 import tempfile
 import shutil
-import datetime
+import stat
 
 py_ver = sys.version_info[:2]
 module = globals()
@@ -4933,6 +4934,7 @@ class TestReadWriteDefaultOpen(unittest.TestCase):
         table.close()
 
     def tearDown(self):
+        os.chmod(self.dbf_table.filename, stat.S_IWRITE|stat.S_IREAD)
         self.dbf_table.close()
 
     def test_context_manager(self):
@@ -4948,6 +4950,13 @@ class TestReadWriteDefaultOpen(unittest.TestCase):
     def test_processing(self):
         for rec in dbf.Process(self.dbf_table):
             rec.name = 'Carnations'
+
+    def test_read_only(self):
+        table = self.dbf_table
+        os.chmod(table.filename, stat.S_IREAD)
+        table.open(READ_ONLY)
+        table.close()
+        self.assertRaises((IOError, OSError), table.open, READ_WRITE)
 
 
 class TestWhatever(unittest.TestCase):

@@ -4935,6 +4935,7 @@ class TestReadWriteDefaultOpen(unittest.TestCase):
 
     def tearDown(self):
         os.chmod(self.dbf_table.filename, stat.S_IWRITE|stat.S_IREAD)
+        os.chmod(self.dbf_table._meta.memoname, stat.S_IWRITE|stat.S_IREAD)
         self.dbf_table.close()
 
     def test_context_manager(self):
@@ -4954,6 +4955,7 @@ class TestReadWriteDefaultOpen(unittest.TestCase):
     def test_read_only(self):
         table = self.dbf_table
         os.chmod(table.filename, stat.S_IREAD)
+        os.chmod(table._meta.memoname, stat.S_IREAD)
         table.open(READ_ONLY)
         table.close()
         self.assertRaises((IOError, OSError), table.open, READ_WRITE)

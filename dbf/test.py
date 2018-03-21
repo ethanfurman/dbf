@@ -247,13 +247,12 @@ class TestDateTime(unittest.TestCase):
 
     def test_date_creation(self):
         "Date creation"
-        date0 = Date()
-        date1 = Date()
-        date2 = Date.fromymd('        ')
-        date5 = Date.fromordinal(0)
-        date6 = Date.today()
-        date7 = Date.max
-        date8 = Date.min
+        Date()
+        Date.fromymd('        ')
+        Date.fromordinal(0)
+        Date.today()
+        Date.max
+        Date.min
         self.assertRaises(ValueError, Date.fromymd, '00000')
         self.assertRaises(ValueError, Date.fromymd, '00000000')
         self.assertRaises(ValueError, Date, 0, 0, 0)
@@ -269,12 +268,11 @@ class TestDateTime(unittest.TestCase):
 
     def test_datetime_creation(self):
         "DateTime creation"
-        datetime0 = DateTime()
-        datetime1 = DateTime()
-        datetime5 = DateTime.fromordinal(0)
-        datetime6 = DateTime.today()
-        datetime7 = DateTime.max
-        datetime8 = DateTime.min
+        DateTime()
+        DateTime.fromordinal(0)
+        DateTime.today()
+        DateTime.max
+        DateTime.min
 
     def test_datetime_compare(self):
         "DateTime comparisons"
@@ -304,10 +302,9 @@ class TestDateTime(unittest.TestCase):
 
     def test_time_creation(self):
         "Time creation"
-        time0 = Time()
-        time1 = Time()
-        time7 = Time.max
-        time8 = Time.min
+        Time()
+        Time.max
+        Time.min
 
     def test_time_compare(self):
         "Time comparisons"
@@ -525,7 +522,7 @@ class TestLogical(unittest.TestCase):
     def test_unknown(self):
         "Unknown"
         for unk in '', '?', ' ', None, Null, Unknown, Other:
-            huh = unknown = Logical(unk)
+            huh = Logical(unk)
             self.assertEqual(huh == None, True, "huh is %r from %r, which is not None" % (huh, unk))
             self.assertEqual(huh != None, False, "huh is %r from %r, which is not None" % (huh, unk))
             self.assertEqual(huh != True, True, "huh is %r from %r, which is not None" % (huh, unk))
@@ -2620,7 +2617,7 @@ class TestExceptions(unittest.TestCase):
         self.assertRaises(DbfError, table.append, dict(name='uh uh!'))
 
     def test_clipper(self):
-        table = Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
+        Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
         self.assertRaises(BadDataError, Table, os.path.join(tempdir, 'temptable'))
 
     def test_data_overflow(self):
@@ -3016,7 +3013,7 @@ class TestDbfRecords(unittest.TestCase):
             photolist.append(photo)
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc, \
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo, \
-                    'dist': dist,})
+                    'dist': dist, 'price':price})
             record = table[-1]
             self.assertEqual(record.name.strip(), name)
             self.assertEqual(record.paid, paid)
@@ -3246,7 +3243,6 @@ class TestDbfRecords(unittest.TestCase):
 
     def test_null_type(self):
         "NullType"
-        from pprint import pprint
         table = Table(
             filename=':memory:',
             field_specs='name C(20) null; born L null; married D null; appt T null; wisdom M null',
@@ -3331,6 +3327,10 @@ class TestDbfRecords(unittest.TestCase):
         else:
             high_ascii = bytes(range(128, 128+50))
         table.append(dict(bindata=high_ascii, binmemo=high_ascii))
+        bindata = table[0].bindata
+        binmemo = table[0].binmemo
+        self.assertTrue(isinstance(bindata, bytes))
+        self.assertTrue(isinstance(binmemo, bytes))
         self.assertEqual(table[0].bindata, high_ascii)
         self.assertEqual(table[0].binmemo, high_ascii)
         table.close()
@@ -3433,8 +3433,6 @@ class TestDbfRecords(unittest.TestCase):
 
     def test_remove_field_from_null(self):
         "removing a normal field from a table with null fields"
-        mfd = self.vfp_table._meta.mfd
-        mfd = None
         table = Table(
             self.vfp_table.filename,
             'name C(50); age N(3,0); fired D null',
@@ -3657,7 +3655,6 @@ class TestDbfFunctions(unittest.TestCase):
         i = 0
         for record in table:
             self.assertEqual(dbf.recno(record), i)
-
             self.assertEqual(table[i].paid, paidlist[i])
             self.assertEqual(record.paid, paidlist[i])
             self.assertEqual(abs(table[i].qty - qtylist[i]) < .00001, True)
@@ -3681,7 +3678,8 @@ class TestDbfFunctions(unittest.TestCase):
             i += 1
         self.assertEqual(i, len(table))
         self.assertTrue('paid' not in dbf.field_names(first))
-        self.assertTrue('orderdate' not in dbf.field_names(first))
+        self.assertTrue('orderdate' not in dbf.field_names(middle))
+        self.assertTrue('name' not in dbf.field_names(last))
         table.add_fields('name C(25); paid L; orderdate D')
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
@@ -3852,13 +3850,7 @@ class TestDbfFunctions(unittest.TestCase):
 
     def test_len_contains_iter(self):
         "basic function tests - len, contains & iterators"
-        table = self.dbf_table
-        table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
+        table = self.dbf_table.open()
         for field in table.field_names:
             self.assertEqual(1, table.field_names.count(field))
         length = sum([1 for rec in table])
@@ -3998,11 +3990,6 @@ class TestDbfFunctions(unittest.TestCase):
         "finding, ordering, searching"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
 
         # find (brute force)
         unordered = []
@@ -4072,11 +4059,6 @@ class TestDbfFunctions(unittest.TestCase):
         "scattering and gathering fields, and new()"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
         table2 = table.new(os.path.join(tempdir, 'temptable2'))
         table2.open(mode=READ_WRITE)
         for record in table:
@@ -4119,11 +4101,6 @@ class TestDbfFunctions(unittest.TestCase):
         "renaming fields, __contains__, has_key"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
         for field in table.field_names:
             oldfield = field
             table.rename_field(oldfield, 'newfield')
@@ -4143,11 +4120,6 @@ class TestDbfFunctions(unittest.TestCase):
         "kamikaze"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
         table2 = table.new(os.path.join(tempdir, 'temptable2'))
         table2.open(mode=READ_WRITE)
         for record in table:
@@ -4187,11 +4159,6 @@ class TestDbfFunctions(unittest.TestCase):
         "multiple append"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
         table2 = table.new(os.path.join(tempdir, 'temptable2'))
         table2.open(mode=READ_WRITE)
         record = table.next_record
@@ -4226,11 +4193,6 @@ class TestDbfFunctions(unittest.TestCase):
         "slices"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
         slice1 = [table[0], table[1], table[2]]
         self.assertEqual(slice1, list(table[:3]))
         slice2 = [table[-3], table[-2], table[-1]]
@@ -4251,14 +4213,14 @@ class TestDbfFunctions(unittest.TestCase):
         "reset record"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
+        for record in table:
+            with record:
+                self.assertTrue(record.qty)
+                dbf.reset(record, keep_fields=['name'])
+            self.assertFalse(record.qty)
+            self.assertTrue(record.name)
         for record in table:
             dbf.reset(record)
-            dbf.write(record)
         self.assertEqual(table[0].name, table[1].name)
         dbf.write(table[0], name='Python rocks!')
         self.assertNotEqual(table[0].name, table[1].name)
@@ -4310,11 +4272,6 @@ class TestDbfFunctions(unittest.TestCase):
         "from_csv"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
         dbf.export(table, table.filename, header=False)
         csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'))
         csvtable.open(mode=READ_WRITE)
@@ -4369,11 +4326,6 @@ class TestDbfFunctions(unittest.TestCase):
         table = self.dbf_table
         table.open(mode=READ_WRITE)
         test_record = dbf.scatter(table[5])
-        namelist = self.dbf_namelist
-        paidlist = self.dbf_paidlist
-        qtylist = self.dbf_qtylist
-        orderlist = self.dbf_orderlist
-        desclist = self.dbf_desclist
         test_record = dbf.scatter(table[5])
         table.resize_field('name', 40)
         new_record = dbf.scatter(table[5])
@@ -4675,7 +4627,6 @@ class TestDbfNavigation(unittest.TestCase):
         list = List(table)
         index = Index(table, key=lambda rec: dbf.recno(rec))
         total = len(table)
-        mid = total // 2
         self.assertEqual(table.current, -1)
         self.assertEqual(list.current, -1)
         self.assertEqual(index.current, -1)
@@ -4700,7 +4651,6 @@ class TestDbfNavigation(unittest.TestCase):
         list = List(table)
         index = Index(table, key=lambda rec: dbf.recno(rec))
         total = len(table)
-        mid = total // 2
         self.assertTrue(table[0] is list[0])
         self.assertTrue(table[0] is index[0])
         self.assertTrue(table.first_record is table[0])
@@ -4715,7 +4665,6 @@ class TestDbfNavigation(unittest.TestCase):
         list = List(table)
         index = Index(table, key=lambda rec: dbf.recno(rec))
         total = len(table)
-        mid = total // 2
         self.assertTrue(table[0] is list[0])
         self.assertTrue(table[0] is index[0])
         table.top()
@@ -4773,7 +4722,6 @@ class TestDbfNavigation(unittest.TestCase):
         list = List(table)
         index = Index(table, key=lambda rec: dbf.recno(rec))
         total = len(table)
-        mid = total // 2
         self.assertTrue(table[0] is list[0])
         self.assertTrue(table[0] is index[0])
         table.bottom()
@@ -4803,7 +4751,6 @@ class TestDbfNavigation(unittest.TestCase):
         list = List(table)
         index = Index(table, key=lambda rec: dbf.recno(rec))
         total = len(table)
-        mid = total // 2
         self.assertTrue(table[-1] is list[-1])
         self.assertTrue(table[-1] is index[-1])
         self.assertTrue(table.last_record is table[-1])
@@ -4931,7 +4878,7 @@ class TestDbfLists(unittest.TestCase):
         table1.open(mode=READ_WRITE)
         list1 = table1[::2]
         list2 = table1[::3]
-        list3 = table1[:] - list1 - list2
+        table1[:] - list1 - list2
         list4 = table1[:]
         index = table1.create_index(key = lambda rec: rec.name )
         list4.sort(key=lambda rec: rec.name)
@@ -4970,6 +4917,37 @@ class TestDbfLists(unittest.TestCase):
             i += 1
         self.assertEqual(i, len(list))
         table.close()
+
+
+class TestReadWriteDefaultOpen(unittest.TestCase):
+    "test __enter__/__exit__"
+
+    def setUp(self):
+        "create a dbf table"
+        self.dbf_table = table = Table(
+            os.path.join(tempdir, 'temptable'),
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            )
+        table.open(READ_WRITE)
+        table.append(('Rose Petals', True, 115, Date(2018, 2, 14), 'lightly scented, pink & red'))
+        table.close()
+
+    def tearDown(self):
+        self.dbf_table.close()
+
+    def test_context_manager(self):
+        with self.dbf_table as t:
+            t.append(dict(name='Stoneleaf', paid=True, qty=1))
+
+    def test_delete_fields(self):
+        dbf.delete_fields(self.dbf_table.filename, 'orderdate')
+
+    def test_add_fields(self):
+        dbf.add_fields(self.dbf_table.filename, 'alias C(25)')
+
+    def test_processing(self):
+        for rec in dbf.Process(self.dbf_table):
+            rec.name = 'Carnations'
 
 
 class TestWhatever(unittest.TestCase):

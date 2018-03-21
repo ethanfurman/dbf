@@ -36,6 +36,7 @@ import codecs
 import collections
 import csv
 import datetime
+import decimal
 import os
 import struct
 import sys
@@ -45,12 +46,11 @@ import weakref
 from array import array
 from bisect import bisect_left, bisect_right
 from collections import defaultdict, deque
-from decimal import Decimal
 from functools import partial
 from aenum import Enum, IntEnum, export
 from glob import glob
 from math import floor
-from os import SEEK_SET, SEEK_CUR, SEEK_END
+from os import SEEK_END
 from textwrap import dedent
 
 
@@ -280,6 +280,8 @@ def string(text):
     elif isinstance(text, bytes):
         return text.decode(default_codepage)
 
+## keep pyflakes happy  :(
+execute = None
 if py_ver < (3, 0):
     from __builtin__ import ord as bi_ord
     exec(dedent("""\
@@ -333,8 +335,16 @@ if py_ver == (2, 6):
         if isinstance(val, float):
             return decimal.Decimal(unicode(val))
         return decimal.Decimal(val)
+else:
+    Decimal = decimal.Decimal
 
-
+## keep pyflakes happy :(
+SYSTEM = NULLABLE = BINARY = NOCPTRANS = None
+SPACE = ASTERISK = TYPE = CR = NULL = None
+START = LENGTH = END = DECIMALS = FLAGS = CLASS = EMPTY = NUL = None
+IN_MEMORY = ON_DISK = CLOSED = READ_ONLY = READ_WRITE = None
+_NULLFLAG = CHAR = CURRENCY = DATE = DATETIME = DOUBLE = FLOAT = None
+GENERAL = INTEGER = LOGICAL = MEMO = NUMERIC = PICTURE = None
 
 class HexEnum(IntEnum):
     "repr is in hex"
@@ -1826,10 +1836,10 @@ class Time(object):
                 "%H:%M:%S",
                 ):
             try:
-                return cls(datetime.datetime.strptime(datetime_string, format))
+                return cls(datetime.datetime.strptime(time_string, format))
             except ValueError:
                 pass
-        raise ValueError("Unable to convert %r" % datetime_string)
+        raise ValueError("Unable to convert %r" % time_string)
 
     def time(self):
         if self:
@@ -2750,7 +2760,6 @@ class Record(object):
         record._memos = {}
         record._write_to_disk = True
         record._old_data = None
-        header = layout.header
         record._data = layout.blankrecord[:]
         if kamikaze and len(record._data) != len(kamikaze):
             raise BadDataError("record data is not the correct length (should be %r, not %r)" %
@@ -2831,7 +2840,7 @@ class Record(object):
             return value
         except DbfError:
             error = sys.exc_info()[1]
-            error.message = "field --%s-- is %s -> %s" % (name, self._meta.fieldtypes[fielddef['type']]['Type'], error.message)
+            error.message = "error accessing field %r:  %s" % (name, error.message)
             raise
 
     def __getitem__(self, item):
@@ -2850,7 +2859,7 @@ class Record(object):
                 field_names = api.field_names(self)
                 start, stop, step = item.start, item.stop, item.step
                 if start not in field_names or stop not in field_names:
-                    raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
+                    raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an intger, not %r" % type(step))
                 start = field_names.index(start)
@@ -2890,8 +2899,7 @@ class Record(object):
             self._update_field_value(name, value)
         except DbfError:
             error = sys.exc_info()[1]
-            fielddef = self._meta[name]
-            message = "%s (%s) = %r --> %s" % (name, self._meta.fieldtypes[fielddef[TYPE]]['Type'], value, error.args)
+            message = "field %r: %s" % (name, error.args)
             data = name
             err_cls = error.__class__
             raise err_cls(message, data)
@@ -2911,7 +2919,7 @@ class Record(object):
             if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = name.start, name.stop, name.step
                 if start not in field_names or stop not in field_names:
-                    raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
+                    raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an integer, not %r" % type(step))
                 start = field_names.index(start)
@@ -3003,11 +3011,11 @@ class Record(object):
         """
         calls appropriate routine to convert value stored in field from array
         """
+        # check nullable here, binary is handled in the appropriate retrieve_* functions
         index = self._meta.fields.index(name)
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
         nullable = flags & NULLABLE and '_nullflags' in self._meta
-        binary = flags & BINARY
         if nullable:
             byte, bit = divmod(index, 8)
             null_def = self._meta['_nullflags']
@@ -3058,11 +3066,11 @@ class Record(object):
         """
         calls appropriate routine to convert value to bytes, and save it in record
         """
+        # check nullabel here, binary is handled in the appropriate update_* functions
         index = self._meta.fields.index(name)
         fielddef = self._meta[name]
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
-        binary = flags & BINARY
         nullable = flags & NULLABLE and '_nullflags' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
@@ -3134,11 +3142,11 @@ class RecordTemplate(object):
         Calls appropriate routine to convert value stored in field from
         array
         """
+        # check nullable here, binary is handled in the appropriate retrieve_* functions
         index = self._meta.fields.index(name)
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
         nullable = flags & NULLABLE and '_nullflags' in self._meta
-        binary = flags & BINARY
         if nullable:
             byte, bit = divmod(index, 8)
             null_def = self._meta['_nullflags']
@@ -3175,11 +3183,11 @@ class RecordTemplate(object):
         """
         calls appropriate routine to convert value to ascii bytes, and save it in record
         """
+        # check nullabel here, binary is handled in the appropriate update_* functions
         index = self._meta.fields.index(name)
         fielddef = self._meta[name]
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
-        binary = flags & BINARY
         nullable = flags & NULLABLE and '_nullflags' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
@@ -3223,7 +3231,6 @@ class RecordTemplate(object):
         for name in layout.memofields:
             field_type = layout[name][TYPE]
             record._memos[name] = layout.fieldtypes[field_type]['Empty']()
-        header = layout.header
         if original_record is None:
             record._data = layout.blankrecord[:]
         else:
@@ -3277,6 +3284,7 @@ class RecordTemplate(object):
             value = self._retrieve_field_value(name)
             return value
         except DbfError:
+            fielddef = self._meta[name]
             error = sys.exc_info()[1]
             error.message = "field --%s-- is %s -> %s" % (name, self._meta.fieldtypes[fielddef['type']]['Type'], error.message)
             raise
@@ -3296,7 +3304,7 @@ class RecordTemplate(object):
             if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
                 start, stop, step = item.start, item.stop, item.step
                 if start not in fields or stop not in fields:
-                    raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
+                    raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an integer, not %r" % type(step))
                 start = fields.index(start)
@@ -3348,7 +3356,7 @@ class RecordTemplate(object):
             if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = name.start, name.stop, name.step
                 if start not in field_names or stop not in field_names:
-                    raise MissingFieldError("Either %r or %r (or both) are not valid field names" % (start, stop))
+                    raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an integer, not %r" % type(step))
                 start = field_names.index(start)
@@ -4575,20 +4583,21 @@ class Table(_Navigation):
         Container class for storing per table metadata
         """
         blankrecord = None
-        dfd = None              # file handle
-        fields = None           # field names
-        field_count = 0         # number of fields
-        field_types = None      # dictionary of dbf type field specs
-        filename = None         # name of .dbf file
-        ignorememos = False     # True when memos should be ignored
-        memoname = None         # name of .dbt/.fpt file
-        mfd = None              # file handle
-        memo = None             # memo object
-        memofields = None       # field names of Memo type
-        newmemofile = False     # True when memo file needs to be created
-        nulls = None            # non-None when Nullable fields present
-        user_fields = None      # not counting SYSTEM fields
-        user_field_count = 0    # also not counting SYSTEM fields
+        dfd = None                # file handle
+        fields = None             # field names
+        field_count = 0           # number of fields
+        field_types = None        # dictionary of dbf type field specs
+        filename = None           # name of .dbf file
+        ignorememos = False       # True when memos should be ignored
+        memoname = None           # name of .dbt/.fpt file
+        mfd = None                # file handle
+        memo = None               # memo object
+        memofields = None         # field names of Memo type
+        newmemofile = False       # True when memo file needs to be created
+        nulls = None              # non-None when Nullable fields present
+        user_fields = None        # not counting SYSTEM fields
+        user_field_count = 0      # also not counting SYSTEM fields
+        unicode_errors = 'strict' # default to strict unicode translations
 
     class _TableHeader(object):
         """
@@ -4786,7 +4795,6 @@ class Table(_Navigation):
                 maybe = maybe()
             self._accesses += 1
             if self._accesses >= self._dead_check:
-                dead = []
                 for key, value in list(self._weakref_list.items()):
                     if value() is None:
                         del self._weakref_list[key]
@@ -5016,7 +5024,7 @@ class Table(_Navigation):
 
     def __enter__(self):
         self._previous_status.append(self._meta.status)
-        self.open()
+        self.open(READ_WRITE)
         return self
 
     def __exit__(self, *exc_info):
@@ -5098,6 +5106,7 @@ class Table(_Navigation):
         meta.memo_size = memo_size
         meta.input_decoder = codecs.getdecoder(input_decoding)      # from ascii to unicode
         meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
+        meta.unicode_errors = unicode_errors
         meta.header = header = self._TableHeader(self._dbfTableHeader, self._pack_date, self._unpack_date)
         header.extra = self._dbfTableHeaderExtra
         if default_data_types is None:
@@ -5310,8 +5319,8 @@ class Table(_Navigation):
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to change codepage' % meta.filename)
-        meta.header.codepage(codepage.code)
-        meta.decoder, meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
+        cp, sd, ld = _codepage_lookup(meta.header.codepage(codepage.code))
+        meta.decoder, meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), meta.unicode_errors)
         self._update_disk(headeronly=True)
 
     @property
@@ -5400,7 +5409,6 @@ class Table(_Navigation):
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to add fields (%s)' % (meta.filename, meta.status))
-        header = meta.header
         fields = self.structure() + self._list_fields(field_specs, sep=u';')
         if (len(fields) + ('_nullflags' in meta)) > meta.max_fields:
             raise DbfError(
@@ -5492,7 +5500,6 @@ class Table(_Navigation):
             raise DbfError('%s not in read/write mode, unable to append records' % meta.filename)
         if not self.field_count:
             raise DbfError("No fields defined, cannot append")
-        empty_table = len(self) == 0
         dictdata = False
         tupledata = False
         header = meta.header
@@ -5635,7 +5642,6 @@ class Table(_Navigation):
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to delete fields' % meta.filename)
         doomed = self._list_fields(doomed)
-        header = meta.header
         for victim in doomed:
             if victim not in meta.user_fields:
                 raise DbfError("field %s not in table -- delete aborted" % victim)
@@ -5767,7 +5773,7 @@ class Table(_Navigation):
         returns True if field allows Nulls
         """
         if field not in self.field_names:
-            raise MissingField(field)
+            raise FieldMissingError(field)
         return bool(self._meta[field][FLAGS] & NULLABLE)
 
     def open(self, mode=READ_ONLY):
@@ -5775,7 +5781,7 @@ class Table(_Navigation):
         (re)opens disk table, (re)initializes data structures
         """
         if mode not in (READ_WRITE, READ_ONLY):
-            raise DbfError("mode for open must be 'read-write' or 'read-only', not %r" % mode)
+            raise DbfError("mode for open must be dbf.READ_ONLY or dbf.READ_WRITE, not %r" % mode)
         meta = self._meta
         if meta.status == mode:
             return self     # no-op
@@ -7715,7 +7721,7 @@ class Idx(object):
         self.limit = size_limit
         with open(filename, 'rb') as idx:
             self.header = header = self.Header(idx.read(512))
-            offset = 512
+            # offset = 512
             @DataBlock(header.key_length+4)
             class NodeKey(object):
                 key = Bytes(0, header.key_length)
@@ -8059,7 +8065,7 @@ def pql(records, command):
         name = name.lower()
         fields = field_names(records)
         if pql_functions.get(name) is None:
-            raise DbfError('unknown SQL command: %s' % name.upper())
+            raise DbfError('unknown SQL command %r in %r' % (name.upper(), pql_command))
         result = pql_functions[name](records, command, condition, fields)
         tables = set()
         for record in result:
@@ -8316,7 +8322,7 @@ def recno(record):
 
 def reset(record, keep_fields=None):
     """
-    sets record's fields back to original, except for fields in keep_fields
+    sets record's fields back to blank values, except for fields in keep_fields
     """
     template = record_in_flux = False
     if isinstance(record, RecordTemplate):
@@ -8334,10 +8340,10 @@ def reset(record, keep_fields=None):
     for field in keep_fields:
         record[field] = keep[field]
     if not template:
-        if record._write_to_disk:
-            record._write()
-        else:
+        if record_in_flux:
             record._dirty = True
+        else:
+            record._write()
 
 def source_table(thingie):
     """
@@ -8389,7 +8395,7 @@ def Process(records, start=0, stop=None, filter=None):
     if isinstance(records, Table):
         already_open = records.status != CLOSED
         if not already_open:
-            records.open()
+            records.open(READ_WRITE)
     try:
         if stop is None:
             stop = len(records)
@@ -8474,7 +8480,7 @@ def add_fields(table_name, field_specs):
     adds fields to an existing table
     """
     table = Table(table_name)
-    table.open()
+    table.open(READ_WRITE)
     try:
         table.add_fields(field_specs)
     finally:
@@ -8485,7 +8491,7 @@ def delete_fields(table_name, field_names):
     deletes fields from an existing table
     """
     table = Table(table_name)
-    table.open()
+    table.open(READ_WRITE)
     try:
         table.delete_fields(field_names)
     finally:
@@ -8676,7 +8682,7 @@ api = fake_module('api',
     'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
     'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
     'DbfWarning', 'Eof', 'Bof', 'DoNotIndex', 'IndexLocation',
-    'Process', 'Templates',
+    'Process', 'Templates', 'CLOSED', 'READ_ONLY', 'READ_WRITE',
     )
 
 api.register()

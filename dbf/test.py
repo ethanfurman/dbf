@@ -2747,7 +2747,7 @@ class TestDbfCreation(unittest.TestCase):
                   'litres F(11,5)', 'blob G', 'graphic P', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(':memory:', ';'.join(fieldlist), dbf_type='vfp', on_disk=False)
+                table = Table(':memory:', ';'.join(fieldlist), dbf_type='fp', on_disk=False)
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
 
@@ -2757,8 +2757,8 @@ class TestDbfCreation(unittest.TestCase):
                   'litres F(11,5)', 'blob G', 'graphic P', 'weight F(7,3)']
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(os.path.join(tempdir, 'tempfp'), ';'.join(fieldlist), dbf_type='vfp')
-                table = Table(os.path.join(tempdir, 'tempfp'), dbf_type='vfp')
+                table = Table(os.path.join(tempdir, 'tempfp'), ';'.join(fieldlist), dbf_type='fp')
+                table = Table(os.path.join(tempdir, 'tempfp'), dbf_type='fp')
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
 

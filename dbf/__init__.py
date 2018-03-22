@@ -4852,7 +4852,10 @@ class Table(_Navigation):
         nulls = False
         meta = self._meta
         header = meta.header
-        header.version = header.version & self._noMemoMask
+        if self._yesMemoMask <= 0x80:
+            header.version = header.version & self._noMemoMask
+        else:
+            header.version = self._noMemoMask
         meta.fields = [f for f in meta.fields if f != '_nullflags']
         for field in meta.fields:
             layout = meta[field]
@@ -4871,14 +4874,16 @@ class Table(_Navigation):
             if layout[FLAGS] & NULLABLE:
                 nulls = True
         if memo:
-            header.version = header.version | self._yesMemoMask
+            if self._yesMemoMask <= 0x80:
+                header.version = header.version | self._yesMemoMask
+            else:
+                header.version = self._yesMemoMask
             if meta.memo is None:
                 meta.memo = self._memoClass(meta)
         else:
             if os.path.exists(meta.memoname):
                 if meta.mfd is not None:
                     meta.mfd.close()
-
                 os.remove(meta.memoname)
             meta.memo = None
         if nulls:
@@ -6414,7 +6419,7 @@ class FpTable(Table):
     _memoext = '.fpt'
     _memoClass = _VfpMemo
     _yesMemoMask = 0xf5               # 1111 0101
-    _noMemoMask = 0x03                # 0000 0011
+    _noMemoMask = 0x02                # 0000 0010
     _binary_types = (GENERAL, MEMO, PICTURE)
     _character_types = (CHAR, DATE, FLOAT, LOGICAL, MEMO, NUMERIC)       # field representing character data
     _currency_types = tuple()
@@ -6426,9 +6431,9 @@ class FpTable(Table):
     _numeric_types = (FLOAT, NUMERIC)
     _text_types = (CHAR, MEMO)
     _variable_types = (CHAR, FLOAT, NUMERIC)
-    _supported_tables = (0x03, 0xf5)
+    _supported_tables = (0x02, 0x03, 0xf5)
     _dbfTableHeader = array('B', [0] * 32)
-    _dbfTableHeader[0] = 0x30          # version - Foxpro 6  0011 0000
+    _dbfTableHeader[0] = 0x02          # version - Foxbase
     _dbfTableHeader[8:10] = array('B', pack_short_int(33 + 263))
     _dbfTableHeader[10] = 1         # record length -- one for delete flag
     _dbfTableHeader[29] = 3         # code page -- 437 US-MS DOS
@@ -7809,6 +7814,23 @@ table_types = {
     'vfp' : VfpTable,
     }
 
+# https://social.msdn.microsoft.com/Forums/en-US/315c582a-651f-4a2e-b51c-92aadef8bddf/opening-vfp-tables-with-fox26-dos?forum=visualfoxprogeneral
+# File type:
+# 0x02   FoxBASE
+# 0x03   FoxBASE+/Dbase III plus, no memo
+# 0x30   Visual FoxPro
+# 0x31   Visual FoxPro, autoincrement enabled
+#
+# 0x32 Visual FoxPro, Varchar, Varbinary, or Blob-enabled
+# 0x43   dBASE IV SQL table files, no memo
+# 0x63   dBASE IV SQL system files, no memo
+# 0x83   FoxBASE+/dBASE III PLUS, with memo
+# 0x8B   dBASE IV with memo
+# 0xCB   dBASE IV SQL table files, with memo
+# 0xF5   FoxPro 2.x (or earlier) with memo
+# 0xFB   FoxBASE
+#
+
 version_map = {
         0x02 : 'FoxBASE',
         0x03 : 'dBase III Plus',
@@ -8158,8 +8180,8 @@ class _Db4Table(Table):
     _memoext = '.dbt'
     _memotypes = ('G', 'M', 'P')
     _memoClass = _VfpMemo
-    _yesMemoMask = 0x8b               # 0011 0000
-    _noMemoMask = 0x04                # 0011 0000
+    _yesMemoMask = 0x8b               # 1000 1011
+    _noMemoMask = 0x04                # 0000 0100
     _fixed_fields = ('B', 'D', 'G', 'I', 'L', 'M', 'P', 'T', 'Y')
     _variable_fields = ('C', 'F', 'N')
     _binary_fields = ('G', 'P')

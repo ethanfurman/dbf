@@ -4155,7 +4155,7 @@ def add_logical(format, flags):
 
 def add_memo(format, flags):
     if any(f not in flags for f in format):
-        raise FieldSpecError("Format for Memo field creation is 'M(n)%s', not 'M%s'" % field_spec_error_text(format, flags))
+        raise FieldSpecError("Format for Memo field creation is 'M%s', not 'M%s'" % field_spec_error_text(format, flags))
     length = 10
     decimals = 0
     flag = 0
@@ -4165,7 +4165,7 @@ def add_memo(format, flags):
 
 def add_binary_memo(format, flags):
     if any(f not in flags for f in format):
-        raise FieldSpecError("Format for Memo field creation is 'M(n)%s', not 'M%s'" % field_spec_error_text(format, flags))
+        raise FieldSpecError("Format for Memo field creation is 'M%s', not 'M%s'" % field_spec_error_text(format, flags))
     length = 10
     decimals = 0
     flag = 0
@@ -6559,11 +6559,11 @@ class VfpTable(FpTable):
                     },
             CURRENCY: {
                     'Type':'Currency', 'Retrieve':retrieve_currency, 'Update':update_currency, 'Blank':lambda x: b'\x00' * 8, 'Init':add_vfp_currency,
-                    'Class':Decimal, 'Empty':none, 'flags':('null', ),
+                    'Class':Decimal, 'Empty':none, 'flags':('null', 'binary'),
                     },
             DOUBLE: {
                     'Type':'Double', 'Retrieve':retrieve_double, 'Update':update_double, 'Blank':lambda x: b'\x00' * 8, 'Init':add_vfp_double,
-                    'Class':float, 'Empty':none, 'flags':('null', ),
+                    'Class':float, 'Empty':none, 'flags':('null', 'binary'),
                     },
             FLOAT: {
                     'Type':'Float', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_vfp_numeric,
@@ -6575,7 +6575,7 @@ class VfpTable(FpTable):
                     },
             INTEGER: {
                     'Type':'Integer', 'Retrieve':retrieve_integer, 'Update':update_integer, 'Blank':lambda x: b'\x00' * 4, 'Init':add_vfp_integer,
-                    'Class':int, 'Empty':none, 'flags':('null', ),
+                    'Class':int, 'Empty':none, 'flags':('null', 'binary'),
                     },
             LOGICAL: {
                     'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':lambda x: b'?', 'Init':add_logical,
@@ -6595,11 +6595,11 @@ class VfpTable(FpTable):
                     },
             GENERAL: {
                     'Type':'General', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':lambda x: b'\x00\x00\x00\x00', 'Init':add_vfp_binary_memo,
-                    'Class':bytes, 'Empty':bytes, 'flags':('null', ),
+                    'Class':bytes, 'Empty':bytes, 'flags':('null', 'binary'),
                     },
             PICTURE: {
                     'Type':'Picture', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':lambda x: b'\x00\x00\x00\x00', 'Init':add_vfp_binary_memo,
-                    'Class':bytes, 'Empty':bytes, 'flags':('null', ),
+                    'Class':bytes, 'Empty':bytes, 'flags':('null', 'binary'),
                     },
             _NULLFLAG: {
                     'Type':'_NullFlags', 'Retrieve':unsupported_type, 'Update':unsupported_type, 'Blank':lambda x: b'\x00' * x, 'Init':int,

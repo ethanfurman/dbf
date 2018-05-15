@@ -5,6 +5,8 @@ What's New
 --------
 
 Fix field creation flag handling
+Allow (redundant) "binary" flag on binary type fields
+
 
 0.97.002
 --------

@@ -3013,6 +3013,7 @@ class TestDbfRecords(unittest.TestCase):
             meetlist.append(meeting)
             misclist.append(misc)
             photolist.append(photo)
+            pricelist.append(price)
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc, \
                     'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo, \
                     'dist': dist, 'price':price})
@@ -3029,6 +3030,7 @@ class TestDbfRecords(unittest.TestCase):
             self.assertEqual(record.meeting, meeting)
             self.assertEqual(record.misc, misc)
             self.assertEqual(record.photo, photo)
+            self.assertEqual(record.price, round(price, 4))
         # plus a blank record
         namelist.append('')
         paidlist.append(Unknown)
@@ -3074,6 +3076,8 @@ class TestDbfRecords(unittest.TestCase):
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
+            self.assertEqual(record.price, round(pricelist[i], 4))
+            self.assertEqual(table[i].price, round(pricelist[i], 4))
             i += 1
         record = table[-1]
         self.assertEqual(dbf.recno(record), i)
@@ -3101,6 +3105,8 @@ class TestDbfRecords(unittest.TestCase):
         self.assertEqual(table[i].misc, misclist[i])
         self.assertEqual(record.photo, photolist[i])
         self.assertEqual(table[i].photo, photolist[i])
+        self.assertEqual(record.price, 0)
+        self.assertEqual(table[i].price, 0)
         i += 1
 
     def test_char_memo_return_type(self):
@@ -3589,7 +3595,9 @@ class TestDbfFunctions(unittest.TestCase):
         self.vfp_table = table = Table(
                 os.path.join(tempdir, 'tempvfp'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
-                ' weight F(18,3); age I; meeting T; misc G; photo P',
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;'
+                ' dist B binary; atom I binary; wealth Y binary;'
+                ,
                 dbf_type='vfp',
                 )
         table.open(mode=READ_WRITE)
@@ -3604,10 +3612,12 @@ class TestDbfFunctions(unittest.TestCase):
         meetlist = self.vfp_meetlist = []
         misclist = self.vfp_misclist = []
         photolist = self.vfp_photolist = []
+        pricelist = self.vfp_pricelist = []
         for i in range(len(floats)):
             name = words[i]
             paid = len(words[i]) % 3 == 0
             qty = floats[i]
+            price = Decimal(round(floats[i] * 2.182737, 4))
             orderdate = datetime.date((numbers[i] + 1) * 2, (numbers[i] % 12) +1, (numbers[i] % 27) + 1)
             desc = ' '.join(words[i:i+50])
             mass = floats[i] * floats[i] / 2.0
@@ -3620,6 +3630,7 @@ class TestDbfFunctions(unittest.TestCase):
             namelist.append('%-25s' % name)
             paidlist.append(paid)
             qtylist.append(qty)
+            pricelist.append(price)
             orderlist.append(orderdate)
             desclist.append(desc)
             masslist.append(mass)
@@ -3631,7 +3642,8 @@ class TestDbfFunctions(unittest.TestCase):
             meeting = datetime.datetime((numbers[i] + 2000), (numbers[i] % 12)+1, (numbers[i] % 28)+1,
                       (numbers[i] % 24), numbers[i] % 60, (numbers[i] * 3) % 60)
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc,
-                    'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo})
+                    'mass':mass, 'weight':weight, 'age':age, 'meeting':meeting, 'misc':misc, 'photo':photo,
+                    'price':price, 'dist':mass, 'atom':age, 'wealth':price})
         table.close()
 
     def tearDown(self):
@@ -3734,6 +3746,7 @@ class TestDbfFunctions(unittest.TestCase):
         meetlist = self.vfp_meetlist
         misclist = self.vfp_misclist
         photolist = self.vfp_photolist
+        pricelist = self.vfp_pricelist
         self.assertEqual(len(table), len(floats))
         i = 0
         for record in table:
@@ -3742,24 +3755,32 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(record.name, namelist[i])
             self.assertEqual(table[i].paid, paidlist[i])
             self.assertEqual(record.paid, paidlist[i])
-            self.assertEqual(abs(table[i].qty - qtylist[i]) < .00001, True)
-            self.assertEqual(abs(record.qty - qtylist[i]) < .00001, True)
+            self.assertTrue(abs(table[i].qty - qtylist[i]) < .00001)
+            self.assertTrue(abs(record.qty - qtylist[i]) < .00001)
             self.assertEqual(table[i].orderdate, orderlist[i])
             self.assertEqual(record.orderdate, orderlist[i])
             self.assertEqual(table[i].desc, desclist[i])
             self.assertEqual(record.desc, desclist[i])
             self.assertEqual(record.mass, masslist[i])
             self.assertEqual(table[i].mass, masslist[i])
+            self.assertEqual(record.dist, masslist[i])
+            self.assertEqual(table[i].dist, masslist[i])
             self.assertEqual(record.weight, weightlist[i])
             self.assertEqual(table[i].weight, weightlist[i])
             self.assertEqual(record.age, agelist[i])
             self.assertEqual(table[i].age, agelist[i])
+            self.assertEqual(record.atom, agelist[i])
+            self.assertEqual(table[i].atom, agelist[i])
             self.assertEqual(record.meeting, meetlist[i])
             self.assertEqual(table[i].meeting, meetlist[i])
             self.assertEqual(record.misc, misclist[i])
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
+            self.assertEqual(record.price, round(pricelist[i], 4))
+            self.assertEqual(table[i].price, round(pricelist[i], 4))
+            self.assertTrue(record.wealth, round(pricelist[i], 4))
+            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
             i += 1
         table.delete_fields('desc')
         i = 0
@@ -3777,6 +3798,8 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].weight, weightlist[i])
             self.assertEqual(record.age, agelist[i])
             self.assertEqual(table[i].age, agelist[i])
+            self.assertEqual(record.atom, agelist[i])
+            self.assertEqual(table[i].atom, agelist[i])
             self.assertEqual(record.meeting, meetlist[i])
             self.assertEqual(table[i].meeting, meetlist[i])
             self.assertEqual(record.misc, misclist[i])
@@ -3785,6 +3808,12 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].photo, photolist[i])
             self.assertEqual(record.mass, masslist[i])
             self.assertEqual(table[i].mass, masslist[i])
+            self.assertEqual(record.dist, masslist[i])
+            self.assertEqual(table[i].dist, masslist[i])
+            self.assertEqual(record.price, round(pricelist[i], 4))
+            self.assertEqual(table[i].price, round(pricelist[i], 4))
+            self.assertTrue(record.wealth, round(pricelist[i], 4))
+            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
             i += 1
         table.delete_fields('paid, mass')
         i = 0
@@ -3800,12 +3829,20 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].weight, weightlist[i])
             self.assertEqual(record.age, agelist[i])
             self.assertEqual(table[i].age, agelist[i])
+            self.assertEqual(record.atom, agelist[i])
+            self.assertEqual(table[i].atom, agelist[i])
             self.assertEqual(record.meeting, meetlist[i])
             self.assertEqual(table[i].meeting, meetlist[i])
             self.assertEqual(record.misc, misclist[i])
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
+            self.assertEqual(record.dist, masslist[i])
+            self.assertEqual(table[i].dist, masslist[i])
+            self.assertEqual(record.price, round(pricelist[i], 4))
+            self.assertEqual(table[i].price, round(pricelist[i], 4))
+            self.assertTrue(record.wealth, round(pricelist[i], 4))
+            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
             i += 1
         table.add_fields('desc M; paid L; mass B')
         i = 0
@@ -3837,16 +3874,24 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(record.desc, desclist[i])
             self.assertEqual(record.mass, masslist[i])
             self.assertEqual(table[i].mass, masslist[i])
+            self.assertEqual(record.dist, masslist[i])
+            self.assertEqual(table[i].dist, masslist[i])
             self.assertEqual(record.weight, weightlist[i])
             self.assertEqual(table[i].weight, weightlist[i])
             self.assertEqual(record.age, agelist[i])
             self.assertEqual(table[i].age, agelist[i])
+            self.assertEqual(record.atom, agelist[i])
+            self.assertEqual(table[i].atom, agelist[i])
             self.assertEqual(record.meeting, meetlist[i])
             self.assertEqual(table[i].meeting, meetlist[i])
             self.assertEqual(record.misc, misclist[i])
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
+            self.assertEqual(record.price, round(pricelist[i], 4))
+            self.assertEqual(table[i].price, round(pricelist[i], 4))
+            self.assertTrue(record.wealth, round(pricelist[i], 4))
+            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
             i += 1
         table.close()
 

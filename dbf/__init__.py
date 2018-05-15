@@ -68,7 +68,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 97, 3
+version = 0, 97, 4, 1
 
 NoneType = type(None)
 
@@ -3855,7 +3855,7 @@ def update_currency(value, *ignore):
     """
     if value == None:
         value = 0
-    currency = int(value * 10000)
+    currency = int(round(value * 10000))
     if not -9223372036854775808 < currency < 9223372036854775808:
         raise DataOverflowError("value %s is out of bounds" % value)
     return struct.pack('<q', currency)

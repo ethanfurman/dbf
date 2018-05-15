@@ -3020,17 +3020,17 @@ class TestDbfRecords(unittest.TestCase):
             record = table[-1]
             self.assertEqual(record.name.strip(), name)
             self.assertEqual(record.paid, paid)
-            self.assertEqual(record.qty, round(qty, 5))
+            self.assertEqual(round(record.qty, 5), round(qty, 5))
             self.assertEqual(record.orderdate, orderdate)
             self.assertEqual(record.desc.strip(), desc)
             self.assertEqual(record.mass, mass)
             self.assertEqual(record.dist, dist)
-            self.assertEqual(record.weight, round(weight, 3))
+            self.assertEqual(round(record.weight, 3), round(weight, 3))
             self.assertEqual(record.age, age)
             self.assertEqual(record.meeting, meeting)
             self.assertEqual(record.misc, misc)
             self.assertEqual(record.photo, photo)
-            self.assertEqual(record.price, round(price, 4))
+            self.assertEqual(round(record.price, 4), round(price, 4))
         # plus a blank record
         namelist.append('')
         paidlist.append(Unknown)
@@ -3076,8 +3076,8 @@ class TestDbfRecords(unittest.TestCase):
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
-            self.assertEqual(record.price, round(pricelist[i], 4))
-            self.assertEqual(table[i].price, round(pricelist[i], 4))
+            self.assertEqual(round(record.price, 4), round(pricelist[i], 4))
+            self.assertEqual(round(table[i].price, 4), round(pricelist[i], 4))
             i += 1
         record = table[-1]
         self.assertEqual(dbf.recno(record), i)
@@ -3777,10 +3777,10 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
-            self.assertEqual(record.price, round(pricelist[i], 4))
-            self.assertEqual(table[i].price, round(pricelist[i], 4))
-            self.assertTrue(record.wealth, round(pricelist[i], 4))
-            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
+            self.assertEqual(round(record.price, 4), round(pricelist[i], 4))
+            self.assertEqual(round(table[i].price, 4), round(pricelist[i], 4))
+            self.assertTrue(round(record.wealth, 4), round(pricelist[i], 4))
+            self.assertTrue(round(table[i].wealth, 4), round(pricelist[i], 4))
             i += 1
         table.delete_fields('desc')
         i = 0
@@ -3810,10 +3810,10 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].mass, masslist[i])
             self.assertEqual(record.dist, masslist[i])
             self.assertEqual(table[i].dist, masslist[i])
-            self.assertEqual(record.price, round(pricelist[i], 4))
-            self.assertEqual(table[i].price, round(pricelist[i], 4))
-            self.assertTrue(record.wealth, round(pricelist[i], 4))
-            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
+            self.assertEqual(round(record.price, 4), round(pricelist[i], 4))
+            self.assertEqual(round(table[i].price, 4), round(pricelist[i], 4))
+            self.assertTrue(round(record.wealth, 4), round(pricelist[i], 4))
+            self.assertTrue(round(table[i].wealth, 4), round(pricelist[i], 4))
             i += 1
         table.delete_fields('paid, mass')
         i = 0
@@ -3839,10 +3839,10 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].photo, photolist[i])
             self.assertEqual(record.dist, masslist[i])
             self.assertEqual(table[i].dist, masslist[i])
-            self.assertEqual(record.price, round(pricelist[i], 4))
-            self.assertEqual(table[i].price, round(pricelist[i], 4))
-            self.assertTrue(record.wealth, round(pricelist[i], 4))
-            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
+            self.assertEqual(round(record.price, 4), round(pricelist[i], 4))
+            self.assertEqual(round(table[i].price, 4), round(pricelist[i], 4))
+            self.assertTrue(round(record.wealth, 4), round(pricelist[i], 4))
+            self.assertTrue(round(table[i].wealth, 4), round(pricelist[i], 4))
             i += 1
         table.add_fields('desc M; paid L; mass B')
         i = 0
@@ -3888,10 +3888,10 @@ class TestDbfFunctions(unittest.TestCase):
             self.assertEqual(table[i].misc, misclist[i])
             self.assertEqual(record.photo, photolist[i])
             self.assertEqual(table[i].photo, photolist[i])
-            self.assertEqual(record.price, round(pricelist[i], 4))
-            self.assertEqual(table[i].price, round(pricelist[i], 4))
-            self.assertTrue(record.wealth, round(pricelist[i], 4))
-            self.assertTrue(table[i].wealth, round(pricelist[i], 4))
+            self.assertEqual(round(record.price, 4), round(pricelist[i], 4))
+            self.assertEqual(round(table[i].price, 4), round(pricelist[i], 4))
+            self.assertTrue(round(record.wealth, 4), round(pricelist[i], 4))
+            self.assertTrue(round(table[i].wealth, 4), round(pricelist[i], 4))
             i += 1
         table.close()
 

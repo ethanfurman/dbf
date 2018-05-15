@@ -2551,6 +2551,7 @@ class TestExceptions(unittest.TestCase):
         self.assertRaises(FieldSpecError, Table, 'blah', 'born L(9)', on_disk=False)
         self.assertRaises(FieldSpecError, Table, 'blah', 'married D(12)', on_disk=False)
         self.assertRaises(FieldSpecError, Table, 'blah', 'desc M(1)', on_disk=False)
+        self.assertRaises(FieldSpecError, Table, 'blah', 'desc', on_disk=False)
 
     def test_too_many_fields_on_creation(self):
         fields = []

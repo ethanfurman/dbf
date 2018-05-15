@@ -5440,19 +5440,24 @@ class Table(_Navigation):
 
         meta.blankrecord = None
         for field in fields:
+            if not field:
+                continue
             field = field.lower()
             pieces = field.split()
             name = pieces.pop(0)
-            if '(' in pieces[0]:
-                loc = pieces[0].index('(')
-                pieces.insert(0, pieces[0][:loc])
-                pieces[1] = pieces[1][loc:]
-            format = FieldType(pieces.pop(0))
-            if pieces and '(' in pieces[0]:
-                for i, p in enumerate(pieces):
-                    if ')' in p:
-                        pieces[0:i+1] = [''.join(pieces[0:i+1])]
-                        break
+            try:
+                if '(' in pieces[0]:
+                    loc = pieces[0].index('(')
+                    pieces.insert(0, pieces[0][:loc])
+                    pieces[1] = pieces[1][loc:]
+                format = FieldType(pieces.pop(0))
+                if pieces and '(' in pieces[0]:
+                    for i, p in enumerate(pieces):
+                        if ')' in p:
+                            pieces[0:i+1] = [''.join(pieces[0:i+1])]
+                            break
+            except IndexError:
+                raise FieldSpecError('bad field spec: %r' % field)
             if name[0] == '_' or name[0].isdigit() or not name.replace('_', '').isalnum():
                 raise FieldSpecError("%s invalid:  field names must start with a letter, and can only contain letters, digits, and _" % name)
             if name in meta.fields:

@@ -2638,7 +2638,7 @@ class TestExceptions(unittest.TestCase):
                 os.path.join(tempdir, 'vfp_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
                 ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;' +
-                ' dist B(2)',
+                ' dist B',
                 dbf_type='vfp',
                 default_data_types='enhanced',
                 )
@@ -2870,7 +2870,7 @@ class TestDbfRecords(unittest.TestCase):
                 os.path.join(tempdir, 'vfp_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
                 ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;' +
-                ' dist B(2)',
+                ' dist B',
                 dbf_type='vfp',
                 default_data_types='enhanced',
                 )

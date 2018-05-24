@@ -21,12 +21,18 @@ make = []
 
 data = dict(
         name='dbf',
-        version='0.97.5',
+        version='0.97.6a1',
         license='BSD License',
         description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
         long_description=long_desc,
         url='https://pypi.python.org/pypi/dbf',
         packages=['dbf', ],
+        package_data={
+           'dbf' : [
+               'LICENSE',
+               'README.md',
+               ]
+           },
         provides=['dbf'],
         install_requires=['aenum'],
         author='Ethan Furman',

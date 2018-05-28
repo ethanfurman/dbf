@@ -53,6 +53,10 @@ from math import floor
 from os import SEEK_END
 from textwrap import dedent
 
+try:
+    import pytz
+except ImportError:
+    pytz = None
 
 py_ver = sys.version_info[:2]
 if py_ver < (3, 0):
@@ -68,7 +72,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 97, 6
+version = 0, 97, 7, 1
 
 NoneType = type(None)
 
@@ -1263,7 +1267,7 @@ class DateTime(object):
 
     __slots__ = ['_datetime']
 
-    def __new__(cls, year=None, month=0, day=0, hour=0, minute=0, second=0, microsecond=0):
+    def __new__(cls, year=None, month=0, day=0, hour=0, minute=0, second=0, microsecond=0, tzinfo=Null):
         """year may be a datetime.datetime"""
         if year is None or year is Null:
             return cls._null_datetime
@@ -1271,15 +1275,35 @@ class DateTime(object):
         if isinstance(year, basestring):
             return DateTime.strptime(year)
         elif isinstance(year, DateTime):
+            if tzinfo is not Null and year._datetime.tzinfo:
+                raise ValueError('not naive datetime (tzinfo is already set)')
+            elif tzinfo is Null:
+                tzinfo = None
             ndt._datetime = year._datetime
         elif isinstance(year, datetime.datetime):
+            if tzinfo is not Null and year.tzinfo:
+                raise ValueError('not naive datetime (tzinfo is already set)')
+            elif tzinfo is Null:
+                tzinfo = year.tzinfo
             microsecond = year.microsecond // 1000 * 1000
             hour, minute, second = year.hour, year.minute, year.second
             year, month, day = year.year, year.month, year.day
-            ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond)
+            if pytz is None or tzinfo is None:
+                ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond, tzinfo)
+            else:
+                # if pytz and tzinfo, tzinfo must be added after creation
+                _datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond)
+                ndt._datetime = tzinfo.normalize(tzinfo.localize(_datetime))
         elif year is not None:
+            if tzinfo is Null:
+                tzinfo = None
             microsecond = microsecond // 1000 * 1000
-            ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond)
+            if pytz is None or tzinfo is None:
+                ndt._datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond, tzinfo)
+            else:
+                # if pytz and tzinfo, tzinfo must be added after creation
+                _datetime = datetime.datetime(year, month, day, hour, minute, second, microsecond)
+                ndt._datetime = tzinfo.normalize(tzinfo.localize(_datetime))
         return ndt
 
     def __add__(self, other):
@@ -1419,8 +1443,15 @@ class DateTime(object):
 
     def __repr__(self):
         if self:
-            return "DateTime(%5d, %2d, %2d, %2d, %2d, %2d, %2d)" % (
-                self._datetime.timetuple()[:6] + (self._datetime.microsecond, )
+            if self.tzinfo is None:
+                tz = ''
+            else:
+                diff = self._datetime.utcoffset()
+                hours, minutes = divmod(diff.days * 86400 + diff.seconds, 3600)
+                minus, hours = hours < 0, abs(hours)
+                tz = ', tzinfo=<%s %s%02d%02d>' % (self._datetime.tzname(), ('','-')[minus], hours, minutes)
+            return "DateTime(%d, %d, %d, %d, %d, %d, %d%s)" % (
+                self._datetime.timetuple()[:6] + (self._datetime.microsecond, tz)
                 )
         else:
             return "DateTime()"
@@ -1443,7 +1474,7 @@ class DateTime(object):
     @classmethod
     def combine(cls, date, time):
         if Date(date) and Time(time):
-            return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond)
+            return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond, time.tzinfo)
         return cls()
 
     def date(self):
@@ -1468,15 +1499,17 @@ class DateTime(object):
         return DateTime(datetime.datetime.fromtimestamp(timestamp))
 
     @classmethod
-    def now(cls):
+    def now(cls, tzinfo=None):
         "only accurate to milliseconds"
-        return cls(datetime.datetime.now())
+        return cls(datetime.datetime.now(), tzinfo=tzinfo)
 
-    def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None,
+    def replace(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None, tzinfo=Null,
               delta_year=0, delta_month=0, delta_day=0, delta_hour=0, delta_minute=0, delta_second=0):
         if not self:
             return self.__class__._null_datetime
         old_year, old_month, old_day, old_hour, old_minute, old_second, old_micro = self.timetuple()[:7]
+        if tzinfo is Null:
+            tzinfo = self._datetime.tzinfo
         if isinstance(month, RelativeMonth):
             this_month = IsoMonth(old_month)
             delta_month += month.months_from(this_month)
@@ -1534,7 +1567,7 @@ class DateTime(object):
             while second > 59:
                 minute += 1
                 second = second - 60
-        return DateTime(year, month, day, hour, minute, second, microsecond)
+        return DateTime(year, month, day, hour, minute, second, microsecond, tzinfo)
 
     def strftime(self, format):
         fmt_cls = type(format)
@@ -1561,6 +1594,11 @@ class DateTime(object):
             return Time(self.hour, self.minute, self.second, self.microsecond)
         return Time()
 
+    def timetz(self):
+        if self:
+            return Time(self._datetime.timetz())
+        return Time()
+
     @classmethod
     def utcnow(cls):
         return cls(datetime.datetime.utcnow())
@@ -1583,7 +1621,7 @@ class Time(object):
 
     __slots__ = ['_time']
 
-    def __new__(cls, hour=None, minute=0, second=0, microsecond=0):
+    def __new__(cls, hour=None, minute=0, second=0, microsecond=0, tzinfo=Null):
         """
         hour may be a datetime.time or a str(Time)
         """
@@ -1593,14 +1631,24 @@ class Time(object):
         if isinstance(hour, basestring):
             hour = Time.strptime(hour)
         if isinstance(hour, Time):
-            nt._time = hour._time
+            if tzinfo is not Null and hour._time.tzinfo:
+                raise ValueError('not naive time (tzinfo is already set)')
+            elif tzinfo is Null:
+                tzinfo = None
+            nt._time = hour._time.replace(tzinfo=tzinfo)
         elif isinstance(hour, (datetime.time)):
+            if tzinfo is not Null and hour.tzinfo:
+                raise ValueError('not naive time (tzinfo is already set)')
+            if tzinfo is Null:
+                tzinfo = hour.tzinfo
             microsecond = hour.microsecond // 1000 * 1000
             hour, minute, second = hour.hour, hour.minute, hour.second
-            nt._time = datetime.time(hour, minute, second, microsecond)
+            nt._time = datetime.time(hour, minute, second, microsecond, tzinfo)
         elif hour is not None:
+            if tzinfo is Null:
+                tzinfo = None
             microsecond = microsecond // 1000 * 1000
-            nt._time = datetime.time(hour, minute, second, microsecond)
+            nt._time = datetime.time(hour, minute, second, microsecond, tzinfo)
         return nt
 
     def __add__(self, other):
@@ -1743,7 +1791,14 @@ class Time(object):
 
     def __repr__(self):
         if self:
-            return "Time(%d, %d, %d, %d)" % (self.hour, self.minute, self.second, self.microsecond)
+            if self.tzinfo is None:
+                tz = ''
+            else:
+                diff = self._time.tzinfo.utcoffset(self._time)
+                hours, minutes = divmod(diff.days * 86400 + diff.seconds, 3600)
+                minus, hours = hours < 0, abs(hours)
+                tz = ', tzinfo=<%s %s%02d%02d>' % (self._time.tzinfo.tzname(self._time), ('','-')[minus], hours, minutes)
+            return "Time(%d, %d, %d, %d%s)" % (self.hour, self.minute, self.second, self.microsecond, tz)
         else:
             return "Time()"
 
@@ -1790,13 +1845,15 @@ class Time(object):
         return Time(hours, minutes, seconds, microseconds)
 
     @staticmethod
-    def now():
+    def now(tzinfo=None):
         "only accurate to milliseconds"
-        return DateTime.now().time()
+        return DateTime.now(tzinfo).timetz()
 
-    def replace(self, hour=None, minute=None, second=None, microsecond=None, delta_hour=0, delta_minute=0, delta_second=0):
+    def replace(self, hour=None, minute=None, second=None, microsecond=None, tzinfo=Null, delta_hour=0, delta_minute=0, delta_second=0):
         if not self:
             return self.__class__._null_time
+        if tzinfo is Null:
+            tzinfo = self._time.tzinfo
         old_hour, old_minute, old_second, old_micro = self.hour, self.minute, self.second, self.microsecond
         hour = (hour or old_hour) + delta_hour
         minute = (minute or old_minute) + delta_minute
@@ -1819,7 +1876,7 @@ class Time(object):
                 hour = 24 + hour
             while hour > 23:
                 hour = hour - 24
-        return Time(hour, minute, second, microsecond)
+        return Time(hour, minute, second, microsecond, tzinfo)
 
     def strftime(self, format):
         fmt_cls = type(format)
@@ -2548,9 +2605,12 @@ if py_ver < (3, 0):
     from xmlrpclib import Marshaller
 else:
     from xmlrpc.client import Marshaller
+# Char is unicode
 Marshaller.dispatch[Char] = Marshaller.dump_unicode
+# Logical unknown becomes False
 Marshaller.dispatch[Logical] = Marshaller.dump_bool
-Marshaller.dispatch[DateTime] = Marshaller.dump_datetime
+# DateTime is transmitted as UTC if aware, local if naive
+Marshaller.dispatch[DateTime] = lambda s, dt, w: w('%04d%02d%02dT%02d:%02d:%02d' % dt.utctimetuple[:6])
 del Marshaller
 
 # Internal classes

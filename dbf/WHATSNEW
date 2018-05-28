@@ -1,6 +1,13 @@
 What's New
 ==========
 
+0.97.007
+--------
+
+add pytz support to Time and DateTime
+Marshalling a DateTime sends as UTC if possible
+
+
 0.97.004
 --------
 

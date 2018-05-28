@@ -6,13 +6,18 @@ import unittest
 import tempfile
 import shutil
 import stat
-from unittest import TestCase as unittest_TestCase
+from unittest import skipIf, TestCase as unittest_TestCase
 
 py_ver = sys.version_info[:2]
 module = globals()
 
 from dbf import *
 import dbf
+
+try:
+    import pytz
+except ImportError:
+    pytz = None
 
 if py_ver < (3, 0):
     MISC = ''.join([chr(i) for i in range(256)])
@@ -338,6 +343,39 @@ class TestDateTime(TestCase):
         time2 = Date.fromordinal(2000)
         time3 = Date.fromordinal(3000)
         self.compareTimes(notime1, notime2, time1, time2, time3)
+
+    @unittest.skipIf(pytz is None, 'pytz not installed')
+    def test_datetime_tz(self):
+        "DateTime with Time Zones"
+        pst = pytz.timezone('America/Los_Angeles')
+        mst = pytz.timezone('America/Boise')
+        cst = pytz.timezone('America/Chicago')
+        est = pytz.timezone('America/New_York')
+        utc = pytz.timezone('UTC')
+        #
+        pdt = DateTime(2018, 5, 20, 5, 41, 33, tzinfo=pst)
+        mdt = DateTime(2018, 5, 20, 6, 41, 33, tzinfo=mst)
+        cdt = DateTime(2018, 5, 20, 7, 41, 33, tzinfo=cst)
+        edt = DateTime(2018, 5, 20, 8, 41, 33, tzinfo=est)
+        udt = DateTime(2018, 5, 20, 12, 41, 33, tzinfo=utc)
+        self.assertTrue(pdt == mdt == cdt == edt == udt)
+        #
+        dup1 = DateTime.combine(pdt.date(), mdt.timetz())
+        dup2 = DateTime.combine(cdt.date(), Time(5, 41, 33, tzinfo=pst))
+        self.assertTrue(dup1 == dup2 == udt)
+        #
+        udt2 = DateTime(2018, 5, 20, 13, 41, 33, tzinfo=utc)
+        mdt2 = mdt.replace(tzinfo=pst)
+        self.assertTrue(mdt2 == udt2)
+        #
+        with self.assertRaisesRegex(ValueError, 'not naive datetime'):
+            DateTime(pdt, tzinfo=mst)
+        with self.assertRaisesRegex(ValueError, 'not naive datetime'):
+            DateTime(datetime.datetime(2018, 5, 27, 15, 57, 11, tzinfo=pst), tzinfo=pst)
+        with self.assertRaisesRegex(ValueError, 'not naive time'):
+            Time(pdt.timetz(), tzinfo=mst)
+        with self.assertRaisesRegex(ValueError, 'not naive time'):
+            Time(datetime.time(15, 58, 59, tzinfo=mst), tzinfo=mst)
 
     def test_arithmetic(self):
         "Date, DateTime, & Time Arithmetic"

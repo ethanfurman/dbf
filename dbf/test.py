@@ -6,6 +6,7 @@ import unittest
 import tempfile
 import shutil
 import stat
+from unittest import TestCase as unittest_TestCase
 
 py_ver = sys.version_info[:2]
 module = globals()
@@ -26,6 +27,28 @@ else:
 
 print("\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
     dbf.version[:3] + (sys.platform, sys.version) ))
+
+
+class TestCase(unittest_TestCase):
+
+    def __init__(self, *args, **kwds):
+        regex = getattr(self, 'assertRaisesRegex', None)
+        if regex is None:
+            self.assertRaisesRegex = getattr(self, 'assertRaisesRegexp')
+        super(TestCase, self).__init__(*args, **kwds)
+
+    @classmethod
+    def setUpClass(cls, *args, **kwds):
+        super(TestCase, cls).setUpClass(*args, **kwds)
+        ## filter warnings  (example from scription)
+        # warnings.filterwarnings(
+        #         'ignore',
+        #         'inspect\.getargspec\(\) is deprecated',
+        #         DeprecationWarning,
+        #         'scription',
+        #         0,
+        #         )
+        # double check existence of temp dir
 
 
 # Walker in Leaves -- by Scot Noel -- http://www.scienceandfantasyfiction.com/sciencefiction/Walker-in-Leaves/walker-in-leaves.htm
@@ -139,7 +162,7 @@ def inactive(rec):
     return DoNotIndex
 
 
-class TestChar(unittest.TestCase):
+class TestChar(TestCase):
 
     def test_exceptions(self):
         "exceptions"
@@ -243,7 +266,7 @@ class TestChar(unittest.TestCase):
         self.assertTrue(a6 > a5)
 
 
-class TestDateTime(unittest.TestCase):
+class TestDateTime(TestCase):
     "Testing Date"
 
     def test_date_creation(self):
@@ -409,7 +432,7 @@ class TestDateTime(unittest.TestCase):
         self.assertEqual(tres != tres, False)
 
 
-class TestNull(unittest.TestCase):
+class TestNull(TestCase):
 
     def test_all(self):
         null = Null = dbf.Null()
@@ -517,7 +540,7 @@ class TestNull(unittest.TestCase):
 
         self.assertRaises(TypeError, hash, null)
 
-class TestLogical(unittest.TestCase):
+class TestLogical(TestCase):
     "Testing Logical"
 
     def test_unknown(self):
@@ -2193,7 +2216,7 @@ class TestLogical(unittest.TestCase):
         self.assertEqual(divmod(None, unknown), (unknown, unknown))
 
 
-class TestQuantum(unittest.TestCase):
+class TestQuantum(TestCase):
     "Testing Quantum"
 
     def test_exceptions(self):
@@ -2543,7 +2566,7 @@ class TestQuantum(unittest.TestCase):
         self.assertEqual(-none is none, True)
 
 
-class TestExceptions(unittest.TestCase):
+class TestExceptions(TestCase):
 
     def test_bad_field_specs_on_creation(self):
         self.assertRaises(FieldSpecError, Table, 'blah', 'age N(3,2)', on_disk=False)
@@ -2674,7 +2697,7 @@ class TestExceptions(unittest.TestCase):
         table.close()
 
 
-class TestIndexLocation(unittest.TestCase):
+class TestIndexLocation(TestCase):
 
     def test_false(self):
         self.assertFalse(IndexLocation(0, False))
@@ -2685,7 +2708,7 @@ class TestIndexLocation(unittest.TestCase):
         self.assertTrue(IndexLocation(42, True))
 
 
-class TestDbfCreation(unittest.TestCase):
+class TestDbfCreation(TestCase):
     "Testing table creation..."
 
     def test_db3_memory_tables(self):
@@ -2858,7 +2881,7 @@ class TestDbfCreation(unittest.TestCase):
             table.close()
 
 
-class TestDbfRecords(unittest.TestCase):
+class TestDbfRecords(TestCase):
     "Testing records"
 
     def setUp(self):
@@ -3514,7 +3537,7 @@ class TestDbfRecords(unittest.TestCase):
         self.assertNotEqual(old_data, dbf.scatter(record))
 
 
-class TestDbfRecordTemplates(unittest.TestCase):
+class TestDbfRecordTemplates(TestCase):
     "Testing records"
 
     def setUp(self):
@@ -3564,7 +3587,7 @@ class TestDbfRecordTemplates(unittest.TestCase):
         table.append(record)
 
 
-class TestDbfFunctions(unittest.TestCase):
+class TestDbfFunctions(TestCase):
 
     def setUp(self):
         "create a dbf and vfp table"
@@ -4508,7 +4531,7 @@ class TestDbfFunctions(unittest.TestCase):
         self.assertTrue(sorted.index_search('jul', partial=True))
 
 
-class TestDbfNavigation(unittest.TestCase):
+class TestDbfNavigation(TestCase):
 
     def setUp(self):
         "create a dbf and vfp table"
@@ -4806,7 +4829,7 @@ class TestDbfNavigation(unittest.TestCase):
         table.close()
 
 
-class TestDbfLists(unittest.TestCase):
+class TestDbfLists(TestCase):
     "DbfList tests"
 
     def setUp(self):
@@ -4966,7 +4989,7 @@ class TestDbfLists(unittest.TestCase):
         table.close()
 
 
-class TestReadWriteDefaultOpen(unittest.TestCase):
+class TestReadWriteDefaultOpen(TestCase):
     "test __enter__/__exit__"
 
     def setUp(self):
@@ -5007,7 +5030,7 @@ class TestReadWriteDefaultOpen(unittest.TestCase):
         self.assertRaises((IOError, OSError), table.open, READ_WRITE)
 
 
-class TestWhatever(unittest.TestCase):
+class TestWhatever(TestCase):
     "move tests here to run one at a time while debugging"
 
     def setUp(self):

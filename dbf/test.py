@@ -376,6 +376,16 @@ class TestDateTime(TestCase):
             Time(pdt.timetz(), tzinfo=mst)
         with self.assertRaisesRegex(ValueError, 'not naive time'):
             Time(datetime.time(15, 58, 59, tzinfo=mst), tzinfo=mst)
+        #
+        if py_ver < (3, 0):
+            from xmlrpclib import Marshaller, loads
+        else:
+            from xmlrpc.client import Marshaller, loads
+        self.assertEqual(
+                udt.utctimetuple(),
+                loads(Marshaller().dumps([pdt]), use_datetime=True)[0][0].utctimetuple(),
+                )
+
 
     def test_arithmetic(self):
         "Date, DateTime, & Time Arithmetic"

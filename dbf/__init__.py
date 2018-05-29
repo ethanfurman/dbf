@@ -72,7 +72,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 97, 7
+version = 0, 97, 8, 1
 
 NoneType = type(None)
 
@@ -2610,7 +2610,11 @@ Marshaller.dispatch[Char] = Marshaller.dump_unicode
 # Logical unknown becomes False
 Marshaller.dispatch[Logical] = Marshaller.dump_bool
 # DateTime is transmitted as UTC if aware, local if naive
-Marshaller.dispatch[DateTime] = lambda s, dt, w: w('%04d%02d%02dT%02d:%02d:%02d' % dt.utctimetuple[:6])
+Marshaller.dispatch[DateTime] = lambda s, dt, w: w(
+        '<value><dateTime.iso8601>'
+        '%04d%02d%02dT%02d:%02d:%02d'
+        '</dateTime.iso8601></value>\n'
+            % dt.utctimetuple()[:6])
 del Marshaller
 
 # Internal classes

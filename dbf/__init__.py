@@ -72,7 +72,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 97, 8, 1
+version = 0, 97, 8
 
 NoneType = type(None)
 

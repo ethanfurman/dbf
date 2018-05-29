@@ -276,12 +276,14 @@ class TestDateTime(TestCase):
 
     def test_date_creation(self):
         "Date creation"
-        Date()
-        Date.fromymd('        ')
-        Date.fromordinal(0)
-        Date.today()
-        Date.max
-        Date.min
+        self.assertEqual(Date(), NullDate)
+        self.assertEqual(Date.fromymd('        '), NullDate)
+        self.assertEqual(Date.fromordinal(0), NullDate)
+        self.assertEqual(Date.today(), datetime.date.today())
+        self.assertEqual(Date.max, datetime.date.max)
+        self.assertEqual(Date.min, datetime.date.min)
+        self.assertEqual(Date(2018, 5, 21), datetime.date(2018, 5, 21))
+        self.assertEqual(Date.strptime('2018-01-01'), datetime.date(2018, 1, 1))
         self.assertRaises(ValueError, Date.fromymd, '00000')
         self.assertRaises(ValueError, Date.fromymd, '00000000')
         self.assertRaises(ValueError, Date, 0, 0, 0)
@@ -297,11 +299,13 @@ class TestDateTime(TestCase):
 
     def test_datetime_creation(self):
         "DateTime creation"
-        DateTime()
-        DateTime.fromordinal(0)
-        DateTime.today()
-        DateTime.max
-        DateTime.min
+        self.assertEqual(DateTime(), NullDateTime)
+        self.assertEqual(DateTime.fromordinal(0), NullDateTime)
+        self.assertTrue(DateTime.today())
+        self.assertEqual(DateTime.max, datetime.datetime.max)
+        self.assertEqual(DateTime.min, datetime.datetime.min)
+        self.assertEqual(DateTime(2018, 5, 21, 19, 17, 16), datetime.datetime(2018, 5, 21, 19, 17 ,16))
+        self.assertEqual(DateTime.strptime('2018-01-01 19:17:16'), datetime.datetime(2018, 1, 1, 19, 17, 16))
 
     def test_datetime_compare(self):
         "DateTime comparisons"
@@ -331,9 +335,11 @@ class TestDateTime(TestCase):
 
     def test_time_creation(self):
         "Time creation"
-        Time()
-        Time.max
-        Time.min
+        self.assertEqual(Time(), NullTime)
+        self.assertEqual(Time.max, datetime.time.max)
+        self.assertEqual(Time.min, datetime.time.min)
+        self.assertEqual(Time(19, 17, 16), datetime.time(19, 17 ,16))
+        self.assertEqual(Time.strptime('19:17:16'), datetime.time(19, 17, 16))
 
     def test_time_compare(self):
         "Time comparisons"

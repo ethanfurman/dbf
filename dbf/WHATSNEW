@@ -5,6 +5,8 @@ What's New
 --------
 
 allow tzinfo addition/change in DateTime.combine()
+fix strptime for Time
+hook into datetime.datetime and .date equality comparisons
 
 
 0.97.008

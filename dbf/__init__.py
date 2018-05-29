@@ -1243,6 +1243,9 @@ class Date(object):
             return cls(*(time.strptime(date_string, format)[0:3]))
         return cls(*(time.strptime(date_string, "%Y-%m-%d")[0:3]))
 
+    def timetuple(self):
+        return self._date.timetuple()
+
     @classmethod
     def today(cls):
         return cls(datetime.date.today())
@@ -1316,7 +1319,9 @@ class DateTime(object):
         if isinstance(other, self.__class__):
             return self._datetime == other._datetime
         if isinstance(other, datetime.date):
-            return self._datetime == other
+            me = self._datetime.timetuple()
+            them = other.timetuple()
+            return me[:6] == them[:6] and self.microsecond == (other.microsecond//1000*1000)
         if isinstance(other, type(None)):
             return self._datetime is None
         return NotImplemented
@@ -1601,6 +1606,9 @@ class DateTime(object):
             return Time(self.hour, self.minute, self.second, self.microsecond)
         return Time()
 
+    def timetuple(self):
+        return self._datetime.timetuple()
+
     def timetz(self):
         if self:
             return Time(self._datetime.timetz())
@@ -1671,7 +1679,12 @@ class Time(object):
         if isinstance(other, self.__class__):
             return self._time == other._time
         if isinstance(other, datetime.time):
-            return self._time == other
+            return (
+                    self.hour == other.hour and
+                    self.minute == other.minute and
+                    self.second == other.second and
+                    self.microsecond == (other.microsecond//1000*1000)
+                    )
         if isinstance(other, type(None)):
             return self._time is None
         return NotImplemented
@@ -1894,13 +1907,13 @@ class Time(object):
     @classmethod
     def strptime(cls, time_string, format=None):
         if format is not None:
-            return cls(datetime.time.strptime(time_string, format))
+            return cls(*time.strptime(time_string, format)[3:6])
         for format in (
                 "%H:%M:%S.%f",
                 "%H:%M:%S",
                 ):
             try:
-                return cls(datetime.datetime.strptime(time_string, format))
+                return cls(*time.strptime(time_string, format)[3:6])
             except ValueError:
                 pass
         raise ValueError("Unable to convert %r" % time_string)

@@ -385,7 +385,11 @@ class TestDateTime(TestCase):
                 udt.utctimetuple(),
                 loads(Marshaller().dumps([pdt]), use_datetime=True)[0][0].utctimetuple(),
                 )
-
+        #
+        self.assertEqual(
+                pdt,
+                DateTime.combine(Date(2018, 5, 20), Time(5, 41, 33), tzinfo=pst),
+                )
 
     def test_arithmetic(self):
         "Date, DateTime, & Time Arithmetic"

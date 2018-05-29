@@ -1,6 +1,12 @@
 What's New
 ==========
 
+0.97.009
+--------
+
+allow tzinfo addition/change in DateTime.combine()
+
+
 0.97.008
 --------
 

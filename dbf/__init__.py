@@ -72,7 +72,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 97, 8
+version = 0, 97, 9, 1
 
 NoneType = type(None)
 
@@ -1472,9 +1472,16 @@ class DateTime(object):
             return NotImplemented
 
     @classmethod
-    def combine(cls, date, time):
+    def combine(cls, date, time, tzinfo=Null):
+        # if tzinfo is given, timezone is added/stripped
+        if tzinfo is Null:
+            tzinfo = time.tzinfo
         if Date(date) and Time(time):
-            return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond, time.tzinfo)
+            return cls(
+                    date.year, date.month, date.day,
+                    time.hour, time.minute, time.second, time.microsecond,
+                    tzinfo=tzinfo,
+                    )
         return cls()
 
     def date(self):

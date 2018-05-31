@@ -3362,6 +3362,7 @@ class TestDbfRecords(TestCase):
                 appt = appt,
                 wisdom = 'timing is everything',
                 )
+        record = table[-1]
         self.assertEqual(record.name, 'Ethan')
         self.assertEqual(type(record.name), Char)
         self.assertTrue(record.born)
@@ -3387,11 +3388,56 @@ class TestDbfRecords(TestCase):
                 appt = None,
                 wisdom = None,
                 )
+        record = table[-1]
         self.assertTrue(record.name is None)
         self.assertTrue(record.born is None)
         self.assertTrue(record.married is None)
         self.assertTrue(record.appt is None)
         self.assertTrue(record.wisdom is None)
+        table = Table(
+            filename=':memory:',
+            field_specs='name C(20); born L; married D null; appt T; wisdom M; pets L; cars N(3,0) null; story M; died D null;',
+            default_data_types=dict(
+                    C=(Char, NoneType, NullType),
+                    L=(Logical, NoneType, NullType),
+                    D=(Date, NoneType, NullType),
+                    T=(DateTime, NoneType, NullType),
+                    M=(Char, NoneType, NullType),
+                    N=(int, NoneType, NullType),
+                    ),
+            dbf_type='vfp',
+            on_disk=False,
+            )
+        table.open(mode=READ_WRITE)
+        table.append()
+        record = table[-1]
+        dbf.write(
+                record,
+                name = 'Ethan               ',
+                born = True,
+                married = datetime.date(2001, 6, 27),
+                appt = appt,
+                wisdom = 'timing is everything',
+                pets = True,
+                cars = 10,
+                story = 'a poor farm boy who made  good',
+                died = datetime.date(2018, 5, 30),
+                )
+        record = table[-1]
+        self.assertEqual(record.name, 'Ethan')
+        self.assertTrue(record.born)
+        self.assertTrue(record.born is Truth)
+        self.assertEqual(record.married, datetime.date(2001, 6, 27))
+        self.assertEqual(record.appt, datetime.datetime(2012, 12, 15, 9, 37, 11))
+        self.assertEqual(record.wisdom, 'timing is everything')
+        self.assertTrue(record.pets)
+        self.assertEqual(record.cars, 10)
+        self.assertEqual(record.story, 'a poor farm boy who made  good',)
+        self.assertEqual(record.died, datetime.date(2018, 5, 30))
+        dbf.write(record, married=Null, died=Null)
+        record = table[-1]
+        self.assertTrue(record.married is Null)
+        self.assertTrue(record.died is Null)
 
     def test_nonascii_text_cptrans(self):
         "check non-ascii text to unicode"

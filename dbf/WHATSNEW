@@ -1,6 +1,12 @@
 What's New
 ==========
 
+0.97.010
+--------
+
+fixed nullable-field access in vfp tables
+
+
 0.97.009
 --------
 

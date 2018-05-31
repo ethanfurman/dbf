@@ -72,7 +72,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 97, 9
+version = 0, 97, 10, 1
 
 NoneType = type(None)
 
@@ -3096,11 +3096,12 @@ class Record(object):
         calls appropriate routine to convert value stored in field from array
         """
         # check nullable here, binary is handled in the appropriate retrieve_* functions
-        index = self._meta.fields.index(name)
+        # index = self._meta.fields.index(name)
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
         nullable = flags & NULLABLE and '_nullflags' in self._meta
         if nullable:
+            index = fielddef[NUL]
             byte, bit = divmod(index, 8)
             null_def = self._meta['_nullflags']
             null_data = self._data[null_def[START]:null_def[END]]
@@ -3151,8 +3152,8 @@ class Record(object):
         calls appropriate routine to convert value to bytes, and save it in record
         """
         # check nullabel here, binary is handled in the appropriate update_* functions
-        index = self._meta.fields.index(name)
         fielddef = self._meta[name]
+        index = fielddef[NUL]
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
         nullable = flags & NULLABLE and '_nullflags' in self._meta
@@ -3227,11 +3228,11 @@ class RecordTemplate(object):
         array
         """
         # check nullable here, binary is handled in the appropriate retrieve_* functions
-        index = self._meta.fields.index(name)
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
         nullable = flags & NULLABLE and '_nullflags' in self._meta
         if nullable:
+            index = fielddef[NUL]
             byte, bit = divmod(index, 8)
             null_def = self._meta['_nullflags']
             null_data = self._data[null_def[START]:null_def[END]]
@@ -3268,8 +3269,8 @@ class RecordTemplate(object):
         calls appropriate routine to convert value to ascii bytes, and save it in record
         """
         # check nullabel here, binary is handled in the appropriate update_* functions
-        index = self._meta.fields.index(name)
         fielddef = self._meta[name]
+        index = fielddef[NUL]
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
         nullable = flags & NULLABLE and '_nullflags' in self._meta
@@ -4956,7 +4957,7 @@ class Table(_Navigation):
             if layout[TYPE] in meta.memo_types:
                 memo = True
             if layout[FLAGS] & NULLABLE:
-                nulls = True
+                nulls += 1
         if memo:
             if self._yesMemoMask <= 0x80:
                 header.version = header.version | self._yesMemoMask
@@ -4972,7 +4973,7 @@ class Table(_Navigation):
             meta.memo = None
         if nulls:
             start = layout[START] + layout[LENGTH]
-            length, one_more = divmod(len(meta.fields), 8)
+            length, one_more = divmod(nulls, 8)
             if one_more:
                 length += 1
             fielddef = array('B', [0] * 32)
@@ -5209,7 +5210,7 @@ class Table(_Navigation):
                     'L' : Logical,
                     'D' : Date,
                     }
-            if self._versionabbr != 'db3':
+            if self._versionabbr in ('vfp', 'db4'):
                 default_data_types['T'] = DateTime
         self._meta._default_data_types = default_data_types
         if field_data_types is None:
@@ -5502,7 +5503,8 @@ class Table(_Navigation):
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to add fields (%s)' % (meta.filename, meta.status))
         fields = self.structure() + self._list_fields(field_specs, sep=u';')
-        if (len(fields) + ('_nullflags' in meta)) > meta.max_fields:
+        null_fields = any(['null' in f.lower() for f in fields])
+        if (len(fields) + null_fields) > meta.max_fields:
             raise DbfError(
                     "Adding %d more field%s would exceed the limit of %d"
                     % (len(fields), ('','s')[len(fields)==1], meta.max_fields)
@@ -5523,6 +5525,7 @@ class Table(_Navigation):
         meta.fields[:] = []
 
         meta.blankrecord = None
+        null_index = -1
         for field in fields:
             if not field:
                 continue
@@ -5558,6 +5561,9 @@ class Table(_Navigation):
             except FieldSpecError:
                 exc = sys.exc_info()[1]
                 raise FieldSpecError(exc.message + ' (%s:%s)' % (meta.filename, name)).from_None()
+            nullable = flags & NULLABLE
+            if nullable:
+                null_index += 1
             start = offset
             end = offset + length
             offset = end
@@ -5573,6 +5579,7 @@ class Table(_Navigation):
                     flags,
                     cls,
                     empty,
+                    nullable and null_index,
                     )
         self._build_header_fields()
         self._update_disk()
@@ -6602,6 +6609,7 @@ class FpTable(Table):
                     flags,
                     cls,
                     empty,
+                    0,
                     )
         if offset != total_length:
             raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
@@ -6771,7 +6779,7 @@ class VfpTable(FpTable):
             raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
         if nulls_found:
             nullable_fields = [f for f in meta if meta[f][NUL]]
-            nullable_fields.sort(key=lambda f: f[START])
+            nullable_fields.sort(key=lambda f: meta[f][START])
             for i, f in enumerate(nullable_fields):
                 meta[f] = meta[f][:-1] + (i, )
             null_bytes, plus_one = divmod(len(nullable_fields), 8)

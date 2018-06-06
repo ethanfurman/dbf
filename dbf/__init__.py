@@ -72,7 +72,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 97, 10
+version = 0, 97, 11, 1
 
 NoneType = type(None)
 
@@ -1191,7 +1191,7 @@ class Date(object):
 
     @classmethod
     def fromymd(cls, yyyymmdd):
-        if yyyymmdd in ('', '        ', 'no date'):
+        if yyyymmdd in ('', '        ', 'no date', '00000000'):
             return cls()
         return cls(datetime.date(int(yyyymmdd[:4]), int(yyyymmdd[4:6]), int(yyyymmdd[6:])))
 
@@ -3950,7 +3950,7 @@ def retrieve_date(bytes, fielddef, *ignore):
     Returns the ascii coded date as fielddef[CLASS] or fielddef[EMPTY]
     """
     text = to_bytes(bytes)
-    if text == b'        ':
+    if text in (b'        ', b'00000000'):
         cls = fielddef[EMPTY]
         if cls is NoneType:
             return None

@@ -278,6 +278,7 @@ class TestDateTime(TestCase):
         "Date creation"
         self.assertEqual(Date(), NullDate)
         self.assertEqual(Date.fromymd('        '), NullDate)
+        self.assertEqual(Date.fromymd('00000000'), NullDate)
         self.assertEqual(Date.fromordinal(0), NullDate)
         self.assertEqual(Date.today(), datetime.date.today())
         self.assertEqual(Date.max, datetime.date.max)
@@ -285,7 +286,6 @@ class TestDateTime(TestCase):
         self.assertEqual(Date(2018, 5, 21), datetime.date(2018, 5, 21))
         self.assertEqual(Date.strptime('2018-01-01'), datetime.date(2018, 1, 1))
         self.assertRaises(ValueError, Date.fromymd, '00000')
-        self.assertRaises(ValueError, Date.fromymd, '00000000')
         self.assertRaises(ValueError, Date, 0, 0, 0)
 
     def test_date_compare(self):

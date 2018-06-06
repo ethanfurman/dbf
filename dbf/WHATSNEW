@@ -1,6 +1,12 @@
 What's New
 ==========
 
+0.97.011
+--------
+
+allow '00000000' as a null date in dbf files
+
+
 0.97.010
 --------
 

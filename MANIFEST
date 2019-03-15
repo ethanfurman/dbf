@@ -1,8 +1,5 @@
 setup.py
 dbf/__init__.py
 dbf/tests.py
-dbf/ver_2.py
-dbf/ver_32.py
-dbf/ver_33.py
 dbf/WHATSNEW
 dbf/README.md

@@ -31,6 +31,7 @@ data = dict(
            'dbf' : [
                'LICENSE',
                'README.md',
+	       'WHATSNEW',
                ]
            },
         provides=['dbf'],

@@ -3695,6 +3695,10 @@ class TestDbfFunctions(TestCase):
 
     def setUp(self):
         "create a dbf and vfp table"
+        self.empty_dbf_table = Table(
+            os.path.join(tempdir, 'emptytemptable'),
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            )
         self.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
             'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
@@ -3719,6 +3723,14 @@ class TestDbfFunctions(TestCase):
             table.append({'name':name, 'paid':paid, 'qty':qty, 'orderdate':orderdate, 'desc':desc})
         table.close()
 
+        self.empty_vfp_table = Table(
+                os.path.join(tempdir, 'emptytempvfp'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;'
+                ' dist B binary; atom I binary; wealth Y binary;'
+                ,
+                dbf_type='vfp',
+                )
         self.vfp_table = table = Table(
                 os.path.join(tempdir, 'tempvfp'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
@@ -4494,6 +4506,13 @@ class TestDbfFunctions(TestCase):
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
+
+    def test_resize_empty(self):
+        "resize"
+        table = self.empty_dbf_table
+        table.open(mode=READ_WRITE)
+        table.resize_field('name', 40)
+        table.close()
 
     def test_resize(self):
         "resize"

@@ -6010,6 +6010,7 @@ class Table(_Navigation):
                 raise DbfError("field %s not in table -- resize aborted" % candidate)
             elif self.field_info(candidate).field_type != FieldType.CHAR:
                 raise DbfError("field %s is not Character -- resize aborted" % candidate)
+        old_table = None
         if self:
             old_table = self.create_backup()
             self.zap()

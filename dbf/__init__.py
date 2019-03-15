@@ -8402,7 +8402,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     fields.append(unicode(data))
                 fd.write('\t'.join(fields) + '\n')
         else: # format == 'fixed'
-            with open("%s_layout.txt" % os.path.splitext(filename)[0], 'w', encoding=encoding) as header:
+            with codecs.open("%s_layout.txt" % os.path.splitext(filename)[0], 'w', encoding=encoding) as header:
                 header.write("%-15s  Size\n" % "Field Name")
                 header.write("%-15s  ----\n" % ("-" * 15))
                 sizes = []

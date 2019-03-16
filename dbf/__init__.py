@@ -41,6 +41,8 @@ import os
 import struct
 import sys
 import time
+import traceback
+import warnings
 import weakref
 
 from array import array
@@ -841,6 +843,8 @@ class DoNotIndex(DbfWarning):
     def __init__(self):
         DbfWarning.__init__(self, self.message)
 
+class FieldNameWarning(UserWarning):
+    message = 'non-standard characters in field name'
 
 # wrappers around datetime and logical objects to allow null values
 
@@ -5502,7 +5506,9 @@ class Table(_Navigation):
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to add fields (%s)' % (meta.filename, meta.status))
-        fields = self.structure() + self._list_fields(field_specs, sep=u';')
+        fields = self.structure()
+        original_fields = len(fields)
+        fields += self._list_fields(field_specs, sep=u';')
         null_fields = any(['null' in f.lower() for f in fields])
         if (len(fields) + null_fields) > meta.max_fields:
             raise DbfError(
@@ -5526,7 +5532,7 @@ class Table(_Navigation):
 
         meta.blankrecord = None
         null_index = -1
-        for field in fields:
+        for field_seq, field in enumerate(fields):
             if not field:
                 continue
             field = field.lower()
@@ -5545,8 +5551,15 @@ class Table(_Navigation):
                             break
             except IndexError:
                 raise FieldSpecError('bad field spec: %r' % field)
-            if name[0] == '_' or name[0].isdigit() or not name.replace('_', '').isalnum():
-                raise FieldSpecError("%s invalid:  field names must start with a letter, and can only contain letters, digits, and _" % name)
+            if field_seq >= original_fields and (name[0] == '_' or name[0].isdigit() or not name.replace('_', '').isalnum()):
+                # find appropriate line to point warning to
+                for i, frame in enumerate(reversed(traceback.extract_stack()), start=1):
+                    if frame[0] == __file__ and frame[2] == 'resize_field':
+                        # ignore
+                        break
+                    elif frame[0] != __file__ or frame[2] not in ('__init__','add_fields'):
+                        warnings.warn('"%s invalid:  field names should start with a letter, and only contain letters, digits, and _' % name, FieldNameWarning, stacklevel=i)
+                        break
             if name in meta.fields:
                 raise DbfError("Field '%s' already exists" % name)
             field_type = format

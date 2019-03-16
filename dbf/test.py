@@ -2755,6 +2755,22 @@ class TestExceptions(TestCase):
         table.close()
 
 
+class TestWarnings(TestCase):
+
+    def test_field_name_warning(self):
+        with warnings.catch_warnings(record=True) as w:
+            huh = dbf.Table('cloud', 'p^type C(25)', on_disk=False).open(dbf.READ_WRITE)
+            self.assertEqual(len(w), 1, str(w))
+            warning = w[-1]
+            self.assertTrue(issubclass(warning.category, dbf.FieldNameWarning))
+            huh.resize_field('p^type', 30)
+            self.assertEqual(len(w), 1, 'warning objects\n'+'\n'.join([str(warning) for warning in w]))
+            huh.add_fields('c^word C(50)')
+            self.assertEqual(len(w), 2, str(w))
+            warning = w[-1]
+            self.assertTrue(issubclass(warning.category, dbf.FieldNameWarning))
+
+
 class TestIndexLocation(TestCase):
 
     def test_false(self):

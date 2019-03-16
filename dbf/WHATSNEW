@@ -1,6 +1,14 @@
 What's New
 ==========
 
+0.98.000
+--------
+
+fix resize_field to work on empty tables
+fix export to fixed-width by using codecs.open
+allow non-standard characters in field names (with warnings)
+
+
 0.97.011
 --------
 

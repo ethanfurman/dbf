@@ -74,7 +74,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 98, 0
+version = 0, 98, 1, 1
 
 NoneType = type(None)
 
@@ -5233,13 +5233,15 @@ class Table(_Navigation):
             meta.header.data
         else:
             base, ext = os.path.splitext(filename)
+            search_name = None
             if ext.lower() != '.dbf':
                 meta.filename = filename + '.dbf'
-                searchname = filename + '.[Db][Bb][Ff]'
-            else:
-                meta.filename = filename
-                searchname = filename
-            matches = glob(searchname)
+                search_name = filename + '.[Db][Bb][Ff]'
+                matches = glob(search_name)
+                if not matches:
+                    meta.filename = filename
+                    search_name = filename
+                    matches = glob(search_name)
             if len(matches) == 1:
                 meta.filename = matches[0]
             elif matches:
@@ -5348,9 +5350,6 @@ class Table(_Navigation):
                 raise DbfError("Unknown table type: %s" % dbf_type)
             return object.__new__(table)
         else:
-            base, ext = os.path.splitext(filename)
-            if ext.lower() != '.dbf':
-                filename = filename + '.dbf'
             possibles = guess_table_type(filename)
             if len(possibles) == 1:
                 return object.__new__(possibles[0][2])
@@ -8595,17 +8594,23 @@ def table_type(filename):
     """
     returns text representation of a table's dbf version
     """
+    actual_filename = None
+    search_name = None
     base, ext = os.path.splitext(filename)
-    if ext == '':
-        filename = base + '.[Dd][Bb][Ff]'
+    if ext.lower() != '.dbf':
+        search_name = base + '.[Dd][Bb][Ff]'
         matches = glob(filename)
-        if matches:
-            filename = matches[0]
-        else:
-            filename = base + '.dbf'
-    if not os.path.exists(filename):
-        raise DbfError('File %s not found' % filename)
-    fd = open(filename, 'rb')
+        if not matches:
+            # back to original name
+            search_name = filename
+            matches = glob(search_name)
+    if len(matches) == 1:
+        actual_filename = matches[0]
+    elif matches:
+        raise DbfError("please specify exactly which of %r you want" % (matches, ))
+    else:
+        raise DbfError('File %r not found' % search_name)
+    fd = open(actual_filename, 'rb')
     version = ord(fd.read(1))
     fd.close()
     fd = None

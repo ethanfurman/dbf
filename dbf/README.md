@@ -101,12 +101,12 @@ Whirlwind Tour
         table.append(datum)
 
     for record in table:
-        print record
-        print '--------'
-        print record[0:3]
-        print record['name':'qualified']
-        print [record.name, record.age, record.birth]
-        print '--------'
+        print(record)
+        print('--------')
+        print(record[0:3])
+        print(record['name':'qualified'])
+        print([record.name, record.age, record.birth])
+        print('--------')
 
     custom = table.new(
             filename='test_on_disk',
@@ -118,11 +118,11 @@ Whirlwind Tour
             custom.append(record)
         for record in custom:
             dbf.write(record, name=record.name.upper())
-            print record
-            print '--------'
-            print record[0:3]
-            print record['name':'qualified']
-            print [record.name, record.age, record.birth]
-            print '--------'
+            print(record)
+            print('--------')
+            print(record[0:3])
+            print(record['name':'qualified'])
+            print([record.name, record.age, record.birth])
+            print('--------')
 
     table.close()

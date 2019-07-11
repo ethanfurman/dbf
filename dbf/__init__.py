@@ -2919,6 +2919,7 @@ class Record(object):
     def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
             raise AttributeError('Method %s is not implemented.' % name)
+        name = name.lower()
         if not name in self._meta.fields:
             raise FieldMissingError(name)
         if name in self._memos:
@@ -3365,6 +3366,7 @@ class RecordTemplate(object):
     def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
             raise AttributeError('Method %s is not implemented.' % name)
+        name = name.lower()
         if not name in self._meta.fields:
             raise FieldMissingError(name)
         if name in self._memos:
@@ -5059,7 +5061,7 @@ class Table(_Navigation):
             specs = specs.strip(sep).split(sep)
         else:
             specs = list(specs)
-        specs = [s.strip() for s in specs]
+        specs = [s.strip().lower() for s in specs]
         return specs
 
     def _nav_check(self):
@@ -5836,6 +5838,7 @@ class Table(_Navigation):
         """
         returns (field type, size, dec, class) of field
         """
+        field = field.lower()
         if field in self.field_names:
             field = self._meta[field]
             return FieldInfo(field[TYPE], field[LENGTH], field[DECIMALS], field[CLASS])
@@ -5889,6 +5892,7 @@ class Table(_Navigation):
         """
         returns True if field allows Nulls
         """
+        field = field.lower()
         if field not in self.field_names:
             raise FieldMissingError(field)
         return bool(self._meta[field][FLAGS] & NULLABLE)
@@ -5987,6 +5991,8 @@ class Table(_Navigation):
         """
         renames an existing field
         """
+        oldname = oldname.lower()
+        newname = newname.lower()
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to change field names' % meta.filename)
@@ -5996,7 +6002,6 @@ class Table(_Navigation):
             raise FieldMissingError("field --%s-- does not exist -- cannot rename it." % oldname)
         if newname[0] == '_' or newname[0].isdigit() or not newname.replace('_', '').isalnum():
             raise FieldSpecError("field names cannot start with _ or digits, and can only contain the _, letters, and digits")
-        newname = newname.lower()
         if newname in self._meta.fields:
             raise DbfError("field --%s-- already exists" % newname)
         if len(newname) > 10:
@@ -8759,6 +8764,7 @@ def gather(record, data, drop=False):
         record_fields = field_names(record)
         for key in field_names(data):
             value = data[key]
+            key = key.lower()
             if not key in record_fields:
                 if drop:
                     continue

@@ -3656,6 +3656,20 @@ class TestDbfRecords(TestCase):
                     ))
         self.assertNotEqual(old_data, dbf.scatter(record))
 
+    def test_field_capitalization(self):
+        "ensure mixed- and upper-case field names work"
+        table = dbf.Table('mixed', 'NAME C(30); Age N(5,2)', on_disk=False)
+        self.assertEqual(['name', 'age'], field_names(table))
+        table.open(dbf.READ_WRITE)
+        table.append({'Name':'Ethan', 'AGE': 99})
+        rec = table[0]
+        self.assertEqual(rec.NaMe.strip(), 'Ethan')
+        table.rename_field('NaMe', 'My_NAME')
+        self.assertEqual(rec.My_NaMe.strip(), 'Ethan')
+        self.assertEqual(['my_name', 'age'], field_names(table))
+        table.append({'MY_Name':'Allen', 'AGE': 7})
+        rec = table[1]
+        self.assertEqual(rec.my_NaMe.strip(), 'Allen')
 
 class TestDbfRecordTemplates(TestCase):
     "Testing records"

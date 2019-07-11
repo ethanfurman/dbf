@@ -1,6 +1,13 @@
 What's New
 ==========
 
+0.98.001
+--------
+
+allow dbf files without .dbf ending
+allow any case for accessing field names
+
+
 0.98.000
 --------
 

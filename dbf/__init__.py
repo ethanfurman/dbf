@@ -74,7 +74,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 98, 2
+version = 0, 98, 3, 1
 
 NoneType = type(None)
 
@@ -3030,7 +3030,7 @@ class Record(object):
         return '\n'.join(result)
 
     def __repr__(self):
-        return to_bytes(self._data)
+        return '%r' % to_bytes(self._data)
 
     def _commit_flux(self):
         """
@@ -3464,7 +3464,7 @@ class RecordTemplate(object):
 
 
     def __repr__(self):
-        return to_bytes(self._data)
+        return '%r' % to_bytes(self._data)
 
     def __str__(self):
         result = []

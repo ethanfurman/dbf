@@ -5183,6 +5183,50 @@ class TestReadWriteDefaultOpen(TestCase):
         self.assertRaises((IOError, OSError), table.open, READ_WRITE)
 
 
+class TestDBC(TestCase):
+    "test DBC handling"
+
+
+class TestMisc(TestCase):
+    "miscellaneous tests"
+
+    def setUp(self):
+        self.table = Table(
+                os.path.join(tempdir, 'dbf_table.'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
+                dbf_type='db3',
+                )
+        self.table_dbf = Table(
+                os.path.join(tempdir, 'dbf_table.dbf'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
+                dbf_type='db3',
+                )
+        self.table_implicit = Table(
+                os.path.join(tempdir, 'dbf_table'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
+                dbf_type='db3',
+                )
+        self.table_wierd = Table(
+                os.path.join(tempdir, 'dbf_table.blah'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M',
+                dbf_type='db3',
+                )
+        self.table.close()
+        self.table_dbf.close()
+        self.table_implicit.close()
+        self.table_wierd.close()
+
+    def test_table_type_with_dbf(self):
+        dbf.table_type(self.table.filename)
+        dbf.table_type(self.table_dbf.filename)
+        dbf.table_type(self.table_implicit.filename)
+        dbf.table_type(self.table_wierd.filename)
+        dbf.Table(self.table.filename)
+        dbf.Table(self.table_dbf.filename)
+        dbf.Table(self.table_implicit.filename)
+        dbf.Table(self.table_wierd.filename)
+
+
 class TestWhatever(TestCase):
     "move tests here to run one at a time while debugging"
 

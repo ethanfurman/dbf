@@ -74,7 +74,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 98, 1
+version = 0, 98, 2, 1
 
 NoneType = type(None)
 
@@ -5236,7 +5236,14 @@ class Table(_Navigation):
         else:
             base, ext = os.path.splitext(filename)
             search_name = None
-            if ext.lower() != '.dbf':
+            if ext == '.':
+                # use filename without the '.'
+                search_name = base
+                matches = glob(search_name)
+            elif ext.lower() == '.dbf':
+                # use filename as-is
+                matches = glob(filename)
+            else:
                 meta.filename = filename + '.dbf'
                 search_name = filename + '.[Db][Bb][Ff]'
                 matches = glob(search_name)
@@ -8602,7 +8609,15 @@ def table_type(filename):
     actual_filename = None
     search_name = None
     base, ext = os.path.splitext(filename)
-    if ext.lower() != '.dbf':
+    if ext == '.':
+        # use filename without the '.'
+        search_name = base
+        matches = glob(search_name)
+    elif ext.lower() == '.dbf':
+        # use filename as-is
+        search_name = filename
+        matches = glob(search_name)
+    else:
         search_name = base + '.[Dd][Bb][Ff]'
         matches = glob(filename)
         if not matches:

@@ -1067,21 +1067,37 @@ class Date(object):
             raise AttributeError('NullDate object has no attribute %s' % name)
 
     def __ge__(self, other):
-        if isinstance(other, (datetime.date)):
-            return self._date >= other
-        elif isinstance(other, (Date)):
-            if other:
-                return self._date >= other._date
-            return False
+        if self:
+            if isinstance(other, (datetime.date)):
+                return self._date >= other
+            elif isinstance(other, (Date)):
+                if other:
+                    return self._date >= other._date
+                return True
+        else:
+            if isinstance(other, (datetime.date)):
+                return False
+            elif isinstance(other, (Date)):
+                if other:
+                    return False
+                return True
         return NotImplemented
 
     def __gt__(self, other):
-        if isinstance(other, (datetime.date)):
-            return self._date > other
-        elif isinstance(other, (Date)):
-            if other:
-                return self._date > other._date
-            return True
+        if self:
+            if isinstance(other, (datetime.date)):
+                return self._date > other
+            elif isinstance(other, (Date)):
+                if other:
+                    return self._date > other._date
+                return True
+        else:
+            if isinstance(other, (datetime.date)):
+                return False
+            elif isinstance(other, (Date)):
+                if other:
+                    return False
+                return False
         return NotImplemented
 
     def __hash__(self):

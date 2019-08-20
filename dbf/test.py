@@ -311,9 +311,9 @@ class TestDateTime(TestCase):
         "DateTime comparisons"
         nodatetime1 = DateTime()
         nodatetime2 = DateTime()
-        datetime1 = Date.fromordinal(1000)
-        datetime2 = Date.fromordinal(20000)
-        datetime3 = Date.fromordinal(300000)
+        datetime1 = DateTime.fromordinal(1000)
+        datetime2 = DateTime.fromordinal(20000)
+        datetime3 = DateTime.fromordinal(300000)
         self.compareTimes(nodatetime1, nodatetime2, datetime1, datetime2, datetime3)
 
     def test_datetime_replace(self):
@@ -345,9 +345,9 @@ class TestDateTime(TestCase):
         "Time comparisons"
         notime1 = Time()
         notime2 = Time()
-        time1 = Date.fromordinal(1000)
-        time2 = Date.fromordinal(2000)
-        time3 = Date.fromordinal(3000)
+        time1 = Time.fromfloat(7.75)
+        time2 = Time.fromfloat(9.5)
+        time3 = Time.fromfloat(16.25)
         self.compareTimes(notime1, notime2, time1, time2, time3)
 
     @unittest.skipIf(pytz is None, 'pytz not installed')
@@ -449,7 +449,11 @@ class TestDateTime(TestCase):
         self.assertEqual(bool(actual_datetime), True)
 
     def compareTimes(self, empty1, empty2, uno, dos, tres):
-        self.assertEqual(empty1, empty2)
+        self.assertTrue(empty1 is empty2)
+        self.assertTrue(empty1 < uno, '%r is not less than %r' % (empty1, uno))
+        self.assertFalse(empty1 > uno, '%r is less than %r' % (empty1, uno))
+        self.assertTrue(uno > empty1, '%r is not greater than %r' % (empty1, uno))
+        self.assertFalse(uno < empty1, '%r is greater than %r' % (empty1, uno))
         self.assertEqual(uno < dos, True)
         self.assertEqual(uno <= dos, True)
         self.assertEqual(dos <= dos, True)

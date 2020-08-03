@@ -49,7 +49,7 @@ from array import array
 from bisect import bisect_left, bisect_right
 from collections import defaultdict, deque
 from functools import partial
-from aenum import Enum, IntEnum, export
+from aenum import Enum, IntEnum, IntFlag, export
 from glob import glob
 from math import floor
 from os import SEEK_END
@@ -74,7 +74,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 98, 3
+version = 0, 98, 4, 1
 
 NoneType = type(None)
 
@@ -87,7 +87,7 @@ module = globals()
 LOGICAL_BAD_IS_NONE = True
 
 ## treat non-unicode data as ...
-input_decoding = 'ascii'
+input_decoding = 'utf-8'
 
 ## if no codepage specified on dbf creation, use this
 default_codepage = 'ascii'
@@ -277,7 +277,7 @@ else:
         return obj_type # New-style class
 
 def with_cause(exc, cause):
-    exc.__cause__ = None
+    exc.__cause__ = cause
     return exc
 
 def string(text):
@@ -626,7 +626,7 @@ class FieldType(IntEnum):
     PICTURE = b'P'
 
 @export(module)
-class FieldFlag(IntEnum):
+class FieldFlag(IntFlag):
     @classmethod
     def lookup(cls, alias):
         alias = alias.lower()
@@ -735,8 +735,8 @@ class DbfError(Exception):
     def __init__(self, message, *args):
         Exception.__init__(self, message, *args)
         self.message = message
-    def from_None(self):
-        self.__cause__ = None
+    def from_exc(self, exc):
+        self.__cause__ = exc
         return self
 
 
@@ -2639,6 +2639,196 @@ On = Quantum(True)
 Off = Quantum(False)
 Other = Quantum()
 
+class FieldnameList(list):
+    "storage for field names"
+
+    def __new__(cls, items=()):
+        for item in items:
+            item = ensure_unicode(item)
+            if not isinstance(item, unicode):
+                raise TypeError('%r cannot be a field name' % (item, ))
+        new_list = super(FieldnameList, cls).__new__(cls)
+        return new_list
+
+    def __init__(self, items=()):
+        for item in items:
+            self.append(item.upper())
+
+    def __add__(self, other_list):
+        if not isinstance(other_list, list):
+            return NotImplemented
+        new_list = self[:]
+        for item in other_list:
+            item = ensure_unicode(item)
+            if not isinstance(item, unicode):
+                raise TypeError('%r cannot be a field name' % (item, ))
+            item = item.upper()
+            new_list.append(item)
+        return new_list
+
+    def __contains__(self, item):
+        item = ensure_unicode(item)
+        if not isinstance(item, unicode):
+            raise TypeError('%r cannot be a field name' % (item, ))
+        item = item.upper()
+        return item in list(self)
+
+    def __getslice__(self, start, stop):
+        return FieldnameList(super(FieldnameList, self).__getslice__(start, stop))
+
+    def __getitem__(self, thing):
+        res = super(FieldnameList, self).__getitem__(thing)
+        if isinstance(res, list):
+            res = FieldnameList(res)
+        return res
+
+    def __iadd__(self, other_list):
+        if not isinstance(other_list, list):
+            return NotImplemented
+        for item in other_list:
+            item = ensure_unicode(item)
+            if not isinstance(item, unicode):
+                raise TypeError('%r cannot be a field name' % (item, ))
+            item = item.upper()
+            super(FieldnameList, self).append(item)
+        return self
+
+    def __radd__(self, other_list):
+        if not isinstance(other_list, list):
+            return NotImplemented
+        new_list = FieldnameList(other_list)
+        new_list.extend(self)
+        return new_list
+
+    def __repr__(self):
+        return 'FieldnameList(%s)' % super(FieldnameList, self).__repr__()
+
+    def __setitem__(self, pos, item):
+        item = ensure_unicode(item)
+        if not isinstance(item, unicode):
+            raise TypeError('%r cannot be a field name' % (item, ))
+        item = item.upper()
+        return super(FieldnameList, self).__setitem__(pos, item)
+
+    def __setslice__(self, start, stop, things):
+        if isinstance(things, unicode):
+            things = things.upper()
+        else:
+            try:
+                new_things = []
+                for item in things:
+                    item = ensure_unicode(item)
+                    if not isinstance(item, unicode):
+                        raise TypeError('%r cannot be a field name' % (item, ))
+                    item = item.upper()
+                    new_things.append(item)
+                things = new_things
+            except TypeError:
+                raise TypeError('%r cannot be a field name' % (things, ))
+        super(FieldnameList, self).__setslice__(start, stop, things)
+
+    def __cmp__(self, other):
+        if not isinstance(other, list):
+            return NotImplemented
+        for s, o in zip(self, other):
+            o = ensure_unicode(o)
+            if not isinstance(o, unicode):
+                raise TypeError('%r cannot be a field name' % (o, ))
+            o = o.upper()
+            if s < o:
+                return -1
+            elif s > o:
+                return +1
+        # at least one list exhausted with all elements equal
+        # now check lengths
+        if len(s) < len(o):
+            return -1
+        if len(s) > len(o):
+            return +1
+        else:
+            return 0
+
+    def __eq__(self, other):
+        res = self.__cmp__(other)
+        if res is NotImplemented:
+            return res
+        else:
+            return res == 0
+
+    def __ne__(self, other):
+        res = self.__cmp__(other)
+        if res is NotImplemented:
+            return res
+        else:
+            return res != 0
+
+    def __le__(self, other):
+        res = self.__cmp__(other)
+        if res is NotImplemented:
+            return res
+        else:
+            return res <= 0
+
+    def __lt__(self, other):
+        res = self.__cmp__(other)
+        if res is NotImplemented:
+            return res
+        else:
+            return res < 0
+
+    def __gt__(self, other):
+        res = self.__cmp__(other)
+        if res is NotImplemented:
+            return res
+        else:
+            return res > 0
+
+    def __ge__(self, other):
+        res = self.__cmp__(other)
+        if res is NotImplemented:
+            return res
+        else:
+            return res >= 0
+
+    def append(self, item):
+        item = ensure_unicode(item)
+        if not isinstance(item, unicode):
+            raise TypeError('%r cannot be a field name' % (item, ))
+        item = item.upper()
+        super(FieldnameList, self).append(item)
+
+    def count(self, item):
+        item = ensure_unicode(item)
+        if not isinstance(item, unicode):
+            raise TypeError('%r cannot be a field name' % (item, ))
+        item = item.upper()
+        return super(FieldnameList, self).count(item)
+
+    def extend(self, other_list):
+        for item in other_list:
+            self.append(item)
+
+    def index(self, item):
+        item = ensure_unicode(item)
+        if not isinstance(item, unicode):
+            raise TypeError('%r cannot be a field name' % (item, ))
+        item = item.upper()
+        return super(FieldnameList, self).index(item)
+
+    def insert(self, pos, item):
+        item = ensure_unicode(item)
+        if not isinstance(item, unicode):
+            raise TypeError('%r cannot be a field name' % (item, ))
+        item = item.upper()
+        super(FieldnameList, self).insert(pos, item)
+
+    def remove(self, item):
+        item = ensure_unicode(item)
+        if not isinstance(item, unicode):
+            raise TypeError('%r cannot be a field name' % (item, ))
+        item = item.upper()
+        return super(FieldnameList, self).remove(item)
+
 
 # add xmlrpc support
 if py_ver < (3, 0):
@@ -2909,6 +3099,7 @@ class Record(object):
                 if s_value is not o_value and s_value != o_value:
                     return False
         elif isinstance(other, dict):
+            other = dict((ensure_unicode(k).upper(), v) for k, v in other.items())
             if sorted(field_names(self)) != sorted(other.keys()):
                 return False
             for field in self._meta.user_fields:
@@ -2935,7 +3126,7 @@ class Record(object):
     def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
             raise AttributeError('Method %s is not implemented.' % name)
-        name = name.lower()
+        name = name.upper()
         if not name in self._meta.fields:
             raise FieldMissingError(name)
         if name in self._memos:
@@ -2962,7 +3153,7 @@ class Record(object):
             sequence = []
             if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
                 field_names = api.field_names(self)
-                start, stop, step = item.start, item.stop, item.step
+                start, stop, step = ensure_unicode(item.start).upper(), ensure_unicode(item.stop).upper(), item.step
                 if start not in field_names or stop not in field_names:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
@@ -2990,6 +3181,7 @@ class Record(object):
         if name in self.__slots__:
             object.__setattr__(self, name, value)
             return
+        name = name.upper()
         if self._meta.status != READ_WRITE:
             raise DbfError("%s not in read/write mode" % self._meta.filename)
         elif self._write_to_disk:
@@ -3015,14 +3207,14 @@ class Record(object):
         if self._write_to_disk:
             raise DbfError("unable to modify fields individually except in `with` or `Process()`")
         if isinstance(name, basestring):
-            self.__setattr__(name, value)
+            self.__setattr__(name.upper(), value)
         elif isinstance(name, baseinteger):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
             field_names = api.field_names(self)
             if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
-                start, stop, step = name.start, name.stop, name.step
+                start, stop, step = ensure_unicode(name.start).upper(), ensure_unicode(name.stop).upper(), name.step
                 if start not in field_names or stop not in field_names:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
@@ -3060,7 +3252,7 @@ class Record(object):
             exc = sys.exc_info()[1]
             self._data[:] = self._old_data
             self._update_disk(data=self._old_data)
-            raise DbfError("unable to write updates to disk, original data restored: %r" % (exc,)).from_None()
+            raise DbfError("unable to write updates to disk, original data restored: %r" % (exc,)).from_exc(None)
         self._memos.clear()
         self._old_data = None
         self._write_to_disk = True
@@ -3079,11 +3271,11 @@ class Record(object):
         layout.memofields = []
         signature = [layout.table().codepage.name]
         for index, name in enumerate(layout.fields):
-            if name == '_nullflags':
-                record._data[layout['_nullflags'][START]:layout['_nullflags'][END]] = array('B', [0] * layout['_nullflags'][LENGTH])
+            if name == '_NULLFLAGS':
+                record._data[layout['_NULLFLAGS'][START]:layout['_NULLFLAGS'][END]] = array('B', [0] * layout['_NULLFLAGS'][LENGTH])
         for index, name in enumerate(layout.fields):
             signature.append(name)
-            if name != '_nullflags':
+            if name != '_NULLFLAGS':
                 type = FieldType(layout[name][TYPE])
                 start = layout[name][START]
                 size = layout[name][LENGTH]
@@ -3120,11 +3312,11 @@ class Record(object):
         # index = self._meta.fields.index(name)
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
-        nullable = flags & NULLABLE and '_nullflags' in self._meta
+        nullable = flags & NULLABLE and '_NULLFLAGS' in self._meta
         if nullable:
             index = fielddef[NUL]
             byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
+            null_def = self._meta['_NULLFLAGS']
             null_data = self._data[null_def[START]:null_def[END]]
             try:
                 if null_data[byte] >> bit & 1:
@@ -3177,11 +3369,11 @@ class Record(object):
         index = fielddef[NUL]
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
-        nullable = flags & NULLABLE and '_nullflags' in self._meta
+        nullable = flags & NULLABLE and '_NULLFLAGS' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
             byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
+            null_def = self._meta['_NULLFLAGS']
             null_data = self._data[null_def[START]:null_def[END]]
             if value is Null:
                 null_data[byte] |= 1 << bit
@@ -3251,11 +3443,11 @@ class RecordTemplate(object):
         # check nullable here, binary is handled in the appropriate retrieve_* functions
         fielddef = self._meta[name]
         flags = fielddef[FLAGS]
-        nullable = flags & NULLABLE and '_nullflags' in self._meta
+        nullable = flags & NULLABLE and '_NULLFLAGS' in self._meta
         if nullable:
             index = fielddef[NUL]
             byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
+            null_def = self._meta['_NULLFLAGS']
             null_data = self._data[null_def[START]:null_def[END]]
             if null_data[byte] >> bit & 1:
                 return Null
@@ -3294,11 +3486,11 @@ class RecordTemplate(object):
         index = fielddef[NUL]
         field_type = fielddef[TYPE]
         flags = fielddef[FLAGS]
-        nullable = flags & NULLABLE and '_nullflags' in self._meta
+        nullable = flags & NULLABLE and '_NULLFLAGS' in self._meta
         update = self._meta.fieldtypes[field_type]['Update']
         if nullable:
             byte, bit = divmod(index, 8)
-            null_def = self._meta['_nullflags']
+            null_def = self._meta['_NULLFLAGS']
             null_data = self._data[null_def[START]:null_def[END]] #.tostring()
             if value is Null:
                 null_data[byte] |= 1 << bit
@@ -3362,6 +3554,7 @@ class RecordTemplate(object):
                 if s_value is not o_value and s_value != o_value:
                     return False
         elif isinstance(other, dict):
+            other = dict((ensure_unicode(k).upper(), v) for k, v in other.items())
             if sorted(field_names(self)) != sorted(other.keys()):
                 return False
             for field in self._meta.user_fields:
@@ -3382,7 +3575,7 @@ class RecordTemplate(object):
     def __getattr__(self, name):
         if name[0:2] == '__' and name[-2:] == '__':
             raise AttributeError('Method %s is not implemented.' % name)
-        name = name.lower()
+        name = name.upper()
         if not name in self._meta.fields:
             raise FieldMissingError(name)
         if name in self._memos:
@@ -3409,7 +3602,7 @@ class RecordTemplate(object):
         elif isinstance(item, slice):
             sequence = []
             if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
-                start, stop, step = item.start, item.stop, item.step
+                start, stop, step = item.start.upper(), item.stop.upper(), item.step
                 if start not in fields or stop not in fields:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
@@ -3421,7 +3614,7 @@ class RecordTemplate(object):
                 sequence.append(self[index])
             return sequence
         elif isinstance(item, basestring):
-            return self.__getattr__(item)
+            return self.__getattr__(item.upper())
         else:
             raise TypeError("%r is not a field name" % item)
 
@@ -3437,6 +3630,7 @@ class RecordTemplate(object):
         if name in self.__slots__:
             object.__setattr__(self, name, value)
             return
+        name = name.upper()
         if not name in self._meta.fields:
             raise FieldMissingError(name)
         if name in self._meta.memofields:
@@ -3450,18 +3644,18 @@ class RecordTemplate(object):
             message = "%s (%s) = %r --> %s" % (name, self._meta.fieldtypes[fielddef[TYPE]]['Type'], value, error.message)
             data = name
             err_cls = error.__class__
-            raise err_cls(message, data).from_None()
+            raise err_cls(message, data).from_exc(None)
 
     def __setitem__(self, name, value):
         if isinstance(name, basestring):
-            self.__setattr__(name, value)
+            self.__setattr__(name.upper(), value)
         elif isinstance(name, baseinteger):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
             field_names = api.field_names(self)
             if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
-                start, stop, step = name.start, name.stop, name.step
+                start, stop, step = name.start.upper(), name.stop.upper(), name.step
                 if start not in field_names or stop not in field_names:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
@@ -3666,7 +3860,7 @@ class _Db3Memo(_DbfMemo):
                     self.nextmemo = unpack_long_int(next)
                 except Exception:
                     exc = sys.exc_info()[1]
-                    raise DbfError("memo file appears to be corrupt: %r" % exc.args).from_None()
+                    raise DbfError("memo file appears to be corrupt: %r" % exc.args).from_exc(None)
 
     def _get_memo(self, block):
         block = int(block)
@@ -3745,7 +3939,7 @@ class _VfpMemo(_DbfMemo):
                     self.meta.memo_size = unpack_short_int(header[6:8], bigendian=True)
                 except Exception:
                     exc = sys.exc_info()[1]
-                    raise DbfError("memo file appears to be corrupt: %r" % exc.args).from_None()
+                    raise DbfError("memo file appears to be corrupt: %r" % exc.args).from_exc(None)
 
     def _get_memo(self, block):
         self.meta.mfd.seek(block * self.meta.memo_size)
@@ -3873,7 +4067,7 @@ def unpack_str(chars):
     for i, ch in enumerate(field):
         if ch == NULL:
             break
-    return to_bytes(field[:i]).lower()
+    return to_bytes(field[:i])
 
 def scinot(value, decimals):
     """
@@ -4026,7 +4220,7 @@ def update_integer(value, *ignore):
     try:
         value = int(value)
     except Exception:
-        raise DbfError("incompatible type: %s(%s)" % (type(value), value)).from_None()
+        raise DbfError("incompatible type: %s(%s)" % (type(value), value)).from_exc(None)
     if not -2147483648 < value < 2147483647:
         raise DataOverflowError("Integer size exceeded.  Possible: -2,147,483,648..+2,147,483,647.  Attempted: %d" % value)
     return struct.pack('<i', int(value))
@@ -4133,7 +4327,7 @@ def update_numeric(value, fielddef, *ignore):
     try:
         value = float(value)
     except Exception:
-        raise DbfError("incompatible type: %s(%s)" % (type(value), value)).from_None()
+        raise DbfError("incompatible type: %s(%s)" % (type(value), value)).from_exc(None)
     decimalsize = fielddef[DECIMALS]
     totalsize = fielddef[LENGTH]
     if decimalsize:
@@ -4368,7 +4562,7 @@ def add_vfp_memo(format, flags):
     flag = 0
     for f in format:
         flag |= FieldFlag.lookup(f)
-    if 'binary' not in flags:   # general or picture -- binary is implied
+    if 'BINARY' not in flags:   # general or picture -- binary is implied
         flag |= FieldFlag.BINARY
     return length, decimals, flag
 
@@ -4963,7 +5157,7 @@ class Table(_Navigation):
             header.version = header.version & self._noMemoMask
         else:
             header.version = self._noMemoMask
-        meta.fields = [f for f in meta.fields if f != '_nullflags']
+        meta.fields = [f for f in meta.fields if f != '_NULLFLAGS']
         for field in meta.fields:
             layout = meta[field]
             if meta.fields.count(field) > 1:
@@ -4999,14 +5193,14 @@ class Table(_Navigation):
             if one_more:
                 length += 1
             fielddef = array('B', [0] * 32)
-            fielddef[:11] = array('B', pack_str(b'_nullflags'))
+            fielddef[:11] = array('B', pack_str(b'_NULLFLAGS'))
             fielddef[11] = 0x30
             fielddef[12:16] = array('B', pack_long_int(start))
             fielddef[16] = length
             fielddef[17] = 0
             fielddef[18] = BINARY | SYSTEM
             fieldblock.extend(fielddef)
-            meta.fields.append('_nullflags')
+            meta.fields.append('_NULLFLAGS')
             nullflags = (
                     _NULLFLAG,          # type
                     start,              # start
@@ -5017,10 +5211,10 @@ class Table(_Navigation):
                     none,               # class
                     none,               # empty
                     )
-            meta['_nullflags'] = nullflags
+            meta['_NULLFLAGS'] = nullflags
         # header.fields = to_bytes(fieldblock)
         header.fields = fieldblock
-        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_fields = FieldnameList([f for f in meta.fields if not meta[f][FLAGS] & SYSTEM])
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
 
@@ -5077,8 +5271,11 @@ class Table(_Navigation):
             specs = specs.strip(sep).split(sep)
         else:
             specs = list(specs)
-        specs = [s.strip().lower() for s in specs]
-        return specs
+        specs = [s.strip() for s in specs]
+        for i, s in enumerate(specs):
+            if isinstance(s, bytes):
+                specs[i] = s.decode(input_decoding)
+        return FieldnameList(specs)
 
     def _nav_check(self):
         """
@@ -5207,7 +5404,7 @@ class Table(_Navigation):
         meta.table = weakref.ref(self)
         meta.filename = filename
         meta.fields = []
-        meta.user_fields = []
+        meta.user_fields = FieldnameList()
         meta.user_field_count = 0
         meta.fieldtypes = fieldtypes = self._field_types
         meta.fixed_types = self._fixed_types
@@ -5237,6 +5434,7 @@ class Table(_Navigation):
         self._meta._default_data_types = default_data_types
         if field_data_types is None:
             field_data_types = dict()
+        field_data_types = dict((k.upper(), v) for k, v in field_data_types.items())
         self._meta._field_data_types = field_data_types
         for field, types in default_data_types.items():
             field = FieldType(field)
@@ -5299,7 +5497,7 @@ class Table(_Navigation):
                 dfd = meta.dfd = open(meta.filename, 'rb')
             except IOError:
                 e= sys.exc_info()[1]
-                raise DbfError(unicode(e)).from_None()
+                raise DbfError(unicode(e)).from_exc(None)
             dfd.seek(0)
             meta.header = header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
             if not header.version in self._supported_tables:
@@ -5404,6 +5602,7 @@ class Table(_Navigation):
         return __name__ + ".Table(%r, status=%r)" % (self._meta.filename, self._meta.status)
 
     def __str__(self):
+        encoder = self._meta.encoder
         status = self._meta.status
         version = version_map.get(self._meta.header.version)
         if version is not None:
@@ -5423,7 +5622,7 @@ class Table(_Navigation):
             self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
         for i in range(len(self.field_names)):
-            str += "%11d) %s\n" % (i, self._field_layout(i))
+            str += "%11d) %s\n" % (i, (self._field_layout(i).encode(input_decoding, errors='backslashreplace')))
         return str
 
     @property
@@ -5533,7 +5732,7 @@ class Table(_Navigation):
         fields = self.structure()
         original_fields = len(fields)
         fields += self._list_fields(field_specs, sep=u';')
-        null_fields = any(['null' in f.lower() for f in fields])
+        null_fields = any(['NULL' in f.lower() for f in fields])
         if (len(fields) + null_fields) > meta.max_fields:
             raise DbfError(
                     "Adding %d more field%s would exceed the limit of %d"
@@ -5559,7 +5758,7 @@ class Table(_Navigation):
         for field_seq, field in enumerate(fields):
             if not field:
                 continue
-            field = field.lower()
+            field = field.upper()
             pieces = field.split()
             name = pieces.pop(0)
             try:
@@ -5597,7 +5796,7 @@ class Table(_Navigation):
                 length, decimals, flags = init(pieces, flags)
             except FieldSpecError:
                 exc = sys.exc_info()[1]
-                raise FieldSpecError(exc.message + ' (%s:%s)' % (meta.filename, name)).from_None()
+                raise FieldSpecError(exc.message + ' (%s:%s)' % (meta.filename, name)).from_exc(None)
             nullable = flags & NULLABLE
             if nullable:
                 null_index += 1
@@ -5652,7 +5851,7 @@ class Table(_Navigation):
                 kamikaze = data._data
         else:
             if isinstance(data, dict):
-                dictdata = data
+                dictdata = dict((ensure_unicode(k).upper(), v) for k, v in data.items())
                 data = b''
             elif isinstance(data, tuple):
                 if len(data) > self.field_count:
@@ -5677,6 +5876,7 @@ class Table(_Navigation):
                 elif tupledata:
                     newrecord._start_flux()
                     for index, item in enumerate(tupledata):
+                        item = ensure_unicode(item)
                         newrecord[index] = item
                     newrecord._commit_flux()
                 elif data:
@@ -5797,8 +5997,8 @@ class Table(_Navigation):
             meta.memo = None
         if not meta.ignorememos:
             meta.newmemofile = True
-        if '_nullflags' in meta.fields:
-            doomed.append('_nullflags')
+        if '_NULLFLAGS' in meta.fields:
+            doomed.append('_NULLFLAGS')
         for victim in doomed:
             layout = meta[victim]
             meta.fields.pop(meta.fields.index(victim))
@@ -5861,7 +6061,7 @@ class Table(_Navigation):
         """
         returns (field type, size, dec, class) of field
         """
-        field = field.lower()
+        field = field.upper()
         if field in self.field_names:
             field = self._meta[field]
             return FieldInfo(field[TYPE], field[LENGTH], field[DECIMALS], field[CLASS])
@@ -5915,7 +6115,7 @@ class Table(_Navigation):
         """
         returns True if field allows Nulls
         """
-        field = field.lower()
+        field = field.upper()
         if field not in self.field_names:
             raise FieldMissingError(field)
         return bool(self._meta[field][FLAGS] & NULLABLE)
@@ -6014,8 +6214,8 @@ class Table(_Navigation):
         """
         renames an existing field
         """
-        oldname = oldname.lower()
-        newname = newname.lower()
+        oldname = oldname.upper()
+        newname = newname.upper()
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to change field names' % meta.filename)
@@ -6080,13 +6280,13 @@ class Table(_Navigation):
         return field specification list suitable for creating same table layout
         fields should be a list of fields or None for all fields in table
         """
-        field_specs = []
+        field_specs = FieldnameList([])
         fields = self._list_fields(fields)
         try:
             for name in fields:
                 field_specs.append(self._field_layout(self.field_names.index(name)))
         except ValueError:
-            raise DbfError("field %s does not exist" % name).from_None()
+            raise DbfError("field %s does not exist" % name).from_exc(None)
         return field_specs
 
     def zap(self):
@@ -6192,7 +6392,7 @@ class Db3Table(Table):
                     exc = sys.exc_info()[1]
                     self._meta.dfd.close()
                     self._meta.dfd = None
-                    raise BadDataError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1]).from_None()
+                    raise BadDataError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1]).from_exc(None)
 
     def _initialize_fields(self):
         """
@@ -6216,7 +6416,7 @@ class Db3Table(Table):
         null_index = None
         for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = self._meta.decoder(unpack_str(fieldblock[:11]))[0]
+            name = self._meta.decoder(unpack_str(fieldblock[:11]))[0].upper()
             type = fieldblock[11]
             if not type in meta.fieldtypes:
                 raise BadDataError("Unknown field type: %s" % type)
@@ -6248,7 +6448,7 @@ class Db3Table(Table):
                     )
         if offset != total_length:
             raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
-        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_fields = FieldnameList([f for f in meta.fields if not meta[f][FLAGS] & SYSTEM])
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
 
@@ -6365,7 +6565,7 @@ class ClpTable(Db3Table):
         meta = self._meta
         header = meta.header
         header.version = header.version & self._noMemoMask
-        meta.fields = [f for f in meta.fields if f != '_nullflags']
+        meta.fields = [f for f in meta.fields if f != '_NULLFLAGS']
         total_length = 1    # delete flag
         for field in meta.fields:
             layout = meta[field]
@@ -6412,7 +6612,7 @@ class ClpTable(Db3Table):
             fielddef[17] = 0
             fielddef[18] = BINARY | SYSTEM
             fieldblock.extend(fielddef)
-            meta.fields.append('_nullflags')
+            meta.fields.append('_NULLFLAGS')
             nullflags = (
                     _NULLFLAG,          # type
                     start,              # start
@@ -6423,11 +6623,11 @@ class ClpTable(Db3Table):
                     none,               # class
                     none,               # empty
                     )
-            meta['_nullflags'] = nullflags
+            meta['_NULLFLAGS'] = nullflags
         header.fields = fieldblock
         # header.fields = to_bytes(fieldblock)
         header.record_length = total_length
-        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_fields = FieldnameList([f for f in meta.fields if not meta[f][FLAGS] & SYSTEM])
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
 
@@ -6445,10 +6645,13 @@ class ClpTable(Db3Table):
         offset = 1
         fieldsdef = meta.header.fields
         if len(fieldsdef) % 32 != 0:
-            raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
+            raise BadDataError(
+                    "field definition block corrupt: %d bytes in size"
+                        % len(fieldsdef))
         if len(fieldsdef) // 32 != meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields"
-                    (meta.header.field_count, len(fieldsdef) // 32))
+            raise BadDataError(
+                    "Header shows %d fields, but field definition block has %d fields"
+                        % (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         nulls_found = False
         for i in range(meta.header.field_count):
@@ -6489,8 +6692,9 @@ class ClpTable(Db3Table):
                     null
                     )
         if offset != total_length:
-            raise BadDataError("Header shows record length of %d, but calculated record length is %d"
-                    (total_length, offset))
+            raise BadDataError(
+                    "Header shows record length of %d, but calculated record length is %d"
+                        % (total_length, offset))
         if nulls_found:
             nullable_fields = [f for f in meta if meta[f][NUL]]
             nullable_fields.sort(key=lambda f: f[START])
@@ -6500,7 +6704,7 @@ class ClpTable(Db3Table):
             if plus_one:
                 null_bytes += 1
             meta.empty_null = array('B', b'\x00' * null_bytes)
-        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_fields = FieldnameList([f for f in meta.fields if not meta[f][FLAGS] & SYSTEM])
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
 
@@ -6518,39 +6722,39 @@ class FpTable(Table):
         return {
             CHAR: {
                     'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':lambda x: b' ' * x, 'Init':add_vfp_character,
-                    'Class':unicode, 'Empty':unicode, 'flags':('binary', 'nocptrans', 'null', ),
+                    'Class':unicode, 'Empty':unicode, 'flags':('BINARY', 'NOCPTRANS', 'NULL', ),
                     },
             FLOAT: {
                     'Type':'Float', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_vfp_numeric,
-                    'Class':'default', 'Empty':none, 'flags':('null', ),
+                    'Class':'default', 'Empty':none, 'flags':('NULL', ),
                     },
             NUMERIC: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_vfp_numeric,
-                    'Class':'default', 'Empty':none, 'flags':('null', ),
+                    'Class':'default', 'Empty':none, 'flags':('NULL', ),
                     },
             LOGICAL: {
                     'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':lambda x: b'?', 'Init':add_logical,
-                    'Class':bool, 'Empty':none, 'flags':('null', ),
+                    'Class':bool, 'Empty':none, 'flags':('NULL', ),
                     },
             DATE: {
                     'Type':'Date', 'Retrieve':retrieve_date, 'Update':update_date, 'Blank':lambda x: b'        ', 'Init':add_date,
-                    'Class':datetime.date, 'Empty':none, 'flags':('null', ),
+                    'Class':datetime.date, 'Empty':none, 'flags':('NULL', ),
                     },
             MEMO: {
                     'Type':'Memo', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: b'          ', 'Init':add_memo,
-                    'Class':unicode, 'Empty':unicode, 'flags':('binary', 'nocptrans', 'null', ),
+                    'Class':unicode, 'Empty':unicode, 'flags':('BINARY', 'NOCPTRANS', 'NULL', ),
                     },
             GENERAL: {
                     'Type':'General', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: b'          ', 'Init':add_binary_memo,
-                    'Class':bytes, 'Empty':bytes, 'flags':('null', ),
+                    'Class':bytes, 'Empty':bytes, 'flags':('NULL', ),
                     },
             PICTURE: {
                     'Type':'Picture', 'Retrieve':retrieve_memo, 'Update':update_memo, 'Blank':lambda x: b'          ', 'Init':add_binary_memo,
-                    'Class':bytes, 'Empty':bytes, 'flags':('null', ),
+                    'Class':bytes, 'Empty':bytes, 'flags':('NULL', ),
                     },
             _NULLFLAG: {
                     'Type':'_NullFlags', 'Retrieve':unsupported_type, 'Update':unsupported_type, 'Blank':lambda x: b'\x00' * x, 'Init':None,
-                    'Class':none, 'Empty':none, 'flags':('binary', 'system', ),
+                    'Class':none, 'Empty':none, 'flags':('BINARY', 'SYSTEM', ),
                     } }
 
     _memoext = '.fpt'
@@ -6599,7 +6803,7 @@ class FpTable(Table):
                     exc = sys.exc_info()[1]
                     self._meta.dfd.close()
                     self._meta.dfd = None
-                    raise BadDataError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1]).from_None()
+                    raise BadDataError("Table structure corrupt:  unable to use memo file (%s)" % exc.args[-1]).from_exc(None)
 
     def _initialize_fields(self):
         """
@@ -6617,8 +6821,9 @@ class FpTable(Table):
         if len(fieldsdef) % 32 != 0:
             raise BadDataError("field definition block corrupt: %d bytes in size" % len(fieldsdef))
         if len(fieldsdef) // 32 != meta.header.field_count:
-            raise BadDataError("Header shows %d fields, but field definition block has %d fields"
-                    (meta.header.field_count, len(fieldsdef) // 32))
+            raise BadDataError(
+                    "Header shows %d fields, but field definition block has %d fields"
+                        % (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         for i in range(meta.header.field_count):
             fieldblock = fieldsdef[i*32:(i+1)*32]
@@ -6654,7 +6859,7 @@ class FpTable(Table):
                     )
         if offset != total_length:
             raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
-        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_fields = FieldnameList([f for f in meta.fields if not meta[f][FLAGS] & SYSTEM])
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
 
@@ -6688,55 +6893,55 @@ class VfpTable(FpTable):
         return {
             CHAR: {
                     'Type':'Character', 'Retrieve':retrieve_character, 'Update':update_character, 'Blank':lambda x: b' ' * x, 'Init':add_vfp_character,
-                    'Class':unicode, 'Empty':unicode, 'flags':('binary', 'nocptrans', 'null', ),
+                    'Class':unicode, 'Empty':unicode, 'flags':('BINARY', 'NOCPTRANS', 'NULL', ),
                     },
             CURRENCY: {
                     'Type':'Currency', 'Retrieve':retrieve_currency, 'Update':update_currency, 'Blank':lambda x: b'\x00' * 8, 'Init':add_vfp_currency,
-                    'Class':Decimal, 'Empty':none, 'flags':('null', 'binary'),
+                    'Class':Decimal, 'Empty':none, 'flags':('NULL', 'BINARY'),
                     },
             DOUBLE: {
                     'Type':'Double', 'Retrieve':retrieve_double, 'Update':update_double, 'Blank':lambda x: b'\x00' * 8, 'Init':add_vfp_double,
-                    'Class':float, 'Empty':none, 'flags':('null', 'binary'),
+                    'Class':float, 'Empty':none, 'flags':('NULL', 'BINARY'),
                     },
             FLOAT: {
                     'Type':'Float', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_vfp_numeric,
-                    'Class':'default', 'Empty':none, 'flags':('null', ),
+                    'Class':'default', 'Empty':none, 'flags':('NULL', ),
                     },
             NUMERIC: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_vfp_numeric,
-                    'Class':'default', 'Empty':none, 'flags':('null', ),
+                    'Class':'default', 'Empty':none, 'flags':('NULL', ),
                     },
             INTEGER: {
                     'Type':'Integer', 'Retrieve':retrieve_integer, 'Update':update_integer, 'Blank':lambda x: b'\x00' * 4, 'Init':add_vfp_integer,
-                    'Class':int, 'Empty':none, 'flags':('null', 'binary'),
+                    'Class':int, 'Empty':none, 'flags':('NULL', 'BINARY'),
                     },
             LOGICAL: {
                     'Type':'Logical', 'Retrieve':retrieve_logical, 'Update':update_logical, 'Blank':lambda x: b'?', 'Init':add_logical,
-                    'Class':bool, 'Empty':none, 'flags':('null', ),
+                    'Class':bool, 'Empty':none, 'flags':('NULL', ),
                     },
             DATE: {
                     'Type':'Date', 'Retrieve':retrieve_date, 'Update':update_date, 'Blank':lambda x: b'        ', 'Init':add_date,
-                    'Class':datetime.date, 'Empty':none, 'flags':('null', ),
+                    'Class':datetime.date, 'Empty':none, 'flags':('NULL', ),
                     },
             DATETIME: {
                     'Type':'DateTime', 'Retrieve':retrieve_vfp_datetime, 'Update':update_vfp_datetime, 'Blank':lambda x: b'\x00' * 8, 'Init':add_vfp_datetime,
-                    'Class':datetime.datetime, 'Empty':none, 'flags':('null', ),
+                    'Class':datetime.datetime, 'Empty':none, 'flags':('NULL', ),
                     },
             MEMO: {
                     'Type':'Memo', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':lambda x: b'\x00\x00\x00\x00', 'Init':add_vfp_memo,
-                    'Class':unicode, 'Empty':unicode, 'flags':('binary', 'nocptrans', 'null', ),
+                    'Class':unicode, 'Empty':unicode, 'flags':('BINARY', 'NOCPTRANS', 'NULL', ),
                     },
             GENERAL: {
                     'Type':'General', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':lambda x: b'\x00\x00\x00\x00', 'Init':add_vfp_binary_memo,
-                    'Class':bytes, 'Empty':bytes, 'flags':('null', 'binary'),
+                    'Class':bytes, 'Empty':bytes, 'flags':('NULL', 'BINARY'),
                     },
             PICTURE: {
                     'Type':'Picture', 'Retrieve':retrieve_vfp_memo, 'Update':update_vfp_memo, 'Blank':lambda x: b'\x00\x00\x00\x00', 'Init':add_vfp_binary_memo,
-                    'Class':bytes, 'Empty':bytes, 'flags':('null', 'binary'),
+                    'Class':bytes, 'Empty':bytes, 'flags':('NULL', 'BINARY'),
                     },
             _NULLFLAG: {
                     'Type':'_NullFlags', 'Retrieve':unsupported_type, 'Update':unsupported_type, 'Blank':lambda x: b'\x00' * x, 'Init':int,
-                    'Class':none, 'Empty':none, 'flags':('binary', 'system',),
+                    'Class':none, 'Empty':none, 'flags':('BINARY', 'SYSTEM',),
                     } }
 
     _memoext = '.fpt'
@@ -6827,7 +7032,7 @@ class VfpTable(FpTable):
             if plus_one:
                 null_bytes += 1
             meta.empty_null = array('B', b'\x00' * null_bytes)
-        meta.user_fields = [f for f in meta.fields if not meta[f][FLAGS] & SYSTEM]
+        meta.user_fields = FieldnameList([f for f in meta.fields if not meta[f][FLAGS] & SYSTEM])
         meta.user_field_count = len(meta.user_fields)
         Record._create_blank_data(meta)
 
@@ -7465,7 +7670,7 @@ class Relation(object):
             else:
                 tgt_table.field_names.index(tgt_field)
         except (IndexError, ValueError):
-            raise DbfError('%r not in %r' % (field, table)).from_None()
+            raise DbfError('%r not in %r' % (field, table)).from_exc(None)
         if src_names:
             src_table_name, src_field_name = src_names
         else:
@@ -7586,7 +7791,7 @@ class Relation(object):
                 table = (yo._src_table, yo._tgt_table)[yo._tgt_table_name == table]
             return yo._tables[table]
         except IndexError:
-            raise NotFoundError("table %s not in relation" % table).from_None()
+            raise NotFoundError("table %s not in relation" % table).from_exc(None)
 
 
 class IndexFile(_Navigation):
@@ -8157,8 +8362,10 @@ def pql_criteria(records, criteria):
             _matched.append(_rec)
     return _matched"""
     fields = []
+    criteria = ensure_unicode(criteria)
+    uc_criteria = criteria.upper()
     for field in field_names(records):
-        if field in criteria:
+        if field in uc_criteria:
             fields.append(field)
     criteria = criteria.replace('recno()', 'recno(_rec)').replace('is_deleted()', 'is_deleted(_rec)')
     fields = '\n        '.join(['%s = _rec.%s' % (field, field) for field in fields])
@@ -8218,16 +8425,21 @@ def pql(records, command):
     try:
         if not records:
             return List()
+        command = ensure_unicode(command)
         pql_command = command
-        if ' where ' in command:
-            command, condition = command.split(' where ', 1)
+        uc_command = command.upper()
+        if u' WHERE ' in uc_command:
+            index = uc_command.find(u' WHERE ')
+            condition = command[index+7:]
+            command = command[:index]
+            # command, condition = command.split(' where ', 1)
             condition = pql_criteria(records, condition)
         else:
             def condition(records):
                 return records[:]
         name, command = command.split(' ', 1)
         command = command.strip()
-        name = name.lower()
+        name = name.upper()
         fields = field_names(records)
         if pql_functions.get(name) is None:
             raise DbfError('unknown SQL command %r in %r' % (name.upper(), pql_command))
@@ -8241,17 +8453,17 @@ def pql(records, command):
     return result
 
 pql_functions = {
-        'select' : pql_select,
-        'update' : pql_update,
-        'replace': pql_update,
-        'insert' : None,
-        'delete' : pql_delete,
-        'recall' : pql_recall,
-        'add'    : pql_add,
-        'drop'   : pql_drop,
-        'count'  : None,
-        'pack'   : pql_pack,
-        'resize' : pql_resize,
+        u'SELECT' : pql_select,
+        u'UPDATE' : pql_update,
+        u'REPLACE': pql_update,
+        u'INSERT' : None,
+        u'DELETE' : pql_delete,
+        u'RECALL' : pql_recall,
+        u'ADD'    : pql_add,
+        u'DROP'   : pql_drop,
+        u'COUNT'  : None,
+        u'PACK'   : pql_pack,
+        u'RESIZE' : pql_resize,
         }
 
 
@@ -8389,6 +8601,11 @@ def delete(record):
     if not template and not record_in_flux:
         record._commit_flux()
 
+def ensure_unicode(value):
+    if isinstance(value, bytes):
+        value = value.decode(input_decoding)
+    return value
+
 def export(table_or_records, filename=None, field_names=None, format='csv', header=True, dialect='dbf', encoding=None):
     """
     writes the records using CSV or tab-delimited format, using the filename
@@ -8462,6 +8679,9 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
 def field_names(thing):
     """
     fields in table/record, keys in dict
+
+    if dict and dict keys are not unicode, returned keys will also
+    not be unicode; either way, they will not be upper-cased
     """
     if isinstance(thing, dict):
         return list(thing.keys())
@@ -8795,7 +9015,7 @@ def gather(record, data, drop=False):
         record_fields = field_names(record)
         for key in field_names(data):
             value = data[key]
-            key = key.lower()
+            key = ensure_unicode(key).upper()
             if not key in record_fields:
                 if drop:
                     continue

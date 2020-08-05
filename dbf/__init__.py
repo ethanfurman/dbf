@@ -30,7 +30,7 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 
 import codecs
 import collections
@@ -2704,28 +2704,26 @@ class FieldnameList(list):
         return 'FieldnameList(%s)' % super(FieldnameList, self).__repr__()
 
     def __setitem__(self, pos, item):
-        item = ensure_unicode(item)
-        if not isinstance(item, unicode):
-            raise TypeError('%r cannot be a field name' % (item, ))
-        item = item.upper()
-        return super(FieldnameList, self).__setitem__(pos, item)
-
-    def __setslice__(self, start, stop, things):
-        if isinstance(things, unicode):
-            things = things.upper()
-        else:
+        if isinstance(item, list):
+            if not isinstance(pos, slice):
+                raise TypeError('%r cannot be a single field name' % item)
             try:
                 new_things = []
-                for item in things:
-                    item = ensure_unicode(item)
-                    if not isinstance(item, unicode):
-                        raise TypeError('%r cannot be a field name' % (item, ))
-                    item = item.upper()
-                    new_things.append(item)
-                things = new_things
+                for thing in item:
+                    thing = ensure_unicode(thing)
+                    if not isinstance(thing, unicode):
+                        raise TypeError('%r cannot be a field name' % (thing, ))
+                    thing = thing.upper()
+                    new_things.append(thing)
+                item = new_things
             except TypeError:
                 raise TypeError('%r cannot be a field name' % (things, ))
-        super(FieldnameList, self).__setslice__(start, stop, things)
+        else:
+            item = ensure_unicode(item)
+            if not isinstance(item, unicode):
+                raise TypeError('%r cannot be a field name' % (item, ))
+            item = item.upper()
+        return super(FieldnameList, self).__setitem__(pos, item)
 
     def __cmp__(self, other):
         if not isinstance(other, list):
@@ -4061,13 +4059,13 @@ def unpack_long_int(bytes, bigendian=False):
 
 def unpack_str(chars):
     """
-    Returns a normal, lower-cased string from a null-padded byte string
+    Returns a normal, upper-cased string from a null-padded byte string
     """
     field = array('B', struct.unpack('%ds' % len(chars), chars)[0])
     for i, ch in enumerate(field):
         if ch == NULL:
             break
-    return to_bytes(field[:i])
+    return to_bytes(field[:i]).upper()
 
 def scinot(value, decimals):
     """
@@ -4893,6 +4891,7 @@ class Table(_Navigation):
         filename = None           # name of .dbf file
         ignorememos = False       # True when memos should be ignored
         memoname = None           # name of .dbt/.fpt file
+        memo_size = None           # size of blocks in memo file
         mfd = None                # file handle
         memo = None               # memo object
         memofields = None         # field names of Memo type
@@ -5732,7 +5731,7 @@ class Table(_Navigation):
         fields = self.structure()
         original_fields = len(fields)
         fields += self._list_fields(field_specs, sep=u';')
-        null_fields = any(['NULL' in f.lower() for f in fields])
+        null_fields = any(['NULL' in f.upper() for f in fields])
         if (len(fields) + null_fields) > meta.max_fields:
             raise DbfError(
                     "Adding %d more field%s would exceed the limit of %d"
@@ -5946,7 +5945,13 @@ class Table(_Navigation):
             name, ext = os.path.splitext(filename)
             extra = ('_backup', '_BACKUP')[upper]
             new_name = os.path.join(temp_dir or directory, name + extra + ext)
-        bkup = Table(new_name, self.structure(), codepage=self.codepage.name, dbf_type=self._versionabbr, on_disk=on_disk)
+        memo_size = meta.memo_size
+        bkup = Table(
+                new_name, self.structure(), memo_size,
+                codepage=self.codepage.name,
+                dbf_type=self._versionabbr,
+                on_disk=on_disk,
+                )
         # use same encoder/decoder as current table, which may have been overridden
         bkup._meta.encoder = self._meta.encoder
         bkup._meta.decoder = self._meta.decoder
@@ -8368,7 +8373,7 @@ def pql_criteria(records, criteria):
         if field in uc_criteria:
             fields.append(field)
     criteria = criteria.replace('recno()', 'recno(_rec)').replace('is_deleted()', 'is_deleted(_rec)')
-    fields = '\n        '.join(['%s = _rec.%s' % (field, field) for field in fields])
+    fields = '\n        '.join(['%s = _rec.%s' % (field.lower(), field) for field in fields])
     g = dict()
     g['dbf'] = api
     g.update(pql_user_functions)
@@ -8400,8 +8405,8 @@ def pql_cmd(command, field_names):
         if field in command:
             fields.append(field)
     command = command.replace('recno()', 'recno(_rec)').replace('is_deleted()', 'is_deleted(_rec)')
-    pre_fields = '\n        '.join(['%s = _tmp.%s' % (field, field) for field in fields])
-    post_fields = '\n        '.join(['_tmp.%s = %s' % (field, field) for field in fields])
+    pre_fields = '\n        '.join(['%s = _tmp.%s' % (field.lower(), field) for field in fields])
+    post_fields = '\n        '.join(['_tmp.%s = %s' % (field, field).lower() for field in fields])
     g = pql_user_functions.copy()
     g['dbf'] = api
     g['recno'] = recno

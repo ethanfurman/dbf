@@ -167,10 +167,18 @@ def inactive(rec):
         return recno(rec)
     return DoNotIndex
 
-def unicodify(list):
-    for i, item in enumerate(list):
-        list[i] = unicode(item)
-    return list
+def unicodify(data):
+    if isinstance(data, list):
+        for i, item in enumerate(data):
+            data[i] = unicode(item)
+        return data
+    elif isinstance(data, dict):
+        new_data = {}
+        for k, v in data.items():
+            new_data[unicode(k)] = v
+        return new_data
+    else:
+        raise TypeError('unknown type: %r' % (data, ))
 
 class TestChar(TestCase):
 
@@ -577,8 +585,8 @@ class TestNull(TestCase):
         value |= NULL
         self.assertTrue(value is Null)
 
-        self.assertTrue(str(divmod(NULL, 1)) == '(<NULL>, <NULL>)')
-        self.assertTrue(str(divmod(1, NULL)) == '(<NULL>, <NULL>)')
+        self.assertTrue(str(divmod(NULL, 1)) == '(<null>, <null>)')
+        self.assertTrue(str(divmod(1, NULL)) == '(<null>, <null>)')
 
         self.assertTrue(NULL << 1 is Null)
         self.assertTrue(2 << NULL is Null)
@@ -3772,6 +3780,15 @@ class TestDbfFunctions(TestCase):
                 ,
                 dbf_type='vfp',
                 )
+        self.odd_memo_vfp_table = Table(
+                os.path.join(tempdir, 'emptytempvfp'),
+                'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
+                ' weight F(18,3); age I; meeting T; misc G; photo P; price Y;'
+                ' dist B BINARY; atom I BINARY; wealth Y BINARY;'
+                ,
+                dbf_type='vfp',
+                memo_size=48,
+                )
         self.vfp_table = table = Table(
                 os.path.join(tempdir, 'tempvfp'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
@@ -4609,6 +4626,18 @@ class TestDbfFunctions(TestCase):
         backup.close()
         table.close()
 
+    def test_memo_file_size_before_backup(self):
+        table = self.odd_memo_vfp_table
+        self.assertEqual(48, table._meta.memo_size)
+
+    def test_memo_file_size_after_backup(self):
+        table = self.odd_memo_vfp_table
+        table.open(mode=READ_ONLY)
+        table.create_backup()
+        table.close()
+        backup = dbf.Table(table.backup)
+        self.assertEqual(backup._meta.memo_size, table._meta.memo_size)
+
     def test_write_loop(self):
         "Process loop commits changes"
         table = self.dbf_table
@@ -5165,7 +5194,6 @@ class TestFieldnameLists(TestCase):
         self.assertRaises(TypeError, list1.__iadd__, [7])
         self.assertRaises(TypeError, list1.__radd__, [7])
         self.assertRaises(TypeError, list1.__setitem__, 0, 7)
-        self.assertRaises(TypeError, list1.__setslice__, slice(1, 10), 7)
         self.assertRaises(TypeError, list1.append, 7)
         self.assertRaises(TypeError, list1.count, 7)
         self.assertRaises(TypeError, list1.index, 7)
@@ -5202,7 +5230,7 @@ class TestFieldnameLists(TestCase):
         self.assertEqual(list1, unicodify(['LoWeR', 'uPpEr', 'MixED']))
         self.assertEqual(list5, unicodify(['UhHuh', 'uHuH', 'zero', 'lowER', 'UPPer', 'miXeD']))
         self.assertTrue(isinstance(list5, FieldnameList))
-        
+
     def test_append_extend(self):
         "appending and extending"
         list1 = FieldnameList(unicodify(['lowER', 'UPPer', 'miXeD']))

@@ -1,6 +1,29 @@
 What's New
 ==========
 
+0.98.004
+--------
+
+change default input encoding from 'ascii' to 'utf-8'
+improve unicode supporto
+default field case is now upper
+FieldnameList is used to support both upper- and lower-case field checks
+fix memo block size changing to default when copying
+
+
+0.98.003
+--------
+
+fix repr of Record and RecordTemplate
+fix > and >= for Date
+
+
+0.98.002
+--------
+
+fix file extension handling.
+
+
 0.98.001
 --------
 

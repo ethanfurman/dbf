@@ -74,7 +74,7 @@ else:
     long = int
     xrange = range
 
-version = 0, 98, 4
+version = 0, 98, 5, 1
 
 NoneType = type(None)
 
@@ -3270,7 +3270,7 @@ class Record(object):
         signature = [layout.table().codepage.name]
         for index, name in enumerate(layout.fields):
             if name == '_NULLFLAGS':
-                record._data[layout['_NULLFLAGS'][START]:layout['_NULLFLAGS'][END]] = array('B', [0] * layout['_NULLFLAGS'][LENGTH])
+                record._data[layout['_NULLFLAGS'][START]:layout['_NULLFLAGS'][END]] = array('B', [0xff] * layout['_NULLFLAGS'][LENGTH])
         for index, name in enumerate(layout.fields):
             signature.append(name)
             if name != '_NULLFLAGS':

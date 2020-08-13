@@ -1,6 +1,12 @@
 What's New
 ==========
 
+0.98.005
+--------
+
+new records will have unspecified fields that are nullable set to Null
+
+
 0.98.004
 --------
 

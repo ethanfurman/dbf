@@ -3632,6 +3632,23 @@ class TestDbfRecords(TestCase):
             self.assertTrue(datum[-1] is recordnum[-1] or datum[-1] == recordnum[-1], "name = %s; datum[-1] = %r;  recordnum[-1] = %r" % (datum[0], datum[-1], recordnum[-1]))
         table.close()
 
+    def test_blank_record_template_uses_null(self):
+        nullable = Table(
+                'nowhere',
+                'name C(25) null; age N(3,0); life_story M null',
+                dbf_type='vfp',
+                default_data_types='enhanced',
+                on_disk=False,
+                )
+        with nullable:
+            nullable.append()
+            rec = nullable[-1]
+            self.assertTrue(rec.name is Null, "rec.name is %r" % (rec.name, ))
+            self.assertTrue(rec.age is None, "rec.age is %r" % (rec.age, ))
+            # nullable.append(('ethan', 50, Null))
+            # rec = nullable[-1]
+            self.assertTrue(rec.life_story is Null, "rec.life_story is %r" % (rec.life_story, ))
+
     def test_flux_internal(self):
         "commit and rollback of flux record (implementation detail)"
         table = self.dbf_table

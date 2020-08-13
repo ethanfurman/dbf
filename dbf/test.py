@@ -3381,11 +3381,11 @@ class TestDbfRecords(TestCase):
         table.open(mode=READ_WRITE)
         table.append()
         record = table[-1]
-        self.assertEqual(record.name, None)
-        self.assertEqual(record.born, None)
-        self.assertEqual(record.married, None)
-        self.assertEqual(record.appt, None)
-        self.assertEqual(record.wisdom, None)
+        self.assertIs(record.name, Null)
+        self.assertIs(record.born, Null)
+        self.assertIs(record.married, Null)
+        self.assertIs(record.appt, Null)
+        self.assertIs(record.wisdom, Null)
         appt = datetime.datetime(2012, 12, 15, 9, 37, 11)
         dbf.write(
                 record,
@@ -3408,7 +3408,6 @@ class TestDbfRecords(TestCase):
         self.assertEqual(type(record.wisdom), Char)
         dbf.write(record, name=Null, born=Null, married=Null, appt=Null, wisdom=Null)
         self.assertTrue(record.name is Null)
-        self.assertTrue(record.born is Null)
         self.assertTrue(record.born is Null)
         self.assertTrue(record.married is Null)
         self.assertTrue(record.appt is Null)
@@ -3444,6 +3443,15 @@ class TestDbfRecords(TestCase):
         table.open(mode=READ_WRITE)
         table.append()
         record = table[-1]
+        self.assertTrue(record.name is None)
+        self.assertTrue(record.born is None)
+        self.assertTrue(record.married is Null)
+        self.assertTrue(record.appt is None)
+        self.assertTrue(record.wisdom is None)
+        self.assertTrue(record.pets is None)
+        self.assertTrue(record.cars is Null)
+        self.assertTrue(record.story is None)
+        self.assertTrue(record.died is Null)
         dbf.write(
                 record,
                 name = 'Ethan               ',

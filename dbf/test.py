@@ -2989,10 +2989,19 @@ class TestDbfRecords(TestCase):
                 dbf_type='vfp',
                 default_data_types='enhanced',
                 )
+        self.null_vfp_table = null_table = Table(
+                os.path.join(tempdir, 'null_vfp_table'),
+                'first C(25) null; last C(25); height N(3,1) null; age N(3,0); life_story M null; plans M',
+                dbf_type='vfp',
+                )
+        null_table.open(dbf.READ_WRITE)
+        null_table.append()
+        null_table.close()
 
     def tearDown(self):
         self.dbf_table.close()
         self.vfp_table.close()
+        self.null_vfp_table.close()
 
     def test_slicing(self):
         table = self.dbf_table
@@ -3641,21 +3650,72 @@ class TestDbfRecords(TestCase):
         table.close()
 
     def test_blank_record_template_uses_null(self):
+        nullable = self.null_vfp_table
+        with nullable:
+            rec = nullable[-1]
+            self.assertTrue(rec.first is Null, "rec.first is %r" % (rec.first, ))
+            self.assertTrue(rec.last == ' '*25, "rec.last is %r" % (rec.last, ))
+            self.assertTrue(rec.height is Null, "rec.height is %r" % (rec.height, ))
+            self.assertTrue(rec.age is None, "rec.age is %r" % (rec.age, ))
+            self.assertTrue(rec.life_story is Null, "rec.life_story is %r" % (rec.life_story, ))
+            self.assertTrue(rec.plans == '', "rec.plans is %r" % (rec.plans, ))
+        nullable.close()
         nullable = Table(
-                'nowhere',
-                'name C(25) null; age N(3,0); life_story M null',
-                dbf_type='vfp',
+                self.null_vfp_table.filename,
                 default_data_types='enhanced',
-                on_disk=False,
                 )
         with nullable:
-            nullable.append()
             rec = nullable[-1]
-            self.assertTrue(rec.name is Null, "rec.name is %r" % (rec.name, ))
+            self.assertTrue(rec.first is Null, "rec.first is %r" % (rec.first, ))
+            self.assertTrue(rec.last == '', "rec.last is %r" % (rec.last, ))
+            self.assertTrue(rec.height is Null, "rec.height is %r" % (rec.height, ))
             self.assertTrue(rec.age is None, "rec.age is %r" % (rec.age, ))
-            # nullable.append(('ethan', 50, Null))
-            # rec = nullable[-1]
             self.assertTrue(rec.life_story is Null, "rec.life_story is %r" % (rec.life_story, ))
+            self.assertTrue(rec.plans == '', "rec.plans is %r" % (rec.plans, ))
+        nullable.close()
+        nullable = Table(
+                self.null_vfp_table.filename,
+                default_data_types=dict(
+                        C=(Char, NoneType, NullType),
+                        L=(Logical, NoneType, NullType),
+                        D=(Date, NoneType, NullType),
+                        T=(DateTime, NoneType, NullType),
+                        M=(Char, NoneType, NullType),
+                        ),
+                )
+        with nullable:
+            rec = nullable[-1]
+            self.assertTrue(rec.first is Null, "rec.first is %r" % (rec.first, ))
+            self.assertTrue(rec.last is None, "rec.last is %r" % (rec.last, ))
+            self.assertTrue(rec.height is Null, "rec.height is %r" % (rec.height, ))
+            self.assertTrue(rec.age is None, "rec.age is %r" % (rec.age, ))
+            self.assertTrue(rec.life_story is Null, "rec.life_story is %r" % (rec.life_story, ))
+            self.assertTrue(rec.plans is None, "rec.plans is %r" % (rec.plans, ))
+
+    def test_new_record_with_partial_fields_respects_null(self):
+        nullable = self.null_vfp_table
+        nullable.close()
+        nullable = Table(
+                self.null_vfp_table.filename,
+                default_data_types=dict(
+                        C=(Char, NoneType, NullType),
+                        L=(Logical, NoneType, NullType),
+                        D=(Date, NoneType, NullType),
+                        T=(DateTime, NoneType, NullType),
+                        M=(Char, NoneType, NullType),
+                        ),
+                )
+        with nullable:
+            nullable.append({'first': 'ethan', 'last':'doe'})
+            rec = nullable[-1]
+            self.assertTrue(rec.first == 'ethan', "rec.first is %r" % (rec.first, ))
+            self.assertTrue(rec.last == 'doe', "rec.last is %r" % (rec.last, ))
+            self.assertTrue(rec.height is Null, "rec.height is %r" % (rec.height, ))
+            self.assertTrue(rec.age is None, "rec.age is %r" % (rec.age, ))
+            self.assertTrue(rec.life_story is Null, "rec.life_story is %r" % (rec.life_story, ))
+            self.assertTrue(rec.plans is None, "rec.plans is %r" % (rec.plans, ))
+            print(repr(rec))
+        nullable.close()
 
     def test_flux_internal(self):
         "commit and rollback of flux record (implementation detail)"

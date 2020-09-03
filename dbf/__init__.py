@@ -923,6 +923,19 @@ class Vapor(object):
     def __ne__(self, other):
         return True
 
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            """
+            Vapor objects are always False
+            """
+            return False
+    else:
+        def __bool__(self):
+            """
+            Vapor objects are always False
+            """
+            return False
+
 Vapor = Vapor()
 
 

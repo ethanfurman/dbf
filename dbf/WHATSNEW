@@ -1,6 +1,12 @@
 What's New
 ==========
 
+0.99.001
+--------
+
+Vapor objects are now Falsey
+
+
 0.99.000
 --------
 

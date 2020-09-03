@@ -5448,6 +5448,13 @@ class TestDBC(TestCase):
     "test DBC handling"
 
 
+class TestVapor(TestCase):
+    "test Vapor objects"
+
+    def test_falsey(self):
+        self.assertFalse(dbf.Vapor)
+
+
 class TestMisc(TestCase):
     "miscellaneous tests"
 

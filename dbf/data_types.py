@@ -3,6 +3,8 @@ try:
 except ImportError:
     pytz = None
 
+NoneType = type(None)
+
 # gets replaced later by their final values
 Unknown = Other = object()
 

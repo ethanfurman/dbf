@@ -1,3 +1,9 @@
+from array import array
+from collections import deque
+from textwrap import dedent
+import decimal
+import sys
+
 # 2/3 constructs
 
 py_ver = sys.version_info[:2]

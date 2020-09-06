@@ -1,9 +1,18 @@
+from math import floor
+
+import datetime
+import time
+
 try:
     import pytz
 except ImportError:
     pytz = None
 
 NoneType = type(None)
+
+## dec jan feb mar apr may jun jul aug sep oct nov dec jan
+days_per_month = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
+days_per_leap_month = [31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
 
 # gets replaced later by their final values
 Unknown = Other = object()

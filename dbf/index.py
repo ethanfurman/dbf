@@ -1,3 +1,8 @@
+from bisect import bisect_left, bisect_right
+from functools import partial
+import struct
+import weakref
+
 class Index(_Navigation):
     """
     non-persistent index for a table

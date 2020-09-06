@@ -1,3 +1,21 @@
+from __future__ import print_function
+
+from array import array
+from collections import defaultdict
+from functools import partial
+from glob import glob
+from os import SEEK_END
+
+import codecs
+import csv
+import datetime
+import os
+import struct
+import sys
+import traceback
+import warnings
+import weakref
+
 # other constructs
 
 class LazyAttr(object):

@@ -30,30 +30,9 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-from __future__ import with_statement, print_function
+from __future__ import print_function
 
-import codecs
-import collections
-import csv
-import datetime
-import decimal
-import os
-import struct
-import sys
-import time
-import traceback
-import warnings
-import weakref
 
-from array import array
-from bisect import bisect_left, bisect_right
-from collections import defaultdict, deque
-from functools import partial
-from aenum import Enum, IntEnum, IntFlag, export
-from glob import glob
-from math import floor
-from os import SEEK_END
-from textwrap import dedent
 
 version = 0, 99, 1, 1
 
@@ -65,10 +44,6 @@ pql_user_functions = dict()
 
 ## signature:_meta of template records
 _Template_Records = dict()
-
-## dec jan feb mar apr may jun jul aug sep oct nov dec jan
-days_per_month = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
-days_per_leap_month = [31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
 
 ## keep pyflakes happy :(
 SYSTEM = NULLABLE = BINARY = NOCPTRANS = None

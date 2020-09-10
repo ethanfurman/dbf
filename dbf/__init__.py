@@ -30,9 +30,21 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-from __future__ import print_function
 
-
+from .bridge import Decimal
+from .constant import CLOSED, READ_ONLY, READ_WRITE, IN_MEMORY, ON_DISK 
+from .data_types import Char, Date, DateTime, Time, Logical, Quantum, Null
+from .data_types import NullDate, NullDateTime, NullTime, NullType, NoneType
+from .data_types import Vapor, Period, On, Off, Other, Truth, Falsth, Unknown
+from .exceptions import DbfError, DataOverflowError, BadDataError
+from .exceptions import FieldMissingError, FieldSpecError, NonUnicodeError
+from .exceptions import NotFoundError, DbfWarning, Eof, Bof, DoNotIndex
+from .exceptions import FieldNameWarning
+from .tables import Table, Record, List, Index, Relation, Iter, IndexLocation
+from .tables import CodePage
+from .utils import create_template, delete, field_names, is_deleted, recno
+from .utils import reset, source_table, undelete, write, Process, Templates
+from .utils import gather, scatter, scan
 
 version = 0, 99, 1, 1
 
@@ -44,15 +56,6 @@ pql_user_functions = dict()
 
 ## signature:_meta of template records
 _Template_Records = dict()
-
-## keep pyflakes happy :(
-SYSTEM = NULLABLE = BINARY = NOCPTRANS = None
-SPACE = ASTERISK = TYPE = CR = NULL = None
-START = LENGTH = END = DECIMALS = FLAGS = CLASS = EMPTY = NUL = None
-IN_MEMORY = ON_DISK = CLOSED = READ_ONLY = READ_WRITE = None
-_NULLFLAG = CHAR = CURRENCY = DATE = DATETIME = DOUBLE = FLOAT = None
-GENERAL = INTEGER = LOGICAL = MEMO = NUMERIC = PICTURE = None
-
 
 
 # from dbf.api import *
@@ -73,12 +76,12 @@ class fake_module(object):
 api = fake_module('api',
     'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'Null', 'Char', 'Date', 'DateTime', 'Time',
     'Logical', 'Quantum', 'CodePage', 'create_template', 'delete', 'field_names', 'gather', 'is_deleted',
-    'recno', 'source_table', 'reset', 'scatter', 'undelete',
+    'recno', 'source_table', 'reset', 'scatter', 'scan', 'undelete', 'write',
     'NullDate', 'NullDateTime', 'NullTime', 'NoneType', 'NullType', 'Decimal', 'Vapor', 'Period',
     'Truth', 'Falsth', 'Unknown', 'On', 'Off', 'Other',
     'DbfError', 'DataOverflowError', 'BadDataError', 'FieldMissingError',
     'FieldSpecError', 'NonUnicodeError', 'NotFoundError',
-    'DbfWarning', 'Eof', 'Bof', 'DoNotIndex', 'IndexLocation',
+    'DbfWarning', 'Eof', 'Bof', 'DoNotIndex', 'FieldNameWarning', 'IndexLocation',
     'Process', 'Templates', 'CLOSED', 'READ_ONLY', 'READ_WRITE',
     )
 

@@ -1,42 +1,21 @@
 from aenum import Enum, IntEnum, IntFlag, export
 from array import array
 
-class HexEnum(IntEnum):
-    "repr is in hex"
-    def __repr__(self):
-        return '<%s.%s: %#02x>' % (
-                self.__class__.__name__,
-                self._name_,
-                self._value_,
-                )
+## keep pyflakes happy :(
+SYSTEM = NULLABLE = BINARY = NOCPTRANS = None
+SPACE = ASTERISK = TYPE = CR = NULL = None
+START = LENGTH = END = DECIMALS = FLAGS = CLASS = EMPTY = NUL = None
+IN_MEMORY = ON_DISK = CLOSED = READ_ONLY = READ_WRITE = None
+_NULLFLAG = CHAR = CURRENCY = DATE = DATETIME = DOUBLE = FLOAT = None
+GENERAL = INTEGER = LOGICAL = MEMO = NUMERIC = PICTURE = None
 
-class AutoEnum(IntEnum):
+
+class ZeroEnum(IntEnum, start=0, init='value __doc__'):
     """
-    Automatically numbers enum members starting from __number__ (defaults to 0).
+    Automatically numbers enum members starting from 0.
 
     Includes support for a custom docstring per member.
     """
-    __number__ = 0
-
-    def __new__(cls, *args):
-        """Ignores arguments (will be handled in __init__."""
-        value = cls.__number__
-        cls.__number__ += 1
-        obj = int.__new__(cls, value)
-        obj._value_ = value
-        return obj
-
-    def __init__(self, *args):
-        """Can handle 0 or 1 argument; more requires a custom __init__.
-        0  = auto-number w/o docstring
-        1  = auto-number w/ docstring
-        2+ = needs custom __init__
-
-        """
-        if len(args) == 1 and isinstance(args[0], basestring):
-            self.__doc__ = string(args[0])
-        elif args:
-            raise TypeError('%s not dealt with -- need custom __init__' % (args,))
 
 
 class IsoDay(IntEnum):
@@ -212,6 +191,12 @@ class LatinByte(HexEnum):
         obj.array = array('B', [byte])
         return obj
 
+    def __repr__(self):
+        return (
+                '<%s.%s: %#02x>'
+                %( self.__class__.__name__, self._name_, self._value_)
+                )
+
     def __add__(self, other):
         if isinstance(other, bytes):
             return self.byte + other
@@ -291,7 +276,7 @@ class FieldFlag(IntFlag):
     #AUTOINC = 0x0c         # not currently supported (not vfp 6)
 
 @export(module)
-class Field(AutoEnum):
+class Field(ZeroEnum):
     __order__ = 'TYPE START LENGTH END DECIMALS FLAGS CLASS EMPTY NUL'
     TYPE = "Char, Date, Logical, etc."
     START = "Field offset in record"
@@ -304,13 +289,13 @@ class Field(AutoEnum):
     NUL = "python function for null field"
 
 @export(module)
-class DbfLocation(AutoEnum):
+class DbfLocation(ZeroEnum):
     __order__ = 'IN_MEMORY ON_DISK'
     IN_MEMORY = "dbf is kept in memory (disappears at program end)"
     ON_DISK = "dbf is kept on disk"
 
 @export(module)
-class DbfStatus(AutoEnum):
+class DbfStatus(ZeroEnum):
     __order__ = 'CLOSED READ_ONLY READ_WRITE'
     CLOSED = 'closed (only meta information available)'
     READ_ONLY = 'read-only'

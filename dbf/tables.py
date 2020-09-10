@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 from array import array
+from aenum import NamedTuple
 from collections import defaultdict
 from functools import partial
 from glob import glob
@@ -23,17 +24,17 @@ class LazyAttr(object):
     doesn't create object until actually accessed
     """
 
-    def __init__(yo, func=None, doc=None):
-        yo.fget = func
-        yo.__doc__ = doc or func.__doc__
+    def __init__(self, func=None, doc=None):
+        self.fget = func
+        self.__doc__ = doc or func.__doc__
 
-    def __call__(yo, func):
-        yo.fget = func
+    def __call__(self, func):
+        self.fget = func
 
-    def __get__(yo, instance, owner):
+    def __get__(self, instance, owner):
         if instance is None:
-            return yo
-        return yo.fget(instance)
+            return self
+        return self.fget(instance)
 
 
 class MutableDefault(object):
@@ -1401,13 +1402,8 @@ class _DeadObject(object):
     """
     used because you cannot weakref None
     """
-
-    if py_ver < (3, 0):
-        def __nonzero__(self):
-            return False
-    else:
-        def __bool__(self):
-            return False
+    def __bool__(self):
+        return False
 
 _DeadObject = _DeadObject()
 
@@ -2048,23 +2044,23 @@ class Tables(object):
     """
     context manager for multiple tables and/or indices
     """
-    def __init__(yo, *tables):
+    def __init__(self, *tables):
         if len(tables) == 1 and not isinstance(tables[0], (Table, basestring)):
             tables = tables[0]
-        yo._tables = []
-        yo._entered = []
+        self._tables = []
+        self._entered = []
         for table in tables:
             if isinstance(table, basestring):
                 table = Table(table)
-            yo._tables.append(table)
-    def __enter__(yo):
-        for table in yo._tables:
+            self._tables.append(table)
+    def __enter__(self):
+        for table in self._tables:
             table.__enter__()
-            yo._entered.append(table)
-        return tuple(yo._tables)
-    def __exit__(yo, *args):
-        while yo._entered:
-            table = yo._entered.pop()
+            self._entered.append(table)
+        return tuple(self._tables)
+    def __exit__(self, *args):
+        while self._entered:
+            table = self._entered.pop()
             try:
                 table.__exit__()
             except Exception:
@@ -2084,72 +2080,39 @@ class IndexLocation(long):
         result.found = found
         return result
 
-    if py_ver < (3, 0):
-        def __nonzero__(self):
-            return self.found
-    else:
-        def __bool__(self):
-            return self.found
+    def __bool__(self):
+        return self.found
 
-class FieldInfo(tuple):
+
+class FieldInfo(NamedTuple):
     """
     tuple with named attributes for representing a field's dbf type,
     length, decimal portion, and python class
     """
-
-    __slots__= ()
-
-    def __new__(cls, *args):
-        if len(args) != 4:
-            raise TypeError("%s should be called with Type, Length, Decimal size, and Class" % cls.__name__)
-        return tuple.__new__(cls, args)
-
-    @property
-    def field_type(self):
-        return self[0]
-
-    @property
-    def length(self):
-        return self[1]
-
-    @property
-    def decimal(self):
-        return self[2]
-
-    @property
-    def py_type(self):
-        return self[3]
+    field_type = 0, "dbf field type (C, N, D, etc.)"
+    length = 1, "overall length of field"
+    decimal = 2, "number of decimal places for numeric fields"
+    py_type = 3, "Python class for this field (Char, Logical, default, etc.)"
 
 
-class CodePage(tuple):
+class CodePage(NamedTuple):
     """
     tuple with named attributes for representing a tables codepage
     """
-
-    __slots__= ()
-
     def __new__(cls, name):
         "call with name of codepage (e.g. 'cp1252')"
         code, name, desc = _codepage_lookup(name)
         return tuple.__new__(cls, (name, desc, code))
 
     def __repr__(self):
-        return "CodePage(%r, %r, %r)" % (self[0], self[1], self[2])
+        return "CodePage(%r, %r, %02x)" % self
 
     def __str__(self):
         return "%s (%s)" % (self[0], self[1])
 
-    @property
-    def name(self):
-        return self[0]
-
-    @property
-    def desc(self):
-        return self[1]
-
-    @property
-    def code(self):
-        return self[2]
+    name = 0, "name of code page"
+    desc = 1, "description of code page"
+    code = 2, "numeric code of code page"
 
 
 class Iter(_Navigation):
@@ -2170,36 +2133,20 @@ class Iter(_Navigation):
     def __iter__(self):
         return self
 
-    if py_ver < (3, 0):
-        def next(self):
-            while not self._exhausted:
-                if self._index == len(self._table):
-                    break
-                if self._index >= (len(self._table) - 1):
-                    self._index = max(self._index, len(self._table))
-                    if self._include_vapor:
-                        return RecordVaporWare('eof', self._table)
-                    break
-                self._index += 1
-                record = self._table[self._index]
-                return record
-            self._exhausted = True
-            raise StopIteration
-    else:
-        def __next__(self):
-            while not self._exhausted:
-                if self._index == len(self._table):
-                    break
-                if self._index >= (len(self._table) - 1):
-                    self._index = max(self._index, len(self._table))
-                    if self._include_vapor:
-                        return RecordVaporWare('eof', self._table)
-                    break
-                self._index += 1
-                record = self._table[self._index]
-                return record
-            self._exhausted = True
-            raise StopIteration
+    def __next__(self):
+        while not self._exhausted:
+            if self._index == len(self._table):
+                break
+            if self._index >= (len(self._table) - 1):
+                self._index = max(self._index, len(self._table))
+                if self._include_vapor:
+                    return RecordVaporWare('eof', self._table)
+                break
+            self._index += 1
+            record = self._table[self._index]
+            return record
+        self._exhausted = True
+        raise StopIteration
 
 
 class Table(_Navigation):
@@ -2994,18 +2941,11 @@ class Table(_Navigation):
                     abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'
                     raise DbfError("Table could be any of %s.  Please specify %s when opening" % (types, abbrs))
 
-    if py_ver < (3, 0):
-        def __nonzero__(self):
-            """
-            True if table has any records
-            """
-            return self._meta.header.record_count != 0
-    else:
-        def __bool__(self):
-            """
-            True if table has any records
-            """
-            return self._meta.header.record_count != 0
+    def __bool__(self):
+        """
+        True if table has any records
+        """
+        return self._meta.header.record_count != 0
 
     def __repr__(self):
         return __name__ + ".Table(%r, status=%r)" % (self._meta.filename, self._meta.status)
@@ -3121,20 +3061,10 @@ class Table(_Navigation):
         backup table is created with _backup appended to name
         then zaps table, recreates current structure, and copies records back from the backup
         """
-        # for python 2, convert field_specs from bytes to unicode if necessary
         if isinstance(field_specs, bytes):
-            if input_decoding is None:
-                raise DbfError('field specifications must be in unicode (or set input_decoding)')
-            field_specs = field_specs.decode(input_decoding)
+            raise DbfError('field specifications must be in unicode (or set input_decoding)')
         if isinstance(field_specs, list) and any(isinstance(t, bytes) for t in field_specs):
-            if input_decoding is None:
-                raise DbfError('field specifications must be in unicode (or set input_decoding)')
-            fs = []
-            for text in field_specs:
-                if isinstance(text, bytes):
-                    text = text.decode(input_decoding)
-                fs.append(text)
-            field_specs = fs
+            raise DbfError('field specifications must be in unicode (or set input_decoding)')
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to add fields (%s)' % (meta.filename, meta.status))
@@ -4563,14 +4493,9 @@ class List(_Navigation):
         self._still_valid_check()
         return len(self._list)
 
-    if py_ver < (3, 0):
-        def __nonzero__(self):
-            self._still_valid_check()
-            return len(self) > 0
-    else:
-        def __bool__(self):
-            self._still_valid_check()
-            return len(self) > 0
+    def __bool__(self):
+        self._still_valid_check()
+        return len(self) > 0
 
     def __radd__(self, other):
         self._still_valid_check()
@@ -5011,5 +4936,4 @@ class _Db4Table(Table):
                         self._meta.dfd = None
                         raise BadDataError("Table structure corrupt:  memo fields exist without memo file")
                     break
-
 

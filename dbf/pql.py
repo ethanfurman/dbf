@@ -112,7 +112,7 @@ def pql_criteria(records, criteria):
     g['dbf'] = api
     g.update(pql_user_functions)
     function %= (criteria, fields, criteria)
-    execute(function, g)
+    exec(function, g)
     return g['func']
 
 def pql_cmd(command, field_names):
@@ -150,7 +150,7 @@ def pql_cmd(command, field_names):
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset + 6:]
     function %= (command, pre_fields, command, post_fields)
-    execute(function, g)
+    exec(function, g)
     return g['func']
 
 def pql(records, command):

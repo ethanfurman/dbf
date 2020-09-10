@@ -31,7 +31,7 @@ data = dict(
            'dbf' : [
                'LICENSE',
                'README.md',
-	       'WHATSNEW',
+               'WHATSNEW',
                ]
            },
         provides=['dbf'],
@@ -44,7 +44,6 @@ data = dict(
             'License :: OSI Approved :: BSD License',
             'Programming Language :: Python',
             'Topic :: Database',
-            'Programming Language :: Python :: 2.7',
             'Programming Language :: Python :: 3.3',
             'Programming Language :: Python :: 3.4',
             'Programming Language :: Python :: 3.5',

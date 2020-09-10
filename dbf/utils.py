@@ -9,6 +9,17 @@ import os
 
 # utility functions
 
+def add_fields(table_name, field_specs):
+    """
+    adds fields to an existing table
+    """
+    table = Table(table_name)
+    table.open(READ_WRITE)
+    try:
+        table.add_fields(field_specs)
+    finally:
+        table.close()
+
 def create_template(table_or_record, defaults=None):
     if isinstance(table_or_record, Table):
         return RecordTemplate(table_or_record._meta, defaults)
@@ -35,6 +46,17 @@ def delete(record):
         raise
     if not template and not record_in_flux:
         record._commit_flux()
+
+def delete_fields(table_name, field_names):
+    """
+    deletes fields from an existing table
+    """
+    table = Table(table_name)
+    table.open(READ_WRITE)
+    try:
+        table.delete_fields(field_names)
+    finally:
+        table.close()
 
 def ensure_unicode(value):
     if isinstance(value, bytes):
@@ -128,17 +150,141 @@ def field_names(thing):
         for record in thing:    # grab any record
             return record._meta.user_fields[:]
 
+def first_record(table_name):
+    """
+    prints the first record of a table
+    """
+    table = Table(table_name)
+    table.open()
+    try:
+        print(unicode(table[0]))
+    finally:
+        table.close()
+
+def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fields=None,
+        dbf_type='db3', memo_size=64, min_field_size=1,
+        encoding=None, errors=None):
+    """
+    creates a Character table from a csv file
+    to_disk will create a table with the same name
+    filename will be used if provided
+    field_names default to f0, f1, f2, etc, unless specified (list)
+    extra_fields can be used to add additional fields -- should be normal field specifiers (list)
+    """
+    with codecs.open(csvfile, 'r', encoding='latin-1', errors=errors) as fd:
+        reader = csv.reader(fd)
+        if field_names:
+            if isinstance(field_names, basestring):
+                field_names = field_names.split()
+            if ' ' not in field_names[0]:
+                field_names = ['%s M' % fn for fn in field_names]
+        else:
+            field_names = ['f0 M']
+        if filename:
+            to_disk = True
+        else:
+            filename = os.path.splitext(csvfile)[0]
+        if to_disk:
+            csv_table = Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
+        else:
+            csv_table = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
+        csv_table.open(READ_WRITE)
+        fields_so_far = 1
+        while reader:
+            try:
+                row = next(reader)
+            except UnicodeEncodeError:
+                row = ['']
+            except StopIteration:
+                break
+            while fields_so_far < len(row):
+                if fields_so_far == len(field_names):
+                    field_names.append('f%d M' % fields_so_far)
+                csv_table.add_fields(field_names[fields_so_far])
+                fields_so_far += 1
+            csv_table.append(tuple(row))
+        if extra_fields:
+            csv_table.add_fields(extra_fields)
+        csv_table.close()
+        return csv_table
+
+def guess_table_type(filename):
+    reported = table_type(filename)
+    possibles = []
+    version = reported[0]
+    for tabletype in (Db3Table, ClpTable, FpTable, VfpTable):
+        if version in tabletype._supported_tables:
+            possibles.append((tabletype._versionabbr, tabletype._version, tabletype))
+    if not possibles:
+        raise DbfError("Tables of type %s not supported" % unicode(reported))
+    return possibles
+
+def get_fields(table_name):
+    """
+    returns the list of field names of a table
+    """
+    table = Table(table_name)
+    return table.field_names
+
+def hex_dump(records):
+    """
+    just what it says ;)
+    """
+    for index, dummy in enumerate(records):
+        chars = dummy._data
+        print("%2d: " % (index,))
+        for char in chars[1:]:
+            print(" %2x " % (char,))
+        print()
+
+
+def index(sequence):
+    """
+    returns integers 0 - len(sequence)
+    """
+    for i in xrange(len(sequence)):
+        yield i
+
+def info(table_name):
+    """
+    prints table info
+    """
+    table = Table(table_name)
+    print(unicode(table))
+
 def is_deleted(record):
     """
     marked for deletion?
     """
     return record._data[0] == ASTERISK
 
+def is_leapyear(year):
+    if year % 400 == 0:
+        return True
+    elif year % 100 == 0:
+        return False
+    elif year % 4 == 0:
+        return True
+    else:
+        return False
+
+
+
 def recno(record):
     """
     physical record number
     """
     return record._recnum
+
+def rename_field(table_name, oldfield, newfield):
+    """
+    renames a field in a table
+    """
+    table = Table(table_name)
+    try:
+        table.rename_field(oldfield, newfield)
+    finally:
+        table.close()
 
 def reset(record, keep_fields=None):
     """
@@ -173,6 +319,55 @@ def source_table(thingie):
     if table is None:
         raise DbfError("table is no longer available")
     return table
+
+def string(text):
+    if isinstance(text, unicode):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode(default_codepage)
+
+def structure(table_name, field=None):
+    """
+    returns the definition of a field (or all fields)
+    """
+    table = Table(table_name)
+    return table.structure(field)
+
+def table_type(filename):
+    """
+    returns text representation of a table's dbf version
+    """
+    actual_filename = None
+    search_name = None
+    base, ext = os.path.splitext(filename)
+    if ext == '.':
+        # use filename without the '.'
+        search_name = base
+        matches = glob(search_name)
+    elif ext.lower() == '.dbf':
+        # use filename as-is
+        search_name = filename
+        matches = glob(search_name)
+    else:
+        search_name = base + '.[Dd][Bb][Ff]'
+        matches = glob(filename)
+        if not matches:
+            # back to original name
+            search_name = filename
+            matches = glob(search_name)
+    if len(matches) == 1:
+        actual_filename = matches[0]
+    elif matches:
+        raise DbfError("please specify exactly which of %r you want" % (matches, ))
+    else:
+        raise DbfError('File %r not found' % search_name)
+    fd = open(actual_filename, 'rb')
+    version = ord(fd.read(1))
+    fd.close()
+    fd = None
+    if not version in version_map:
+        raise DbfError("Unknown dbf type: %s (%x)" % (version, version))
+    return version, version_map[version]
 
 def undelete(record):
     """
@@ -256,183 +451,6 @@ def Templates(records, start=0, stop=None, filter=None):
             records.close()
 
 
-def index(sequence):
-    """
-    returns integers 0 - len(sequence)
-    """
-    for i in xrange(len(sequence)):
-        yield i
-
-def guess_table_type(filename):
-    reported = table_type(filename)
-    possibles = []
-    version = reported[0]
-    for tabletype in (Db3Table, ClpTable, FpTable, VfpTable):
-        if version in tabletype._supported_tables:
-            possibles.append((tabletype._versionabbr, tabletype._version, tabletype))
-    if not possibles:
-        raise DbfError("Tables of type %s not supported" % unicode(reported))
-    return possibles
-
-def table_type(filename):
-    """
-    returns text representation of a table's dbf version
-    """
-    actual_filename = None
-    search_name = None
-    base, ext = os.path.splitext(filename)
-    if ext == '.':
-        # use filename without the '.'
-        search_name = base
-        matches = glob(search_name)
-    elif ext.lower() == '.dbf':
-        # use filename as-is
-        search_name = filename
-        matches = glob(search_name)
-    else:
-        search_name = base + '.[Dd][Bb][Ff]'
-        matches = glob(filename)
-        if not matches:
-            # back to original name
-            search_name = filename
-            matches = glob(search_name)
-    if len(matches) == 1:
-        actual_filename = matches[0]
-    elif matches:
-        raise DbfError("please specify exactly which of %r you want" % (matches, ))
-    else:
-        raise DbfError('File %r not found' % search_name)
-    fd = open(actual_filename, 'rb')
-    version = ord(fd.read(1))
-    fd.close()
-    fd = None
-    if not version in version_map:
-        raise DbfError("Unknown dbf type: %s (%x)" % (version, version))
-    return version, version_map[version]
-
-def add_fields(table_name, field_specs):
-    """
-    adds fields to an existing table
-    """
-    table = Table(table_name)
-    table.open(READ_WRITE)
-    try:
-        table.add_fields(field_specs)
-    finally:
-        table.close()
-
-def delete_fields(table_name, field_names):
-    """
-    deletes fields from an existing table
-    """
-    table = Table(table_name)
-    table.open(READ_WRITE)
-    try:
-        table.delete_fields(field_names)
-    finally:
-        table.close()
-
-def first_record(table_name):
-    """
-    prints the first record of a table
-    """
-    table = Table(table_name)
-    table.open()
-    try:
-        print(unicode(table[0]))
-    finally:
-        table.close()
-
-def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fields=None,
-        dbf_type='db3', memo_size=64, min_field_size=1,
-        encoding=None, errors=None):
-    """
-    creates a Character table from a csv file
-    to_disk will create a table with the same name
-    filename will be used if provided
-    field_names default to f0, f1, f2, etc, unless specified (list)
-    extra_fields can be used to add additional fields -- should be normal field specifiers (list)
-    """
-    with codecs.open(csvfile, 'r', encoding='latin-1', errors=errors) as fd:
-        reader = csv.reader(fd)
-        if field_names:
-            if isinstance(field_names, basestring):
-                field_names = field_names.split()
-            if ' ' not in field_names[0]:
-                field_names = ['%s M' % fn for fn in field_names]
-        else:
-            field_names = ['f0 M']
-        if filename:
-            to_disk = True
-        else:
-            filename = os.path.splitext(csvfile)[0]
-        if to_disk:
-            csv_table = Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
-        else:
-            csv_table = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
-        csv_table.open(READ_WRITE)
-        fields_so_far = 1
-        while reader:
-            try:
-                row = next(reader)
-            except UnicodeEncodeError:
-                row = ['']
-            except StopIteration:
-                break
-            while fields_so_far < len(row):
-                if fields_so_far == len(field_names):
-                    field_names.append('f%d M' % fields_so_far)
-                csv_table.add_fields(field_names[fields_so_far])
-                fields_so_far += 1
-            csv_table.append(tuple(row))
-        if extra_fields:
-            csv_table.add_fields(extra_fields)
-        csv_table.close()
-        return csv_table
-
-def get_fields(table_name):
-    """
-    returns the list of field names of a table
-    """
-    table = Table(table_name)
-    return table.field_names
-
-def info(table_name):
-    """
-    prints table info
-    """
-    table = Table(table_name)
-    print(unicode(table))
-
-def rename_field(table_name, oldfield, newfield):
-    """
-    renames a field in a table
-    """
-    table = Table(table_name)
-    try:
-        table.rename_field(oldfield, newfield)
-    finally:
-        table.close()
-
-def structure(table_name, field=None):
-    """
-    returns the definition of a field (or all fields)
-    """
-    table = Table(table_name)
-    return table.structure(field)
-
-def hex_dump(records):
-    """
-    just what it says ;)
-    """
-    for index, dummy in enumerate(records):
-        chars = dummy._data
-        print("%2d: " % (index,))
-        for char in chars[1:]:
-            print(" %2x " % (char,))
-        print()
-
-
 # Foxpro functions
 
 def gather(record, data, drop=False):
@@ -493,22 +511,4 @@ def scatter(record, as_type=create_template, _mappings=getattr(collections, 'Map
         return as_type(zip(field_names(record), record))
     else:
         return as_type(record)
-
-def string(text):
-    if isinstance(text, unicode):
-        return text
-    elif isinstance(text, bytes):
-        return text.decode(default_codepage)
-
-def is_leapyear(year):
-    if year % 400 == 0:
-        return True
-    elif year % 100 == 0:
-        return False
-    elif year % 4 == 0:
-        return True
-    else:
-        return False
-
-
 

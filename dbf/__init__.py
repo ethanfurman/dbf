@@ -4162,9 +4162,11 @@ def update_character(string, fielddef, memo, decoder, encoder):
             raise ValueError('binary field: %r not in bytes format' % string)
         return string
     else:
-        if not isinstance(string, basestring):
+        if isinstance(string, basestring):
+            string = encoder(string.strip())[0]
+        elif not isinstance(string, bytes):
             raise ValueError("unable to coerce %r(%r) to string" % (type(string), string))
-        string = encoder(string.strip())[0]
+
         if not string[length:].strip():     # trims trailing white space to fit in field
             string = string[:length]
         return string

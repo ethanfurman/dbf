@@ -1975,7 +1975,20 @@ class Period(object):
     "for matching various time ranges"
 
     def __init__(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None):
-        params = vars()
+       #
+       if year:
+           attrs = []
+           if isinstance(year, (Date, datetime.date)):
+               attrs = ['year','month','day']
+           elif isinstance(year, (DateTime, datetime.datetime)):
+               attrs = ['year','month','day','hour','minute','second']
+           elif isinstance(year, (Time, datetime.time)):
+               attrs = ['hour','minute','second']
+           for attr in attrs:
+               value = getattr(year, attr)
+               self._mask[attr] = value
+       #
+       params = vars()
         self._mask = {}
         for attr in ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond'):
             value = params[attr]

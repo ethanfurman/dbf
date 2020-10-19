@@ -1113,6 +1113,19 @@ class Period(object):
     def __init__(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None):
         params = vars()
         self._mask = {}
+        #
+        if year:
+            attrs = []
+            if isinstance(year, (Date, datetime.date)):
+                attrs = ['year','month','day']
+            elif isinstance(year, (DateTime, datetime.datetime)):
+                attrs = ['year','month','day','hour','minute','second']
+            elif isinstance(year, (Time, datetime.time)):
+                attrs = ['hour','minute','second']
+            for attr in attrs:
+                value = getattr(year, attr)
+                self._mask[attr] = value
+        #
         for attr in ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond'):
             value = params[attr]
             if value is not None:

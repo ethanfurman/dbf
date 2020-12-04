@@ -33,7 +33,6 @@ ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 from __future__ import with_statement, print_function
 
 import codecs
-import collections
 import csv
 import datetime
 import decimal
@@ -66,6 +65,7 @@ if py_ver < (3, 0):
     unicode = unicode
     basestring = bytes, unicode
     baseinteger = int, long
+    import collections as collections_abc
 else:
     bytes = bytes
     unicode = str
@@ -73,6 +73,7 @@ else:
     baseinteger = int,
     long = int
     xrange = range
+    import collections.abc as collections_abc
 
 version = 0, 99, 1, 1
 
@@ -9067,7 +9068,7 @@ def scan(table, direction='forward', filter=lambda rec: True):
     except no_more_records:
         return False
 
-def scatter(record, as_type=create_template, _mappings=getattr(collections, 'Mapping', dict)):
+def scatter(record, as_type=create_template, _mappings=getattr(collections_abc, 'Mapping', dict)):
     """
     returns as_type() of [fieldnames and] values.
     """

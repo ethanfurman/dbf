@@ -75,7 +75,7 @@ else:
     xrange = range
     import collections.abc as collections_abc
 
-version = 0, 99, 1, 1
+version = 0, 99, 1, 3
 
 NoneType = type(None)
 
@@ -625,6 +625,7 @@ class FieldType(IntEnum):
     MEMO = b'M'
     NUMERIC = b'N'
     PICTURE = b'P'
+    TIMESTAMP = b'@'
 
 @export(module)
 class FieldFlag(IntFlag):
@@ -761,7 +762,7 @@ class BadDataError(DbfError):
         self.data = data
 
 
-class FieldMissingError(KeyError, DbfError):
+class FieldMissingError(AttributeError, KeyError, DbfError):
     """
     Field does not exist in table
     """
@@ -1976,20 +1977,20 @@ class Period(object):
     "for matching various time ranges"
 
     def __init__(self, year=None, month=None, day=None, hour=None, minute=None, second=None, microsecond=None):
-       #
-       if year:
-           attrs = []
-           if isinstance(year, (Date, datetime.date)):
-               attrs = ['year','month','day']
-           elif isinstance(year, (DateTime, datetime.datetime)):
-               attrs = ['year','month','day','hour','minute','second']
-           elif isinstance(year, (Time, datetime.time)):
-               attrs = ['hour','minute','second']
-           for attr in attrs:
-               value = getattr(year, attr)
-               self._mask[attr] = value
-       #
-       params = vars()
+        #
+        if year:
+            attrs = []
+            if isinstance(year, (Date, datetime.date)):
+                attrs = ['year','month','day']
+            elif isinstance(year, (DateTime, datetime.datetime)):
+                attrs = ['year','month','day','hour','minute','second']
+            elif isinstance(year, (Time, datetime.time)):
+                attrs = ['hour','minute','second']
+            for attr in attrs:
+                value = getattr(year, attr)
+                self._mask[attr] = value
+        #
+        params = vars()
         self._mask = {}
         for attr in ('year', 'month', 'day', 'hour', 'minute', 'second', 'microsecond'):
             value = params[attr]
@@ -4410,6 +4411,58 @@ def update_vfp_datetime(moment, *ignore):
         data[:4] = update_integer(moment.toordinal() + VFPTIME)
     return to_bytes(data)
 
+def retrieve_clp_timestamp(bytes, fielddef, *ignore):
+    """
+    returns the timestamp stored in bytes
+    """
+    # First long repesents date and second long time.
+    # Date is the number of days since January 1st, 4713 BC.
+    # Time is hours * 3600000L + minutes * 60000L + seconds * 1000L
+    # http://www.manmrk.net/tutorials/database/xbase/data_types.html
+    if bytes == array('B', [0] * 8):
+        cls = fielddef[EMPTY]
+        if cls is NoneType:
+            return None
+        return cls()
+    cls = fielddef[CLASS]
+    days = unpack_long_int(bytes[:4])
+    # how many days between -4713-01-01 and 0001-01-01 ?  going to guess 1,721,425
+    BC = 1721425
+    if days < BC:
+        # bail
+        cls = fielddef[EMPTY]
+        if cls is NoneType:
+            return None
+        return cls()
+    date = datetime.date.fromordinal(days-BC)
+    time = unpack_long_int(bytes[4:])
+    microseconds = (time % 1000) * 1000
+    time = time // 1000                      # int(round(time, -3)) // 1000 discard milliseconds
+    hours = time // 3600
+    mins = time % 3600 // 60
+    secs = time % 3600 % 60
+    time = datetime.time(hours, mins, secs, microseconds)
+    return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond)
+
+def update_clp_timestamp(moment, *ignore):
+    """
+    Sets the timestamp stored in moment
+    moment must have fields:
+        year, month, day, hour, minute, second, microsecond
+    """
+    data = [0] * 8
+    if moment:
+        BC = 1721425
+        days = BC + moment.toordinal()
+        hour = moment.hour
+        minute = moment.minute
+        second = moment.second
+        millisecond = moment.microsecond // 1000       # convert from millionths to thousandths
+        time = ((hour * 3600) + (minute * 60) + second) * 1000 + millisecond
+        data[:4] = pack_long_int(days)
+        data[4:] = pack_long_int(time)
+    return to_bytes(data)
+
 def retrieve_vfp_memo(bytes, fielddef, memo, decoder):
     """
     Returns the block of data from a memo file
@@ -4616,6 +4669,16 @@ def add_vfp_numeric(format, flags):
         raise FieldSpecError("Numeric fields must be between 1 and 20 digits, not %d" % length)
     if decimals and not 0 < decimals <= length - 2:
         raise FieldSpecError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
+    return length, decimals, flag
+
+def add_clp_timestamp(format, flags):
+    if any(f not in flags for f in format):
+        raise FieldSpecError("Format for TimeStamp field creation is '@%s', not '@%s'" % field_spec_error_text(format, flags))
+    length = 8
+    decimals = 0
+    flag = 0
+    for f in format[1:]:
+        flag |= FieldFlag.lookup(f)
     return length, decimals, flag
 
 def field_spec_error_text(format, flags):
@@ -6373,19 +6436,24 @@ class Db3Table(Table):
             FLOAT: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_numeric,
                     'Class':'default', 'Empty':none, 'flags':tuple(),
-                    } }
+                    },
+            TIMESTAMP: {
+                    'Type':'TimeStamp', 'Retrieve':retrieve_clp_timestamp, 'Update':update_clp_timestamp, 'Blank':lambda x: b'\x00' * 8, 'Init':add_clp_timestamp,
+                    'Class':datetime.datetime, 'Empty':none, 'flags':tuple(),
+                    },
+            }
 
     _memoext = '.dbt'
     _memoClass = _Db3Memo
     _yesMemoMask = 0x80
     _noMemoMask = 0x7f
-    _binary_types = ()
+    _binary_types = (TIMESTAMP, )
     _character_types = (CHAR, MEMO)
     _currency_types = tuple()
     _date_types = (DATE, )
-    _datetime_types = tuple()
+    _datetime_types = (TIMESTAMP, )
     _decimal_types = (NUMERIC, FLOAT)
-    _fixed_types = (DATE, LOGICAL, MEMO)
+    _fixed_types = (DATE, LOGICAL, MEMO, TIMESTAMP)
     _logical_types = (LOGICAL, )
     _memo_types = (MEMO, )
     _numeric_types = (NUMERIC, FLOAT)

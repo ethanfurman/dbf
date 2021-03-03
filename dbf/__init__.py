@@ -805,7 +805,7 @@ class NotFoundError(DbfError, ValueError, KeyError, IndexError):
         self.data = data
 
 
-class DbfWarning(Exception):
+class DbfWarning(UserWarning):
     """
     Normal operations elicit this response
     """
@@ -4974,6 +4974,7 @@ class Table(_Navigation):
         Container class for storing per table metadata
         """
         blankrecord = None
+        codepage = None           # code page being used (can be overridden when table is opened)
         dfd = None                # file handle
         fields = None             # field names
         field_count = 0           # number of fields
@@ -5569,6 +5570,7 @@ class Table(_Navigation):
         if codepage is not None:
             header.codepage(codepage)
             cp, sd, ld = _codepage_lookup(codepage)
+            self._meta.codepage = sd
             self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
         if field_specs:
             meta.status = READ_WRITE
@@ -5578,6 +5580,7 @@ class Table(_Navigation):
             if codepage is None:
                 header.codepage(default_codepage)
                 cp, sd, ld = _codepage_lookup(header.codepage())
+                self._meta.codepage = sd
                 self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
             self.add_fields(field_specs)
         else:
@@ -5585,37 +5588,41 @@ class Table(_Navigation):
             try:
                 dfd = meta.dfd = open(meta.filename, 'rb')
             except IOError:
-                e= sys.exc_info()[1]
+                e = sys.exc_info()[1]
                 raise DbfError(unicode(e)).from_exc(None)
             dfd.seek(0)
-            meta.header = header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
-            if not header.version in self._supported_tables:
+            try:
+                meta.header = header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
+                if not header.version in self._supported_tables:
+                    dfd.close()
+                    raise DbfError(
+                        "%s does not support %s [%x]" %
+                        (self._version,
+                        version_map.get(header.version, 'Unknown: %s' % header.version),
+                        header.version))
+                if codepage is None:
+                    cp, sd, ld = _codepage_lookup(header.codepage())
+                    self._meta.codepage = sd
+                    self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
+                fieldblock = array('B', dfd.read(header.start - 32))
+                for i in range(len(fieldblock) // 32 + 1):
+                    fieldend = i * 32
+                    if fieldblock[fieldend] == CR:
+                        break
+                else:
+                    raise BadDataError("corrupt field structure in header")
+                if len(fieldblock[:fieldend]) % 32 != 0:
+                    raise BadDataError("corrupt field structure in header")
+                old_length = header.data[10:12]
+                header.fields = fieldblock[:fieldend]
+                header.data = header.data[:10] + old_length + header.data[12:]    # restore original for testing
+                header.extra = fieldblock[fieldend + 1:]  # skip trailing \r
+                self._initialize_fields()
+                self._check_memo_integrity()
+                dfd.seek(0)
+            except DbfError:
                 dfd.close()
-                dfd = None
-                raise DbfError(
-                    "%s does not support %s [%x]" %
-                    (self._version,
-                    version_map.get(header.version, 'Unknown: %s' % header.version),
-                    header.version))
-            if codepage is None:
-                cp, sd, ld = _codepage_lookup(header.codepage())
-                self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
-            fieldblock = array('B', dfd.read(header.start - 32))
-            for i in range(len(fieldblock) // 32 + 1):
-                fieldend = i * 32
-                if fieldblock[fieldend] == CR:
-                    break
-            else:
-                raise BadDataError("corrupt field structure in header")
-            if len(fieldblock[:fieldend]) % 32 != 0:
-                raise BadDataError("corrupt field structure in header")
-            old_length = header.data[10:12]
-            header.fields = fieldblock[:fieldend]
-            header.data = header.data[:10] + old_length + header.data[12:]    # restore original for testing
-            header.extra = fieldblock[fieldend + 1:]  # skip trailing \r
-            self._initialize_fields()
-            self._check_memo_integrity()
-            dfd.seek(0)
+                raise
 
         for field in meta.fields:
             field_type = meta[field][TYPE]
@@ -5870,7 +5877,7 @@ class Table(_Navigation):
                         # ignore
                         break
                     elif frame[0] != __file__ or frame[2] not in ('__init__','add_fields'):
-                        warnings.warn('"%s invalid:  field names should start with a letter, and only contain letters, digits, and _' % name, FieldNameWarning, stacklevel=i)
+                        warnings.warn('%r is invalid:  field names should start with a letter, and only contain letters, digits, and _' % name, FieldNameWarning, stacklevel=i)
                         break
             if name in meta.fields:
                 raise DbfError("Field '%s' already exists" % name)
@@ -8726,15 +8733,9 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
     if format == 'fixed':
         format = 'txt'
     if encoding is None:
-        encoding = table.codepage.name
+        encoding = table._meta.codepage
     encoder = codecs.getencoder(encoding)
     header_names = field_names
-    #     encoding = table.codepage.name
-    # encoder = codecs.getencoder(encoding)
-    if isinstance(field_names[0], unicode):
-        header_names = [encoder(f) for f in field_names]
-    else:
-        header_names = field_names
     base, ext = os.path.splitext(filename)
     if ext.lower() in ('', '.dbf'):
         filename = base + "." + format

@@ -1,16 +1,13 @@
 What's New
 ==========
 
-0.99.004
---------
-
-'@' TimeStamp column type added to db3 tables
-
 
 0.99.001
 --------
 
 Vapor objects are now Falsey
+'@' TimeStamp column type added to db3 tables
+fix encoding error when exporting csv files
 
 
 0.99.000

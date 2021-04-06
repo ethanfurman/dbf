@@ -75,7 +75,7 @@ else:
     xrange = range
     import collections.abc as collections_abc
 
-version = 0, 99, 1
+version = 0, 99, 2, 1
 
 NoneType = type(None)
 
@@ -350,7 +350,7 @@ SYSTEM = NULLABLE = BINARY = NOCPTRANS = None
 SPACE = ASTERISK = TYPE = CR = NULL = None
 START = LENGTH = END = DECIMALS = FLAGS = CLASS = EMPTY = NUL = None
 IN_MEMORY = ON_DISK = CLOSED = READ_ONLY = READ_WRITE = None
-_NULLFLAG = CHAR = CURRENCY = DATE = DATETIME = DOUBLE = FLOAT = None
+_NULLFLAG = CHAR = CURRENCY = DATE = DATETIME = DOUBLE = FLOAT = TIMESTAMP = None
 GENERAL = INTEGER = LOGICAL = MEMO = NUMERIC = PICTURE = None
 
 class HexEnum(IntEnum):
@@ -2745,7 +2745,7 @@ class FieldnameList(list):
                     new_things.append(thing)
                 item = new_things
             except TypeError:
-                raise TypeError('%r cannot be a field name' % (things, ))
+                raise TypeError('%r cannot be a field name' % (thing, ))
         else:
             item = ensure_unicode(item)
             if not isinstance(item, unicode):
@@ -5708,13 +5708,13 @@ class Table(_Navigation):
         str =  """
         Table:         %s
         Type:          %s
-        Codepage:      %s
+        Codepage:      %s [%s]
         Status:        %s
         Last updated:  %s
         Record count:  %d
         Field count:   %d
-        Record length: %d """ % (self.filename, version
-            , self.codepage, status,
+        Record length: %d """ % (self.filename, version,
+            self.codepage, encoder, status,
             self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
         for i in range(len(self.field_names)):
@@ -8353,6 +8353,7 @@ code_pages = {
         0x7c : ('cp874', 'Thai Windows'),
         0x7d : ('cp1255', 'Hebrew Windows'),
         0x7e : ('cp1256', 'Arabic Windows'),
+        0x87 : ('cp852', 'Slovenian OEM'),
         0xc8 : ('cp1250', 'Eastern European Windows'),
         0xc9 : ('cp1251', 'Russian Windows'),
         0xca : ('cp1254', 'Turkish Windows'),
@@ -8734,7 +8735,6 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
         format = 'txt'
     if encoding is None:
         encoding = table._meta.codepage
-    encoder = codecs.getencoder(encoding)
     header_names = field_names
     base, ext = os.path.splitext(filename)
     if ext.lower() in ('', '.dbf'):

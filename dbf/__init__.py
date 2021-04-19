@@ -8713,14 +8713,14 @@ def ensure_unicode(value):
         value = value.decode(input_decoding)
     return value
 
-def export(table_or_records, filename=None, field_names=None, format='csv', header=True, dialect='dbf', encoding=None, ignore_errors=False, ignore_null_bytes=False):
+def export(table_or_records, filename=None, field_names=None, format='csv', header=True, dialect='dbf', encoding=None, ignore_errors=False, remove_null_bytes=False):
     """
     writes the records using CSV or tab-delimited format, using the filename
     given if specified, otherwise the table name
     if table_or_records is a collection of records (not an actual table) they
     should all be of the same format
     ignore_errors will skip rows which raise an exception and continue with the export
-    ignore_null_bytes removes all null bytes from output \x00
+    remove_null_bytes removes all null bytes from output \x00
     """
     table = source_table(table_or_records[0])
     if filename is None:
@@ -8757,7 +8757,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     fields = []
                     for fieldname in field_names:
                         data = record[fieldname]
-                        if ignore_null_bytes:
+                        if remove_null_bytes:
                             if '\x00' in data:
                                 data = data.replace('\x00', '')
                         fields.append(unicode(data))
@@ -8774,7 +8774,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     fields = []
                     for fieldname in field_names:
                         data = record[fieldname]
-                        if ignore_null_bytes:
+                        if remove_null_bytes:
                                 if '\x00' in data:
                                     data = data.replace('\x00', '')
                         fields.append(unicode(data))
@@ -8783,7 +8783,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                 except Exception as e:
                     if not ignore_errors:
                         raise e
-                continue
+                    continue
         else: # format == 'fixed'
             with codecs.open("%s_layout.txt" % os.path.splitext(filename)[0], 'w', encoding=encoding) as header:
                 header.write("%-15s  Size\n" % "Field Name")
@@ -8799,7 +8799,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     fields = []
                     for i, fieldname in enumerate(field_names):
                         data = record[fieldname]
-                        if ignore_null_bytes:
+                        if remove_null_bytes:
                                 if '\x00' in data:
                                     data = data.replace('\x00', '')
                         fields.append("%-*s" % (sizes[i], data))

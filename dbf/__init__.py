@@ -8758,7 +8758,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     for fieldname in field_names:
                         data = record[fieldname]
                         if remove_null_bytes:
-                            if '\x00' in data:
+                            if '\x00' in str(data):
                                 data = data.replace('\x00', '')
                         fields.append(unicode(data))
                     csvfile.writerow(fields)
@@ -8775,7 +8775,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     for fieldname in field_names:
                         data = record[fieldname]
                         if remove_null_bytes:
-                                if '\x00' in data:
+                                if '\x00' in str(data):
                                     data = data.replace('\x00', '')
                         fields.append(unicode(data))
                     
@@ -8800,7 +8800,7 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     for i, fieldname in enumerate(field_names):
                         data = record[fieldname]
                         if remove_null_bytes:
-                                if '\x00' in data:
+                                if '\x00' in str(data):
                                     data = data.replace('\x00', '')
                         fields.append("%-*s" % (sizes[i], data))
                     fd.write(''.join(fields) + '\n')

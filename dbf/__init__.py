@@ -75,7 +75,7 @@ else:
     xrange = range
     import collections.abc as collections_abc
 
-version = 0, 99, 2, 1
+version = 0, 99, 2
 
 NoneType = type(None)
 

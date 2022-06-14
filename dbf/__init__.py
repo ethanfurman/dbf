@@ -8745,18 +8745,27 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
         filename = base + "." + format
     with codecs.open(filename, 'w', encoding=encoding) as fd:
         if format == 'csv':
-            csvfile = csv.writer(fd, dialect=dialect)
-            if header:
-                csvfile.writerow(header_names)
+            if header is True:
+                fd.write(','.join(header_names))
+            elif header:
+                fd.write(','.join(header))
+            fd.write('\n')
             for record in table_or_records:
                 fields = []
                 for fieldname in field_names:
                     data = record[fieldname]
+                    if isinstance(data, basestring) and data:
+                        data = '"%s"' % data.replace('"','""')
+                    elif data is None:
+                        data = ''
                     fields.append(unicode(data))
-                csvfile.writerow(fields)
+                fd.write(','.join(fields))
+                fd.write('\n')
         elif format == 'tab':
-            if header:
+            if header is True:
                 fd.write('\t'.join(header_names) + '\n')
+            elif header:
+                fd.write(','.join(header))
             for record in table_or_records:
                 fields = []
                 for fieldname in field_names:
@@ -8764,15 +8773,30 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     fields.append(unicode(data))
                 fd.write('\t'.join(fields) + '\n')
         else: # format == 'fixed'
-            with codecs.open("%s_layout.txt" % os.path.splitext(filename)[0], 'w', encoding=encoding) as header:
-                header.write("%-15s  Size\n" % "Field Name")
-                header.write("%-15s  ----\n" % ("-" * 15))
+            if header is True:
+                header = False  # don't need it
+            elif header:
+                # names to use as field names
+                header = list(header)   # in case header is an iterator
+            with codecs.open("%s_layout.txt" % os.path.splitext(filename)[0], 'w', encoding=encoding) as layout:
+                layout.write("%-15s  Size  Comment\n" % "Field Name")
+                layout.write("%-15s  ----  -------------------------\n" % ("-" * 15))
                 sizes = []
-                for field in field_names:
-                    size = table.field_info(field).length
+                for i, field in enumerate(field_names):
+                    info = table.field_info(field)
+                    if info.field_type == ord('D'):
+                        size = 10
+                    elif info.field_type in (ord('T'), ord('@')):
+                        size = 19
+                    else:
+                        size = info.length
                     sizes.append(size)
-                    header.write("%-15s  %3d\n" % (field, size))
-                header.write('\nTotal Records in file: %d\n' % len(table_or_records))
+                    comment = ''
+                    if header and i < len(header):
+                        # use overridden field name as comment
+                        comment = header[i]
+                    layout.write("%-15s  %4d  %s\n" % (field, size, comment))
+                layout.write('\nTotal Records in file: %d\n' % len(table_or_records))
             for record in table_or_records:
                 fields = []
                 for i, fieldname in enumerate(field_names):

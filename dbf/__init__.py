@@ -6348,7 +6348,7 @@ class Table(_Navigation):
             max_size = 65535
         else:
             max_size = 255
-	if not 0 < new_size <= max_size:
+        if not 0 < new_size <= max_size:
             raise DbfError("new_size must be between 1 and 255 (use delete_fields to remove a field)")
         chosen = self._list_fields(chosen)
         for candidate in chosen:

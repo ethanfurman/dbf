@@ -3096,8 +3096,14 @@ class Record(object):
         if record._data[0] == NULL:
             record._data[0] = SPACE
         if record._data[0] not in (SPACE, ASTERISK):
-            # TODO: log warning instead
-            raise DbfError("record data not correct -- first character should be a ' ' or a '*'.")
+            # Create error log to write erroneous records to
+            with open('error.log', 'a') as f:
+                now = datetime.datetime.now()
+                f.write('\n')
+                f.write(now.strftime("%Y-%m-%d %H:%M:%S"))
+                f.write("\tError with record: " + str(record[0]))
+                f.write("\t Expected character SPACE or ASTERISK, instead found: " + str(record._data[0]))
+            pass
         if not _fromdisk and layout.location == ON_DISK:
             record._update_disk()
         return record

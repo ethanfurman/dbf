@@ -75,7 +75,7 @@ else:
     xrange = range
     import collections.abc as collections_abc
 
-version = 0, 99, 3, 1
+version = 0, 99, 3, 2
 
 NoneType = type(None)
 
@@ -5706,15 +5706,16 @@ class Table(_Navigation):
         else:
             version = 'unknown - ' + hex(self._meta.header.version)
         str =  """
-        Table:         %s
-        Type:          %s
-        Codepage:      %s [%s]
-        Status:        %s
-        Last updated:  %s
-        Record count:  %d
-        Field count:   %d
-        Record length: %d """ % (self.filename, version,
-            self.codepage, encoder, status,
+        Table:           %s
+        Type:            %s
+        Listed Codepage: %s
+        Used Codepage:   %s
+        Status:          %s
+        Last updated:    %s
+        Record count:    %d
+        Field count:     %d
+        Record length:   %d """ % (self.filename, version,
+            code_pages[self._meta.header.codepage()][1], self.codepage, status,
             self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
         for i in range(len(self.field_names)):
@@ -5726,7 +5727,7 @@ class Table(_Navigation):
         """
         code page used for text translation
         """
-        return CodePage(code_pages[self._meta.header.codepage()][0])
+        return CodePage(self._meta.codepage)
 
     @codepage.setter
     def codepage(self, codepage):
@@ -6752,8 +6753,6 @@ class ClpTable(Db3Table):
             old_fields[name]['type'] = meta[name][TYPE]
             old_fields[name]['empty'] = meta[name][EMPTY]
             old_fields[name]['class'] = meta[name][CLASS]
-        meta.fields[:] = []
-        offset = 1
         fieldsdef = meta.header.fields
         if len(fieldsdef) % 32 != 0:
             raise BadDataError(
@@ -6765,43 +6764,57 @@ class ClpTable(Db3Table):
                         % (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         nulls_found = False
-        for i in range(meta.header.field_count):
-            fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = self._meta.decoder(unpack_str(fieldblock[:11]))[0]
-            type = fieldblock[11]
-            if not type in meta.fieldtypes:
-                raise BadDataError("Unknown field type: %s" % type)
-            start = unpack_long_int(fieldblock[12:16])
-            length = fieldblock[16]
-            decimals = fieldblock[17]
-            if type == CHAR:
-                length += decimals * 256
-            offset += length
-            end = start + length
-            flags = fieldblock[18]
-            null = flags & NULLABLE
-            if null:
-                nulls_found = True
-            if name in meta.fields:
-                raise BadDataError('Duplicate field name found: %s' % name)
-            meta.fields.append(name)
-            if name in old_fields and old_fields[name]['type'] == type:
-                cls = old_fields[name]['class']
-                empty = old_fields[name]['empty']
+        starters = set()  # keep track of starting values in case header is poorly created
+        for starter in ('header', 'offset'):
+            meta.fields[:] = []
+            offset = 1
+            for i in range(meta.header.field_count):
+                fieldblock = fieldsdef[i*32:(i+1)*32]
+                name = self._meta.decoder(unpack_str(fieldblock[:11]))[0]
+                type = fieldblock[11]
+                if not type in meta.fieldtypes:
+                    raise BadDataError("Unknown field type: %s" % type)
+                if starter == 'header':
+                    start = unpack_long_int(fieldblock[12:16])
+                    if start in starters:
+                        # poor header
+                        break
+                    starters.add(start)
+                else:
+                    start = offset
+                length = fieldblock[16]
+                decimals = fieldblock[17]
+                if type == CHAR:
+                    length += decimals * 256
+                end = start + length
+                offset += length
+                flags = fieldblock[18]
+                null = flags & NULLABLE
+                if null:
+                    nulls_found = True
+                if name in meta.fields:
+                    raise BadDataError('Duplicate field name found: %s' % name)
+                meta.fields.append(name)
+                if name in old_fields and old_fields[name]['type'] == type:
+                    cls = old_fields[name]['class']
+                    empty = old_fields[name]['empty']
+                else:
+                    cls = meta.fieldtypes[type]['Class']
+                    empty = meta.fieldtypes[type]['Empty']
+                meta[name] = (
+                        type,
+                        start,
+                        length,
+                        end,
+                        decimals,
+                        flags,
+                        cls,
+                        empty,
+                        null
+                        )
             else:
-                cls = meta.fieldtypes[type]['Class']
-                empty = meta.fieldtypes[type]['Empty']
-            meta[name] = (
-                    type,
-                    start,
-                    length,
-                    end,
-                    decimals,
-                    flags,
-                    cls,
-                    empty,
-                    null
-                    )
+                # made it through all the fields
+                break
         if offset != total_length:
             raise BadDataError(
                     "Header shows record length of %d, but calculated record length is %d"
@@ -8747,9 +8760,10 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
         if format == 'csv':
             if header is True:
                 fd.write(','.join(header_names))
+                fd.write('\n')
             elif header:
                 fd.write(','.join(header))
-            fd.write('\n')
+                fd.write('\n')
             for record in table_or_records:
                 fields = []
                 for fieldname in field_names:

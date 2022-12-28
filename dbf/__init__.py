@@ -75,7 +75,7 @@ else:
     xrange = range
     import collections.abc as collections_abc
 
-version = 0, 99, 3
+version = 0, 99, 4, 1
 
 NoneType = type(None)
 
@@ -6599,7 +6599,13 @@ class ClpTable(Db3Table):
             FLOAT: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_numeric,
                     'Class':'default', 'Empty':none, 'flags':tuple(),
-                    } }
+                    },
+            TIMESTAMP: {
+                    'Type':'TimeStamp', 'Retrieve':retrieve_clp_timestamp, 'Update':update_clp_timestamp, 'Blank':lambda x: b'\x00' * 8, 'Init':add_clp_timestamp,
+                    'Class':datetime.datetime, 'Empty':none, 'flags':tuple(),
+                    },
+            }
+
 
     _memoext = '.dbt'
     _memoClass = _Db3Memo
@@ -6608,10 +6614,10 @@ class ClpTable(Db3Table):
     _binary_types = ()
     _character_types = (CHAR, MEMO)
     _currency_types = tuple()
-    _date_types = (DATE, )
-    _datetime_types = tuple()
+    _date_types = (DATE, TIMESTAMP)
+    _datetime_types = tuple(TIMESTAMP, )
     _decimal_types = (NUMERIC, FLOAT)
-    _fixed_types = (DATE, LOGICAL, MEMO)
+    _fixed_types = (DATE, LOGICAL, MEMO, TIMESTAMP)
     _logical_types = (LOGICAL, )
     _memo_types = (MEMO, )
     _numeric_types = (NUMERIC, FLOAT)

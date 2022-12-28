@@ -4372,7 +4372,6 @@ class TestDbfFunctions(TestCase):
             records = nd_index.search(match=(word, ), partial=True)
             ucount = sum([1 for wrd in unordered if wrd.startswith(word)])
             self.assertEqual(len(records), ucount)
-
         for record in table[::2]:
             dbf.write(record, qty=-record.qty)
         unordered = []

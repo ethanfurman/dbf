@@ -6615,7 +6615,7 @@ class ClpTable(Db3Table):
     _character_types = (CHAR, MEMO)
     _currency_types = tuple()
     _date_types = (DATE, TIMESTAMP)
-    _datetime_types = tuple(TIMESTAMP, )
+    _datetime_types = (TIMESTAMP, )
     _decimal_types = (NUMERIC, FLOAT)
     _fixed_types = (DATE, LOGICAL, MEMO, TIMESTAMP)
     _logical_types = (LOGICAL, )

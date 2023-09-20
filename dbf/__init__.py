@@ -8358,6 +8358,7 @@ code_pages = {
         0xc9 : ('cp1251', 'Russian Windows'),
         0xca : ('cp1254', 'Turkish Windows'),
         0xcb : ('cp1253', 'Greek Windows'),
+        0xcc : ('cp1257', 'Baltic Windows'),
         0x96 : ('mac_cyrillic', 'Russian Macintosh'),
         0x97 : ('mac_latin2', 'Macintosh EE'),
         0x98 : ('mac_greek', 'Greek Macintosh'),

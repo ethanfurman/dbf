@@ -5559,13 +5559,9 @@ class Table(_Navigation):
                 meta.filename = matches[0]
             elif matches:
                 raise DbfError("please specify exactly which of %r you want" % (matches, ))
-            case = [('l','u')[c.isupper()] for c in meta.filename[-4:]]
-            if case == ['l','l','l','l']:
-                meta.memoname = base + self._memoext.lower()
-            elif case == ['l','u','u','u']:
-                meta.memoname = base + self._memoext.upper()
-            else:
-                meta.memoname = base + ''.join([c.lower() if case[i] == 'l' else c.upper() for i, c in enumerate(self._memoext)])
+            matches_memo = glob(base + '.[Ff][Pp][Tt]')
+            if len(matches_memo) == 1:
+                meta.memoname = matches_memo[0]
             meta.location = ON_DISK
         if codepage is not None:
             header.codepage(codepage)

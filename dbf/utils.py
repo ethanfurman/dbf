@@ -68,7 +68,7 @@ def ensure_unicode(value):
         value = value.decode(dbf.input_decoding)
     return value
 
-def export(table_or_records, filename=None, field_names=None, format='csv', header=True, dialect='dbf', encoding=None):
+def export(table_or_records, filename=None, field_names=None, format='csv', header=True, dialect='dbf', encoding=None, ignore_errors=False, strip_nulls=False):
     """
     writes the records using CSV or tab-delimited format, using the filename
     given if specified, otherwise the table name
@@ -104,12 +104,20 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
             for record in table_or_records:
                 fields = []
                 for fieldname in field_names:
-                    data = record[fieldname]
+                    try:
+                        data = record[fieldname]
+                    except Exception:
+                        if not ignore_errors:
+                            raise
+                        data = None
                     if isinstance(data, basestring) and data:
                         data = '"%s"' % data.replace('"','""')
                     elif data is None:
                         data = ''
-                    fields.append(unicode(data))
+                    data = unicode(data)
+                    if strip_nulls:
+                        data = data.replace(NULL, '')
+                    fields.append(data)
                 fd.write(','.join(fields))
                 fd.write('\n')
         elif format == 'tab':
@@ -120,8 +128,16 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
             for record in table_or_records:
                 fields = []
                 for fieldname in field_names:
-                    data = record[fieldname]
-                    fields.append(unicode(data))
+                    try:
+                        data = record[fieldname]
+                    except Exception:
+                        if not ignore_errors:
+                            raise
+                        data = None
+                    data = unicode(data)
+                    if strip_nulls:
+                        data = data.replace(NULL, '')
+                    fields.append(data)
                 fd.write('\t'.join(fields) + '\n')
         else: # format == 'fixed'
             if header is True:
@@ -151,7 +167,15 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
             for record in table_or_records:
                 fields = []
                 for i, fieldname in enumerate(field_names):
-                    data = record[fieldname]
+                    try:
+                        data = record[fieldname]
+                    except Exception:
+                        if not ignore_errors:
+                            raise
+                        data = None
+                    data = unicode(data)
+                    if strip_nulls:
+                        data = data.replace(NULL, '')
                     fields.append("%-*s" % (sizes[i], data))
                 fd.write(''.join(fields) + '\n')
     return len(table_or_records)

@@ -4810,6 +4810,25 @@ class TestDbfFunctions(TestCase):
         self.assertEqual(sorted.index_search('jul', partial=True), 9)
         self.assertTrue(sorted.index_search('jul', partial=True))
 
+    def test_mismatched_extensions(self):
+        old_memo_name = self.dbf_table._meta.memoname
+        new_memo_name = old_memo_name[:-3] + 'Dbt'
+        os.rename(old_memo_name, new_memo_name)
+        table = Table(self.dbf_table._meta.filename)
+        self.assertEqual(table._meta.memoname, new_memo_name)
+        with table:
+            for rec, desc in zip(table, self.dbf_desclist):
+                self.assertEqual(rec.desc, desc)
+        #
+        old_memo_name = self.vfp_table._meta.memoname
+        new_memo_name = old_memo_name[:-3] + 'fPt'
+        os.rename(old_memo_name, new_memo_name)
+        table = Table(self.vfp_table._meta.filename)
+        self.assertEqual(table._meta.memoname, new_memo_name)
+        with table:
+            for rec, desc in zip(table, self.vfp_desclist):
+                self.assertEqual(rec.desc, desc)
+
 
 class TestDbfNavigation(TestCase):
 

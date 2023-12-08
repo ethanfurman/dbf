@@ -347,7 +347,7 @@ def string(text):
     if isinstance(text, unicode):
         return text
     elif isinstance(text, bytes):
-        return text.decode(dbf.default_codepage)
+        return text.decode(dbf.input_decoding)
 
 def structure(table_name, field=None):
     """

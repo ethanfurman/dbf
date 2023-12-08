@@ -3300,14 +3300,16 @@ class Table(_Navigation):
             search_name = None
             if ext == '.':
                 # use filename without the '.'
-                search_name = base
+                search_name = search_memo = base
                 matches = glob(search_name)
             elif ext.lower() == '.dbf':
                 # use filename as-is
                 matches = glob(filename)
+                search_memo = base
             else:
                 meta.filename = filename + '.dbf'
                 search_name = filename + '.[Db][Bb][Ff]'
+                search_memo = filename
                 matches = glob(search_name)
                 if not matches:
                     meta.filename = filename
@@ -3317,13 +3319,18 @@ class Table(_Navigation):
                 meta.filename = matches[0]
             elif matches:
                 raise DbfError("please specify exactly which of %r you want" % (matches, ))
+
             case = [('l','u')[c.isupper()] for c in meta.filename[-4:]]
-            if case == ['l','l','l','l']:
-                meta.memoname = base + self._memoext.lower()
-            elif case == ['l','u','u','u']:
-                meta.memoname = base + self._memoext.upper()
-            else:
-                meta.memoname = base + ''.join([c.lower() if case[i] == 'l' else c.upper() for i, c in enumerate(self._memoext)])
+            meta.memoname = base + ''.join([c if case[i] == 'l' else c.upper() for i, c in enumerate(self._memoext)])
+            if not os.path.exists(meta.memoname):
+                # look for other case variations
+                template = ''.join('[%s%s]' % (c, c.upper()) for c in self._memoext[1:])
+                matches = glob('%s.%s' % (search_memo, template))
+                if len(matches) == 1:
+                    meta.memoname = matches[0]
+                elif len(matches) > 1:
+                    raise DbfError("too many possible memo files: %s" % ', '.join(matches))
+
             meta.location = ON_DISK
         if codepage is not None:
             header.codepage(codepage)

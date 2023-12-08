@@ -11,6 +11,7 @@ from os import SEEK_END
 import codecs
 import csv
 import datetime
+import logging
 import os
 import struct
 import sys
@@ -27,6 +28,30 @@ from .data_types import *
 from .exceptions import *
 from .utils import ensure_unicode, field_names, gather, guess_table_type, recno, scatter, source_table
 from .utils import is_deleted
+
+class NullHandler(logging.Handler):
+    """
+    This handler does nothing. It's intended to be used to avoid the
+    "No handlers could be found for logger XXX" one-off warning. This is
+    important for library code, which may contain code to log events. If a user
+    of the library does not configure logging, the one-off warning might be
+    produced; to avoid this, the library developer simply needs to instantiate
+    a NullHandler and add it to the top-level logger of the library module or
+    package.
+
+    Taken from 2.7 lib.
+    """
+    def handle(self, record):
+        """Stub."""
+
+    def emit(self, record):
+        """Stub."""
+
+    def createLock(self):
+        self.lock = None
+
+logger = logging.getLogger('dbf')
+logger.addHandler(NullHandler())
 
 temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TMP") or os.environ.get("TEMP") or ""
 
@@ -493,7 +518,10 @@ class Record(object):
             record._data[0] = SPACE
         if record._data[0] not in (SPACE, ASTERISK):
             # TODO: log warning instead
-            raise DbfError("record data not correct -- first character should be a ' ' or a '*'.")
+            logger.error(
+                    "record %d: invalid delete byte %h (should be SPACE or ASTERISK).  "
+                    "Record will be considered active", record._data[0]
+                    )
         if not _fromdisk and layout.location == ON_DISK:
             record._update_disk()
         return record
@@ -3319,7 +3347,6 @@ class Table(_Navigation):
                 meta.filename = matches[0]
             elif matches:
                 raise DbfError("please specify exactly which of %r you want" % (matches, ))
-
             case = [('l','u')[c.isupper()] for c in meta.filename[-4:]]
             meta.memoname = base + ''.join([c if case[i] == 'l' else c.upper() for i, c in enumerate(self._memoext)])
             if not os.path.exists(meta.memoname):
@@ -3330,7 +3357,6 @@ class Table(_Navigation):
                     meta.memoname = matches[0]
                 elif len(matches) > 1:
                     raise DbfError("too many possible memo files: %s" % ', '.join(matches))
-
             meta.location = ON_DISK
         if codepage is not None:
             header.codepage(codepage)

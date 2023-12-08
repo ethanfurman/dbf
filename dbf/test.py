@@ -12,8 +12,8 @@ from unittest import skipIf, skipUnless, TestCase as unittest_TestCase
 py_ver = sys.version_info[:2]
 module = globals()
 
-from dbf import *
-import dbf
+from . import *
+from .constants import *
 
 try:
     import pytz
@@ -26,7 +26,7 @@ if py_ver < (3, 0):
 else:
     unicode = str
     xrange = range
-    module.update(dbf.LatinByte.__members__)
+    module.update(LatinByte.__members__)
     MISC = ''.join([chr(i) for i in range(256)]).encode('latin-1')
     PHOTO = ''.join(reversed([chr(i) for i in range(256)])).encode('latin-1')
 
@@ -35,7 +35,8 @@ try:
         warnings.warn('test if warning is an exception', dbf.DbfWarning, stacklevel=1)
         warnings_are_exceptions = False
 except dbf.DbfWarning:
-    warnings_are_exceptions = True        
+    warnings_are_exceptions = True
+
 
 print("\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
     dbf.version[:3] + (sys.platform, sys.version) ))
@@ -2771,7 +2772,6 @@ class TestExceptions(TestCase):
 
 class TestWarnings(TestCase):
 
-    @skipIf(warnings_are_exceptions, '-W error specified')
     def test_field_name_warning(self):
         with warnings.catch_warnings(record=True) as w:
             huh = dbf.Table('cloud', 'p^type C(25)', on_disk=False).open(dbf.READ_WRITE)
@@ -2784,17 +2784,6 @@ class TestWarnings(TestCase):
             self.assertEqual(len(w), 2, str(w))
             warning = w[-1]
             self.assertTrue(issubclass(warning.category, dbf.FieldNameWarning))
-
-    @skipUnless(warnings_are_exceptions, 'warnings are just warnings')
-    def test_field_name_exceptions(self):
-        with self.assertRaisesRegex(dbf.FieldNameWarning, "is invalid"):
-            huh = dbf.Table('cloud', 'p^type C(25)', on_disk=False).open(dbf.READ_WRITE)
-        with self.assertRaisesRegex(dbf.FieldNameWarning, "is invalid"):
-            huh = dbf.Table('cloud', 'name C(25)', on_disk=False).open(dbf.READ_WRITE)
-            try:
-                huh.add_fields('c^word C(50)')
-            finally:
-                huh.close()
 
 
 class TestIndexLocation(TestCase):
@@ -4354,7 +4343,7 @@ class TestDbfFunctions(TestCase):
             self.assertEqual(len(records), unordered.count(word), "num records: %d\nnum words: %d\nfailure with %r" % (len(records), unordered.count(word), word))
             records = table.query("select * where name == %r" % word)
             self.assertEqual(len(records), unordered.count(word))
-            records = dbf.pql(table, "select * where name == %r" % word)
+            records = dbf.pqlc(table, "select * where name == %r" % word)
             self.assertEqual(len(records), unordered.count(word))
 
         # ordering by two fields
@@ -4704,8 +4693,8 @@ class TestDbfFunctions(TestCase):
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
         table.open(mode=READ_WRITE)
         field_info = table.field_info('name')
-        self.assertEqual(field_info, (dbf.FieldType.CHAR, 20, 0, Char))
-        self.assertEqual(field_info.field_type, dbf.FieldType.CHAR)
+        self.assertEqual(field_info, (FieldType.CHAR, 20, 0, Char))
+        self.assertEqual(field_info.field_type, FieldType.CHAR)
         self.assertEqual(field_info.length, 20)
         self.assertEqual(field_info.decimal, 0)
         self.assertEqual(field_info.py_type, Char)

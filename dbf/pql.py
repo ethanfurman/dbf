@@ -1,6 +1,7 @@
 from . import dbf
 from .bridge import *
 from .utils import ensure_unicode, field_names, source_table
+from .utils import delete, undelete, is_deleted, reset
 
 # SQL functions
 
@@ -24,13 +25,11 @@ def pql_delete(records, dead_fields, condition, field_names):
     deleted.field_names = field_names
     if dead_fields == '*':
         for record in deleted:
-            record.delete_record()
-            record.write_record()
+            delete(record)
     else:
         keep = [f for f in field_names if f not in dead_fields.replace(' ', '').split(',')]
         for record in deleted:
-            record.reset_record(keep_fields=keep)
-            record.write_record()
+            reset(record, keep_fields=keep)
     return deleted
 
 def pql_recall(records, all_fields, condition, field_names):

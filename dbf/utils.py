@@ -373,7 +373,7 @@ def table_type(filename):
         matches = glob(search_name)
     else:
         search_name = base + '.[Dd][Bb][Ff]'
-        matches = glob(filename)
+        matches = glob(search_name)
         if not matches:
             # back to original name
             search_name = filename

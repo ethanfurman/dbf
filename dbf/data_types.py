@@ -3,6 +3,10 @@ from math import floor
 import datetime
 import time
 
+from .bridge import *
+from .constants import *
+from .utils import string, is_leapyear
+
 try:
     import pytz
 except ImportError:
@@ -51,8 +55,13 @@ class NullType(object):
     def __new__(cls, *args):
         return cls.null
 
-    def __bool__(self):
-        return False
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            return False
+    else:
+        def __bool__(self):
+            return False
+
 
     def __repr__(self):
         return '<null>'
@@ -81,12 +90,18 @@ class Vapor(object):
     def __ne__(self, other):
         return True
 
-    def __bool__(self):
-        """
-        Vapor objects are always False
-        """
-        return False
-
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            """
+            Vapor objects are always False
+            """
+            return False
+    else:
+        def __bool__(self):
+            """
+            Vapor objects are always False
+            """
+            return False
 Vapor = Vapor()
 
 
@@ -170,7 +185,9 @@ class Char(unicode):
         result.field_size = self.field_size
         return result
 
-basestring = unicode, Char
+from . import bridge
+basestring = bridge.basestring = bridge.basestring + (Char, )
+baseinteger = bridge.baseinteger
 
 # wrappers around datetime and logical objects to allow null values
 
@@ -315,8 +332,12 @@ class Date(object):
                 return False
         return NotImplemented
 
-    def __bool__(self):
-        return self._date is not None
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            return self._date is not None
+    else:
+        def __bool__(self):
+            return self._date is not None
 
     __radd__ = __add__
 
@@ -604,8 +625,12 @@ class DateTime(object):
                 return False
         return NotImplemented
 
-    def __bool__(self):
-        return self._datetime is not None
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            return self._datetime is not None
+    else:
+        def __bool__(self):
+            return self._datetime is not None
 
     __radd__ = __add__
 
@@ -963,8 +988,12 @@ class Time(object):
                 return False
         return NotImplemented
 
-    def __bool__(self):
-        return self._time is not None
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            return self._time is not None
+    else:
+        def __bool__(self):
+            return self._time is not None
 
     __radd__ = __add__
 
@@ -1399,10 +1428,27 @@ class Logical(object):
             raise ValueError("unable to return int() of %r" % x)
         return int(x.value)
 
+    if py_ver < (3, 0):
+        def __long__(x):
+            if x.value is None:
+                raise ValueError("unable to return long() of %r" % x)
+            return long(x.value)
+
     def __float__(x):
         if x.value is None:
             raise ValueError("unable to return float() of %r" % x)
         return float(x.value)
+
+    if py_ver < (3, 0):
+        def __oct__(x):
+            if x.value is None:
+                raise ValueError("unable to return oct() of %r" % x)
+            return oct(x.value)
+
+        def __hex__(x):
+            if x.value is None:
+                raise ValueError("unable to return hex() of %r" % x)
+            return hex(x.value)
 
     def __and__(x, y):
         """
@@ -1462,9 +1508,14 @@ class Logical(object):
 
     __rxor__ = __xor__
 
-    def __bool__(x):
-        "boolean value of Unknown is assumed False"
-        return x.value is True
+    if py_ver < (3, 0):
+        def __nonzero__(x):
+            "boolean value of Unknown is assumed False"
+            return x.value is True
+    else:
+        def __bool__(x):
+            "boolean value of Unknown is assumed False"
+            return x.value is True
 
     def __eq__(x, y):
         if isinstance(y, x.__class__):
@@ -1733,10 +1784,16 @@ class Quantum(object):
             return x.false
         return Other
 
-    def __bool__(x):
-        if x is Other:
-            raise TypeError('True/False value of %r is unknown' % x)
-        return x.value is True
+    if py_ver < (3, 0):
+        def __nonzero__(x):
+            if x is Other:
+                raise TypeError('True/False value of %r is unknown' % x)
+            return x.value is True
+    else:
+        def __bool__(x):
+            if x is Other:
+                raise TypeError('True/False value of %r is unknown' % x)
+            return x.value is True
 
     def __repr__(x):
         return "Quantum(%r)" % x.string
@@ -1773,7 +1830,11 @@ Off = Quantum(False)
 Other = Quantum()
 
 # add xmlrpc support
-from xmlrpc.client import Marshaller
+if py_ver < (3, 0):
+    from xmlrpclib import Marshaller
+else:
+    from xmlrpc.client import Marshaller
+
 # Char is unicode
 Marshaller.dispatch[Char] = Marshaller.dump_unicode
 # Logical unknown becomes False

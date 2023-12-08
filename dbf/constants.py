@@ -1,24 +1,38 @@
-from aenum import Enum, IntEnum, IntFlag, export
-from array import array
+from aenum import Enum as _Enum, IntEnum as _IntEnum, IntFlag as _IntFlag, export as _export
+from array import array as _array
+
+from .bridge import *
 
 ## keep pyflakes happy :(
 SYSTEM = NULLABLE = BINARY = NOCPTRANS = None
 SPACE = ASTERISK = TYPE = CR = NULL = None
 START = LENGTH = END = DECIMALS = FLAGS = CLASS = EMPTY = NUL = None
 IN_MEMORY = ON_DISK = CLOSED = READ_ONLY = READ_WRITE = None
-_NULLFLAG = CHAR = CURRENCY = DATE = DATETIME = DOUBLE = FLOAT = None
+_NULLFLAG = CHAR = CURRENCY = DATE = DATETIME = DOUBLE = FLOAT = TIMESTAMP = None
 GENERAL = INTEGER = LOGICAL = MEMO = NUMERIC = PICTURE = None
 
+_module = globals()
 
-class ZeroEnum(IntEnum, start=0, init='value __doc__'):
+class _HexEnum(_IntEnum):
+    "repr is in hex"
+    def __repr__(self):
+        return '<%s.%s: %#02x>' % (
+                self.__class__.__name__,
+                self._name_,
+                self._value_,
+                )
+
+class _ZeroEnum(_IntEnum):
     """
     Automatically numbers enum members starting from 0.
 
     Includes support for a custom docstring per member.
     """
+    _init_ = 'value doc'
+    _start_ = 0
 
 
-class IsoDay(IntEnum):
+class IsoDay(_IntEnum):
     MONDAY = 1
     TUESDAY = 2
     WEDNESDAY = 3
@@ -45,8 +59,8 @@ class IsoDay(IntEnum):
             delta -= 7
         return delta
 
-@export(module)
-class RelativeDay(Enum):
+@_export(_module)
+class RelativeDay(_Enum):
     LAST_SUNDAY = ()
     LAST_SATURDAY = ()
     LAST_FRIDAY = ()
@@ -73,7 +87,7 @@ class RelativeDay(Enum):
             return day.last_delta(target)
         return day.next_delta(target)
 
-class IsoMonth(IntEnum):
+class IsoMonth(_IntEnum):
     JANUARY = 1
     FEBRUARY = 2
     MARCH = 3
@@ -105,8 +119,8 @@ class IsoMonth(IntEnum):
             delta -= 12
         return delta
 
-@export(module)
-class RelativeMonth(Enum):
+@_export(_module)
+class RelativeMonth(_Enum):
     LAST_DECEMBER = ()
     LAST_NOVEMBER = ()
     LAST_OCTOBER = ()
@@ -146,8 +160,8 @@ class RelativeMonth(Enum):
 
 # Constants
 
-@export(module)
-class LatinByte(HexEnum):
+@_export(_module)
+class LatinByte(_HexEnum):
     NULL = 0x00
     SOH = 0x01
     STX = 0x02
@@ -188,7 +202,7 @@ class LatinByte(HexEnum):
         obj = int.__new__(cls, byte)
         obj._value_ = byte
         obj.byte = chr(byte).encode('latin-1')
-        obj.array = array('B', [byte])
+        obj.array = _array('B', [byte])
         return obj
 
     def __repr__(self):
@@ -200,7 +214,7 @@ class LatinByte(HexEnum):
     def __add__(self, other):
         if isinstance(other, bytes):
             return self.byte + other
-        elif isinstance(other, array):
+        elif isinstance(other, _array):
             return self.array + other
         else:
             return super(LatinByte, self).__add__(other)
@@ -208,14 +222,14 @@ class LatinByte(HexEnum):
     def __radd__(self, other):
         if isinstance(other, bytes):
             return other + self.byte
-        elif isinstance(other, array):
+        elif isinstance(other, _array):
             return other + self.array
         else:
             return super(LatinByte, self).__add__(other)
 
 
-@export(module)
-class FieldType(IntEnum):
+@_export(_module)
+class FieldType(_IntEnum):
     def __new__(cls, char):
         char = char.upper()
         uchar = char.decode('ascii')
@@ -249,9 +263,10 @@ class FieldType(IntEnum):
     MEMO = b'M'
     NUMERIC = b'N'
     PICTURE = b'P'
+    TIMESTAMP = b'@'
 
-@export(module)
-class FieldFlag(IntFlag):
+@_export(_module)
+class FieldFlag(_IntFlag):
     @classmethod
     def lookup(cls, alias):
         alias = alias.lower()
@@ -275,8 +290,8 @@ class FieldFlag(IntFlag):
     NOCPTRANS = 0x04
     #AUTOINC = 0x0c         # not currently supported (not vfp 6)
 
-@export(module)
-class Field(ZeroEnum):
+@_export(_module)
+class Field(_ZeroEnum):
     __order__ = 'TYPE START LENGTH END DECIMALS FLAGS CLASS EMPTY NUL'
     TYPE = "Char, Date, Logical, etc."
     START = "Field offset in record"
@@ -288,14 +303,14 @@ class Field(ZeroEnum):
     EMPTY = "python function for empty field"
     NUL = "python function for null field"
 
-@export(module)
-class DbfLocation(ZeroEnum):
+@_export(_module)
+class DbfLocation(_ZeroEnum):
     __order__ = 'IN_MEMORY ON_DISK'
     IN_MEMORY = "dbf is kept in memory (disappears at program end)"
     ON_DISK = "dbf is kept on disk"
 
-@export(module)
-class DbfStatus(ZeroEnum):
+@_export(_module)
+class DbfStatus(_ZeroEnum):
     __order__ = 'CLOSED READ_ONLY READ_WRITE'
     CLOSED = 'closed (only meta information available)'
     READ_ONLY = 'read-only'

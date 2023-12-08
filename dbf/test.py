@@ -6,13 +6,14 @@ import unittest
 import tempfile
 import shutil
 import stat
-from unittest import skipIf, TestCase as unittest_TestCase
+import warnings
+from unittest import skipIf, skipUnless, TestCase as unittest_TestCase
 
 py_ver = sys.version_info[:2]
 module = globals()
 
-from dbf import *
-import dbf
+from . import *
+from .constants import *
 
 try:
     import pytz
@@ -25,9 +26,16 @@ if py_ver < (3, 0):
 else:
     unicode = str
     xrange = range
-    module.update(dbf.LatinByte.__members__)
+    module.update(LatinByte.__members__)
     MISC = ''.join([chr(i) for i in range(256)]).encode('latin-1')
     PHOTO = ''.join(reversed([chr(i) for i in range(256)])).encode('latin-1')
+
+try:
+    with warnings.catch_warnings():
+        warnings.warn('test if warning is an exception', dbf.DbfWarning, stacklevel=1)
+        warnings_are_exceptions = False
+except dbf.DbfWarning:
+    warnings_are_exceptions = True
 
 
 print("\nTesting dbf version %d.%02d.%03d on %s with Python %s\n" % (
@@ -41,19 +49,6 @@ class TestCase(unittest_TestCase):
         if regex is None:
             self.assertRaisesRegex = getattr(self, 'assertRaisesRegexp')
         super(TestCase, self).__init__(*args, **kwds)
-
-    @classmethod
-    def setUpClass(cls, *args, **kwds):
-        super(TestCase, cls).setUpClass(*args, **kwds)
-        ## filter warnings  (example from scription)
-        # warnings.filterwarnings(
-        #         'ignore',
-        #         'inspect\.getargspec\(\) is deprecated',
-        #         DeprecationWarning,
-        #         'scription',
-        #         0,
-        #         )
-        # double check existence of temp dir
 
 
 # Walker in Leaves -- by Scot Noel -- http://www.scienceandfantasyfiction.com/sciencefiction/Walker-in-Leaves/walker-in-leaves.htm
@@ -2690,7 +2685,10 @@ class TestExceptions(TestCase):
             fields.append('a%03d C(10)' % i)
         table = Table(':test:', ';'.join(fields), on_disk=False)
         table.open(mode=READ_WRITE)
-        self.assertRaises(DbfError, table.allow_nulls, 'a001')
+        try:
+            self.assertRaises(DbfError, table.allow_nulls, 'a001')
+        finally:
+            table.close()
 
     def test_adding_existing_field_to_table(self):
         table = Table(':blah:', 'name C(50)', on_disk=False)
@@ -2900,9 +2898,7 @@ class TestDbfCreation(TestCase):
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
                 table = Table(os.path.join(tempdir, 'tempvfp'), u';'.join(fieldlist), dbf_type='vfp')
-                table.close()
                 table = Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
-                table.close()
                 actualFields = table.structure()
                 fieldlist = [f.replace('nocptrans','BINARY') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
@@ -3091,6 +3087,7 @@ class TestDbfRecords(TestCase):
         self.assertEqual(record.desc, desclist[i])
         i += 1
         self.assertEqual(i, len(table))
+        table.close()
 
     def test_vfp_adding_records(self):
         "vfp table:  adding records"
@@ -3231,6 +3228,7 @@ class TestDbfRecords(TestCase):
         self.assertEqual(record.price, 0)
         self.assertEqual(table[i].price, 0)
         i += 1
+        table.close()
 
     def test_char_memo_return_type(self):
         "check character fields return type"
@@ -3714,7 +3712,6 @@ class TestDbfRecords(TestCase):
             self.assertTrue(rec.age is None, "rec.age is %r" % (rec.age, ))
             self.assertTrue(rec.life_story is Null, "rec.life_story is %r" % (rec.life_story, ))
             self.assertTrue(rec.plans is None, "rec.plans is %r" % (rec.plans, ))
-            print(repr(rec))
         nullable.close()
 
     def test_flux_internal(self):
@@ -4346,7 +4343,7 @@ class TestDbfFunctions(TestCase):
             self.assertEqual(len(records), unordered.count(word), "num records: %d\nnum words: %d\nfailure with %r" % (len(records), unordered.count(word), word))
             records = table.query("select * where name == %r" % word)
             self.assertEqual(len(records), unordered.count(word))
-            records = dbf.pql(table, "select * where name == %r" % word)
+            records = dbf.pqlc(table, "select * where name == %r" % word)
             self.assertEqual(len(records), unordered.count(word))
 
         # ordering by two fields
@@ -4364,6 +4361,10 @@ class TestDbfFunctions(TestCase):
             records = nd_index.search(match=(word, ), partial=True)
             ucount = sum([1 for wrd in unordered if wrd.startswith(word)])
             self.assertEqual(len(records), ucount)
+
+        # partial search
+        rec = nd_index[7]
+        self.assertTrue(nd_index.search((rec.name, rec.desc[:4]), partial=True))
 
         for record in table[::2]:
             dbf.write(record, qty=-record.qty)
@@ -4649,6 +4650,7 @@ class TestDbfFunctions(TestCase):
         for i in index(table):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]).strip(), csvtable[i][j].strip())
+        csvtable.close()
 
     def test_resize_empty(self):
         "resize"
@@ -4691,8 +4693,8 @@ class TestDbfFunctions(TestCase):
         table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
         table.open(mode=READ_WRITE)
         field_info = table.field_info('name')
-        self.assertEqual(field_info, (dbf.FieldType.CHAR, 20, 0, Char))
-        self.assertEqual(field_info.field_type, dbf.FieldType.CHAR)
+        self.assertEqual(field_info, (FieldType.CHAR, 20, 0, Char))
+        self.assertEqual(field_info.field_type, FieldType.CHAR)
         self.assertEqual(field_info.length, 20)
         self.assertEqual(field_info.decimal, 0)
         self.assertEqual(field_info.py_type, Char)

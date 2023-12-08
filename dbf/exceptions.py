@@ -1,5 +1,19 @@
 # warnings and errors
 
+class _undef(object):
+    def __repr__(self):
+        return 'not defined'
+_undef = _undef()
+
+def exception(exc, cause=_undef, context=_undef, traceback=_undef):
+    if cause is not _undef:
+        exc.__cause__ = cause
+    if context is not _undef:
+        exc.__context__ = context
+    if traceback is not _undef:
+        exc.__traceback__ = traceback
+    return exc
+
 class DbfError(Exception):
     """
     Fatal errors elicit this response.
@@ -7,7 +21,12 @@ class DbfError(Exception):
     def __init__(self, message, *args):
         Exception.__init__(self, message, *args)
         self.message = message
-
+    def from_exc(self, exc):
+        self.__cause__ = exc
+        return self
+    def with_traceback(self, tb):
+        self.__traceback__ = tb
+        return self
 
 class DataOverflowError(DbfError):
     """
@@ -66,7 +85,7 @@ class NotFoundError(DbfError, ValueError, KeyError, IndexError):
         self.data = data
 
 
-class DbfWarning(Exception):
+class DbfWarning(UserWarning):
     """
     Normal operations elicit this response
     """

@@ -7,30 +7,33 @@ import collections
 import csv
 import os
 
+from . import dbf
+from .constants import *
+
 # utility functions
 
 def add_fields(table_name, field_specs):
     """
     adds fields to an existing table
     """
-    table = Table(table_name)
-    table.open(READ_WRITE)
+    table = dbf.Table(table_name)
+    table.open(dbf.READ_WRITE)
     try:
         table.add_fields(field_specs)
     finally:
         table.close()
 
 def create_template(table_or_record, defaults=None):
-    if isinstance(table_or_record, Table):
-        return RecordTemplate(table_or_record._meta, defaults)
+    if isinstance(table_or_record, dbf.Table):
+        return dbf.RecordTemplate(table_or_record._meta, defaults)
     else:
-        return RecordTemplate(table_or_record._meta, table_or_record, defaults)
+        return dbf.RecordTemplate(table_or_record._meta, table_or_record, defaults)
 
 def delete(record):
     """
     marks record as deleted
     """
-    template = isinstance(record, RecordTemplate)
+    template = isinstance(record, dbf.RecordTemplate)
     if not template and record._meta.status == CLOSED:
         raise DbfError("%s is closed; cannot delete record" % record._meta.filename)
     record_in_flux = not record._write_to_disk
@@ -51,8 +54,8 @@ def delete_fields(table_name, field_names):
     """
     deletes fields from an existing table
     """
-    table = Table(table_name)
-    table.open(READ_WRITE)
+    table = dbf.Table(table_name)
+    table.open(dbf.READ_WRITE)
     try:
         table.delete_fields(field_names)
     finally:
@@ -60,7 +63,9 @@ def delete_fields(table_name, field_names):
 
 def ensure_unicode(value):
     if isinstance(value, bytes):
-        value = value.decode(input_decoding)
+        if dbf.input_decoding is None:
+            raise dbf.DbfError('value must be unicode, not bytes (or set input_decoding)')
+        value = value.decode(dbf.input_decoding)
     return value
 
 def export(table_or_records, filename=None, field_names=None, format='csv', header=True, dialect='dbf', encoding=None):
@@ -79,36 +84,39 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
         field_names = [f.strip() for f in field_names.split(',')]
     format = format.lower()
     if format not in ('csv', 'tab', 'fixed'):
-        raise DbfError("export format: csv, tab, or fixed -- not %s" % format)
+        raise dbf.DbfError("export format: csv, tab, or fixed -- not %s" % format)
     if format == 'fixed':
         format = 'txt'
     if encoding is None:
-        encoding = table.codepage.name
-    encoder = codecs.getencoder(encoding)
+        encoding = table._meta.codepage
     header_names = field_names
-    #     encoding = table.codepage.name
-    # encoder = codecs.getencoder(encoding)
-    if isinstance(field_names[0], unicode):
-        header_names = [encoder(f) for f in field_names]
-    else:
-        header_names = field_names
     base, ext = os.path.splitext(filename)
     if ext.lower() in ('', '.dbf'):
         filename = base + "." + format
     with codecs.open(filename, 'w', encoding=encoding) as fd:
         if format == 'csv':
-            csvfile = csv.writer(fd, dialect=dialect)
-            if header:
-                csvfile.writerow(header_names)
+            if header is True:
+                fd.write(','.join(header_names))
+                fd.write('\n')
+            elif header:
+                fd.write(','.join(header))
+                fd.write('\n')
             for record in table_or_records:
                 fields = []
                 for fieldname in field_names:
                     data = record[fieldname]
+                    if isinstance(data, basestring) and data:
+                        data = '"%s"' % data.replace('"','""')
+                    elif data is None:
+                        data = ''
                     fields.append(unicode(data))
-                csvfile.writerow(fields)
+                fd.write(','.join(fields))
+                fd.write('\n')
         elif format == 'tab':
-            if header:
+            if header is True:
                 fd.write('\t'.join(header_names) + '\n')
+            elif header:
+                fd.write(','.join(header))
             for record in table_or_records:
                 fields = []
                 for fieldname in field_names:
@@ -116,15 +124,30 @@ def export(table_or_records, filename=None, field_names=None, format='csv', head
                     fields.append(unicode(data))
                 fd.write('\t'.join(fields) + '\n')
         else: # format == 'fixed'
-            with codecs.open("%s_layout.txt" % os.path.splitext(filename)[0], 'w', encoding=encoding) as header:
-                header.write("%-15s  Size\n" % "Field Name")
-                header.write("%-15s  ----\n" % ("-" * 15))
+            if header is True:
+                header = False  # don't need it
+            elif header:
+                # names to use as field names
+                header = list(header)   # in case header is an iterator
+            with codecs.open("%s_layout.txt" % os.path.splitext(filename)[0], 'w', encoding=encoding) as layout:
+                layout.write("%-15s  Size  Comment\n" % "Field Name")
+                layout.write("%-15s  ----  -------------------------\n" % ("-" * 15))
                 sizes = []
-                for field in field_names:
-                    size = table.field_info(field).length
+                for i, field in enumerate(field_names):
+                    info = table.field_info(field)
+                    if info.field_type == ord('D'):
+                        size = 10
+                    elif info.field_type in (ord('T'), ord('@')):
+                        size = 19
+                    else:
+                        size = info.length
                     sizes.append(size)
-                    header.write("%-15s  %3d\n" % (field, size))
-                header.write('\nTotal Records in file: %d\n' % len(table_or_records))
+                    comment = ''
+                    if header and i < len(header):
+                        # use overridden field name as comment
+                        comment = header[i]
+                    layout.write("%-15s  %4d  %s\n" % (field, size, comment))
+                layout.write('\nTotal Records in file: %d\n' % len(table_or_records))
             for record in table_or_records:
                 fields = []
                 for i, fieldname in enumerate(field_names):
@@ -142,9 +165,9 @@ def field_names(thing):
     """
     if isinstance(thing, dict):
         return list(thing.keys())
-    elif isinstance(thing, (Table, Record, RecordTemplate)):
+    elif isinstance(thing, (dbf.Table, dbf.Record, dbf.RecordTemplate)):
         return thing._meta.user_fields[:]
-    elif isinstance(thing, Index):
+    elif isinstance(thing, dbf.Index):
         return thing._table._meta.user_fields[:]
     else:
         for record in thing:    # grab any record
@@ -154,7 +177,7 @@ def first_record(table_name):
     """
     prints the first record of a table
     """
-    table = Table(table_name)
+    table = dbf.Table(table_name)
     table.open()
     try:
         print(unicode(table[0]))
@@ -185,10 +208,10 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
         else:
             filename = os.path.splitext(csvfile)[0]
         if to_disk:
-            csv_table = Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
+            csv_table = dbf.Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
         else:
-            csv_table = Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
-        csv_table.open(READ_WRITE)
+            csv_table = dbf.Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
+        csv_table.open(dbf.READ_WRITE)
         fields_so_far = 1
         while reader:
             try:
@@ -212,18 +235,18 @@ def guess_table_type(filename):
     reported = table_type(filename)
     possibles = []
     version = reported[0]
-    for tabletype in (Db3Table, ClpTable, FpTable, VfpTable):
+    for tabletype in (dbf.Db3Table, dbf.ClpTable, dbf.FpTable, dbf.VfpTable):
         if version in tabletype._supported_tables:
             possibles.append((tabletype._versionabbr, tabletype._version, tabletype))
     if not possibles:
-        raise DbfError("Tables of type %s not supported" % unicode(reported))
+        raise dbf.DbfError("Tables of type %s not supported" % unicode(reported))
     return possibles
 
 def get_fields(table_name):
     """
     returns the list of field names of a table
     """
-    table = Table(table_name)
+    table = dbf.Table(table_name)
     return table.field_names
 
 def hex_dump(records):
@@ -249,7 +272,7 @@ def info(table_name):
     """
     prints table info
     """
-    table = Table(table_name)
+    table = dbf.Table(table_name)
     print(unicode(table))
 
 def is_deleted(record):
@@ -280,7 +303,7 @@ def rename_field(table_name, oldfield, newfield):
     """
     renames a field in a table
     """
-    table = Table(table_name)
+    table = dbf.Table(table_name)
     try:
         table.rename_field(oldfield, newfield)
     finally:
@@ -291,12 +314,12 @@ def reset(record, keep_fields=None):
     sets record's fields back to blank values, except for fields in keep_fields
     """
     template = record_in_flux = False
-    if isinstance(record, RecordTemplate):
+    if isinstance(record, dbf.RecordTemplate):
         template = True
     else:
         record_in_flux = not record._write_to_disk
         if record._meta.status == CLOSED:
-            raise DbfError("%s is closed; cannot modify record" % record._meta.filename)
+            raise dbf.DbfError("%s is closed; cannot modify record" % record._meta.filename)
     if keep_fields is None:
         keep_fields = []
     keep = {}
@@ -317,20 +340,20 @@ def source_table(thingie):
     """
     table = thingie._meta.table()
     if table is None:
-        raise DbfError("table is no longer available")
+        raise dbf.DbfError("table is no longer available")
     return table
 
 def string(text):
     if isinstance(text, unicode):
         return text
     elif isinstance(text, bytes):
-        return text.decode(default_codepage)
+        return text.decode(dbf.default_codepage)
 
 def structure(table_name, field=None):
     """
     returns the definition of a field (or all fields)
     """
-    table = Table(table_name)
+    table = dbf.Table(table_name)
     return table.structure(field)
 
 def table_type(filename):
@@ -358,24 +381,24 @@ def table_type(filename):
     if len(matches) == 1:
         actual_filename = matches[0]
     elif matches:
-        raise DbfError("please specify exactly which of %r you want" % (matches, ))
+        raise dbf.DbfError("please specify exactly which of %r you want" % (matches, ))
     else:
-        raise DbfError('File %r not found' % search_name)
+        raise dbf.DbfError('File %r not found' % search_name)
     fd = open(actual_filename, 'rb')
     version = ord(fd.read(1))
     fd.close()
     fd = None
-    if not version in version_map:
-        raise DbfError("Unknown dbf type: %s (%x)" % (version, version))
-    return version, version_map[version]
+    if not version in dbf.tables.version_map:
+        raise dbf.DbfError("Unknown dbf type: %s (%x)" % (version, version))
+    return version, dbf.tables.version_map[version]
 
 def undelete(record):
     """
     marks record as active
     """
-    template = isinstance(record, RecordTemplate)
+    template = isinstance(record, dbf.RecordTemplate)
     if not template and record._meta.status == CLOSED:
-        raise DbfError("%s is closed; cannot undelete record" % record._meta.filename)
+        raise dbf.DbfError("%s is closed; cannot undelete record" % record._meta.filename)
     record_in_flux = not record._write_to_disk
     if not template and not record_in_flux:
         record._start_flux()
@@ -394,9 +417,9 @@ def write(record, **kwargs):
     write record data to disk (updates indices)
     """
     if record._meta.status == CLOSED:
-        raise DbfError("%s is closed; cannot update record" % record._meta.filename)
+        raise dbf.DbfError("%s is closed; cannot update record" % record._meta.filename)
     elif not record._write_to_disk:
-        raise DbfError("unable to use .write_record() while record is in flux")
+        raise dbf.DbfError("unable to use .write_record() while record is in flux")
     if kwargs:
         gather(record, kwargs)
     if record._dirty:
@@ -407,10 +430,10 @@ def Process(records, start=0, stop=None, filter=None):
     if records is a table, it will be opened and closed if necessary
     filter function should return True to skip record, False to keep"""
     already_open = True
-    if isinstance(records, Table):
+    if isinstance(records, dbf.Table):
         already_open = records.status != CLOSED
         if not already_open:
-            records.open(READ_WRITE)
+            records.open(dbf.READ_WRITE)
     try:
         if stop is None:
             stop = len(records)
@@ -435,7 +458,7 @@ def Templates(records, start=0, stop=None, filter=None):
     if records is a table, it will be opened and closed if necessary
     """
     already_open = True
-    if isinstance(records, Table):
+    if isinstance(records, dbf.Table):
         already_open = records.status != CLOSED
         if not already_open:
             records.open()
@@ -460,8 +483,8 @@ def gather(record, data, drop=False):
     exception unless drop_missing == True;
     if an Exception occurs the record is restored before reraising
     """
-    if isinstance(record, Record) and record._meta.status == CLOSED:
-        raise DbfError("%s is closed; cannot modify record" % record._meta.filename)
+    if isinstance(record, dbf.Record) and record._meta.status == CLOSED:
+        raise dbf.DbfError("%s is closed; cannot modify record" % record._meta.filename)
     record_in_flux = not record._write_to_disk
     if not record_in_flux:
         record._start_flux()
@@ -473,7 +496,7 @@ def gather(record, data, drop=False):
             if not key in record_fields:
                 if drop:
                     continue
-                raise FieldMissingError(key)
+                raise dbf.FieldMissingError(key)
             record[key] = value
     except:
         if not record_in_flux:
@@ -491,10 +514,10 @@ def scan(table, direction='forward', filter=lambda rec: True):
         raise TypeError("direction should be 'forward' or 'reverse', not %r" % direction)
     if direction == 'forward':
         n = +1
-        no_more_records = Eof
+        no_more_records = dbf.Eof
     else:
         n = -1
-        no_more_records = Bof
+        no_more_records = dbf.Bof
     try:
         while True:
             table.skip(n)

@@ -92,12 +92,12 @@ Whirlwind Tour
             field_specs='name C(25); age N(3,0); birth D; qualified L',
             on_disk=False,
             )
-    table.open()
+    table.open(dbf.READ_WRITE)
 
     # add some records to it
     for datum in (
             ('Spanky', 7, dbf.Date.fromymd('20010315'), False),
-            ('Spunky', 23, dbf.Date(1989, 07, 23), True),
+            ('Spunky', 23, dbf.Date(1989, 7, 23), True),
             ('Sparky', 99, dbf.Date(), dbf.Unknown),
             ):
         table.append(datum)
@@ -112,7 +112,7 @@ Whirlwind Tour
 
     # make a copy of the test table (structure, not data)
     custom = table.new(
-            filename='test_on_disk',
+            filename='test_on_disk.dbf',
             default_data_types=dict(C=dbf.Char, D=dbf.Date, L=dbf.Logical),
             )
 

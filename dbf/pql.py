@@ -1,3 +1,7 @@
+from . import dbf
+from .bridge import *
+from .utils import ensure_unicode, field_names, source_table
+
 # SQL functions
 
 def pql_select(records, chosen_fields, condition, field_names):
@@ -109,10 +113,10 @@ def pql_criteria(records, criteria):
     criteria = criteria.replace('recno()', 'recno(_rec)').replace('is_deleted()', 'is_deleted(_rec)')
     fields = '\n        '.join(['%s = _rec.%s' % (field.lower(), field) for field in fields])
     g = dict()
-    g['dbf'] = api
-    g.update(pql_user_functions)
+    g['dbf'] = dbf.api
+    g.update(dbf.pql_user_functions)
     function %= (criteria, fields, criteria)
-    exec(function, g)
+    execute(function, g)
     return g['func']
 
 def pql_cmd(command, field_names):
@@ -141,8 +145,8 @@ def pql_cmd(command, field_names):
     command = command.replace('recno()', 'recno(_rec)').replace('is_deleted()', 'is_deleted(_rec)')
     pre_fields = '\n        '.join(['%s = _tmp.%s' % (field.lower(), field) for field in fields])
     post_fields = '\n        '.join(['_tmp.%s = %s' % (field, field).lower() for field in fields])
-    g = pql_user_functions.copy()
-    g['dbf'] = api
+    g = dbf.pql_user_functions.copy()
+    g['dbf'] = dbf.api
     g['recno'] = recno
     g['create_template'] = create_template
     g['gather'] = gather
@@ -150,10 +154,10 @@ def pql_cmd(command, field_names):
         offset = command.lower().index(' with ')
         command = command[:offset] + ' = ' + command[offset + 6:]
     function %= (command, pre_fields, command, post_fields)
-    exec(function, g)
+    execute(function, g)
     return g['func']
 
-def pql(records, command):
+def pqlc(records, command):
     """
     recognized pql commands are SELECT, UPDATE | REPLACE, DELETE, RECALL, ADD, DROP
     """

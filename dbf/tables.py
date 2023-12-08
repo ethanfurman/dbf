@@ -2,6 +2,7 @@ from __future__ import print_function
 
 from array import array
 from aenum import NamedTuple
+from bisect import bisect_left, bisect_right
 from collections import defaultdict
 from functools import partial
 from glob import glob
@@ -16,6 +17,18 @@ import sys
 import traceback
 import warnings
 import weakref
+
+from . import dbf
+from . import pqlc
+from .bridge import *
+from .constants import *
+from .constants import _NULLFLAG
+from .data_types import *
+from .exceptions import *
+from .utils import ensure_unicode, field_names, gather, guess_table_type, recno, scatter, source_table
+from .utils import is_deleted
+
+temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TMP") or os.environ.get("TEMP") or ""
 
 # other constructs
 
@@ -145,7 +158,7 @@ class FieldnameList(list):
                     new_things.append(thing)
                 item = new_things
             except TypeError:
-                raise TypeError('%r cannot be a field name' % (things, ))
+                raise TypeError('%r cannot be a field name' % (thing, ))
         else:
             item = ensure_unicode(item)
             if not isinstance(item, unicode):
@@ -561,14 +574,14 @@ class Record(object):
         elif isinstance(item, slice):
             sequence = []
             if isinstance(item.start, basestring) or isinstance(item.stop, basestring):
-                field_names = api.field_names(self)
+                names = field_names(self)
                 start, stop, step = ensure_unicode(item.start).upper(), ensure_unicode(item.stop).upper(), item.step
-                if start not in field_names or stop not in field_names:
+                if start not in names or stop not in names:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an intger, not %r" % type(step))
-                start = field_names.index(start)
-                stop = field_names.index(stop) + 1
+                start = names.index(start)
+                stop = names.index(stop) + 1
                 item = slice(start, stop, step)
             for index in self._meta.fields[item]:
                 sequence.append(self[index])
@@ -621,15 +634,15 @@ class Record(object):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
-            field_names = api.field_names(self)
+            names = field_names(self)
             if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = ensure_unicode(name.start).upper(), ensure_unicode(name.stop).upper(), name.step
-                if start not in field_names or stop not in field_names:
+                if start not in names or stop not in names:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an integer, not %r" % type(step))
-                start = field_names.index(start)
-                stop = field_names.index(stop) + 1
+                start = names.index(start)
+                stop = names.index(stop) + 1
                 name = slice(start, stop, step)
             for field in self._meta.fields[name]:
                 sequence.append(field)
@@ -923,14 +936,14 @@ class RecordTemplate(object):
         record = ascii array of entire record; layout=record specification
         """
         sig = layout.record_sig
-        if sig not in _Template_Records:
+        if sig not in dbf._Template_Records:
             table = layout.table()
-            _Template_Records[sig] = table.new(
+            dbf._Template_Records[sig] = table.new(
                     ':%s:' % layout.filename,
                     default_data_types=table._meta._default_data_types,
                     field_data_types=table._meta._field_data_types, on_disk=False
                     )._meta
-        layout = _Template_Records[sig]
+        layout = dbf._Template_Records[sig]
         record = object.__new__(cls)
         record._write_to_disk = True
         record._meta = layout
@@ -944,8 +957,8 @@ class RecordTemplate(object):
             record._data = original_record._data[:]
             for name in layout.memofields:
                 record._memos[name] = original_record[name]
-        for field in field_names(defaults or {}):
-            record[field] = defaults[field]
+        for name in field_names(defaults or {}):
+            record[name] = defaults[name]
         record._old_data = record._data[:]
         return record
 
@@ -1062,15 +1075,15 @@ class RecordTemplate(object):
             self.__setattr__(self._meta.fields[name], value)
         elif isinstance(name, slice):
             sequence = []
-            field_names = api.field_names(self)
+            names = field_names(self)
             if isinstance(name.start, basestring) or isinstance(name.stop, basestring):
                 start, stop, step = name.start.upper(), name.stop.upper(), name.step
-                if start not in field_names or stop not in field_names:
+                if start not in names or stop not in names:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
                     raise DbfError("step value must be an integer, not %r" % type(step))
-                start = field_names.index(start)
-                stop = field_names.index(stop) + 1
+                start = names.index(start)
+                stop = names.index(stop) + 1
                 name = slice(start, stop, step)
             for field in self._meta.fields[name]:
                 sequence.append(field)
@@ -1402,9 +1415,12 @@ class _DeadObject(object):
     """
     used because you cannot weakref None
     """
-    def __bool__(self):
-        return False
-
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            return False
+    else:
+        def __bool__(self):
+            return False
 _DeadObject = _DeadObject()
 
 
@@ -1789,6 +1805,58 @@ def update_vfp_datetime(moment, *ignore):
         data[:4] = update_integer(moment.toordinal() + VFPTIME)
     return to_bytes(data)
 
+def retrieve_clp_timestamp(bytes, fielddef, *ignore):
+    """
+    returns the timestamp stored in bytes
+    """
+    # First long repesents date and second long time.
+    # Date is the number of days since January 1st, 4713 BC.
+    # Time is hours * 3600000L + minutes * 60000L + seconds * 1000L
+    # http://www.manmrk.net/tutorials/database/xbase/data_types.html
+    if bytes == array('B', [0] * 8):
+        cls = fielddef[EMPTY]
+        if cls is NoneType:
+            return None
+        return cls()
+    cls = fielddef[CLASS]
+    days = unpack_long_int(bytes[:4])
+    # how many days between -4713-01-01 and 0001-01-01 ?  going to guess 1,721,425
+    BC = 1721425
+    if days < BC:
+        # bail
+        cls = fielddef[EMPTY]
+        if cls is NoneType:
+            return None
+        return cls()
+    date = datetime.date.fromordinal(days-BC)
+    time = unpack_long_int(bytes[4:])
+    microseconds = (time % 1000) * 1000
+    time = time // 1000                      # int(round(time, -3)) // 1000 discard milliseconds
+    hours = time // 3600
+    mins = time % 3600 // 60
+    secs = time % 3600 % 60
+    time = datetime.time(hours, mins, secs, microseconds)
+    return cls(date.year, date.month, date.day, time.hour, time.minute, time.second, time.microsecond)
+
+def update_clp_timestamp(moment, *ignore):
+    """
+    Sets the timestamp stored in moment
+    moment must have fields:
+        year, month, day, hour, minute, second, microsecond
+    """
+    data = [0] * 8
+    if moment:
+        BC = 1721425
+        days = BC + moment.toordinal()
+        hour = moment.hour
+        minute = moment.minute
+        second = moment.second
+        millisecond = moment.microsecond // 1000       # convert from millionths to thousandths
+        time = ((hour * 3600) + (minute * 60) + second) * 1000 + millisecond
+        data[:4] = pack_long_int(days)
+        data[4:] = pack_long_int(time)
+    return to_bytes(data)
+
 def retrieve_vfp_memo(bytes, fielddef, memo, decoder):
     """
     Returns the block of data from a memo file
@@ -1888,8 +1956,8 @@ def add_numeric(format, flags):
     flag = 0
     for f in format[1:]:
         flag |= FieldFlag.lookup(f)
-    if not 0 < length < 20:
-        raise FieldSpecError("Numeric fields must be between 1 and 19 digits, not %d" % length)
+    if not 0 < length <= 20:
+        raise FieldSpecError("Numeric fields must be between 1 and 20 digits, not %d" % length)
     if decimals and not 0 < decimals <= length - 2:
         raise FieldSpecError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
     return length, decimals, flag
@@ -1997,6 +2065,16 @@ def add_vfp_numeric(format, flags):
         raise FieldSpecError("Decimals must be between 0 and Length-2 (Length: %d, Decimals: %d)" % (length, decimals))
     return length, decimals, flag
 
+def add_clp_timestamp(format, flags):
+    if any(f not in flags for f in format):
+        raise FieldSpecError("Format for TimeStamp field creation is '@%s', not '@%s'" % field_spec_error_text(format, flags))
+    length = 8
+    decimals = 0
+    flag = 0
+    for f in format[1:]:
+        flag |= FieldFlag.lookup(f)
+    return length, decimals, flag
+
 def field_spec_error_text(format, flags):
     """
     generic routine for error text for the add...() functions
@@ -2066,6 +2144,399 @@ class Tables(object):
             except Exception:
                 pass
 
+class Index(_Navigation):
+    """
+    non-persistent index for a table
+    """
+
+    def __init__(self, table, key):
+        self._table = table
+        self._values = []             # ordered list of values
+        self._rec_by_val = []         # matching record numbers
+        self._records = {}            # record numbers:values
+        self.__doc__ = key.__doc__ or 'unknown'
+        self._key = key
+        self._previous_status = []
+        for record in table:
+            value = key(record)
+            if value is DoNotIndex:
+                continue
+            rec_num = recno(record)
+            if not isinstance(value, tuple):
+                value = (value, )
+            vindex = bisect_right(self._values, value)
+            self._values.insert(vindex, value)
+            self._rec_by_val.insert(vindex, rec_num)
+            self._records[rec_num] = value
+        table._indexen.add(self)
+
+    def __call__(self, record):
+        rec_num = recno(record)
+        key = self.key(record)
+        if rec_num in self._records:
+            if self._records[rec_num] == key:
+                return
+            old_key = self._records[rec_num]
+            vindex = bisect_left(self._values, old_key)
+            self._values.pop(vindex)
+            self._rec_by_val.pop(vindex)
+            del self._records[rec_num]
+            assert rec_num not in self._records
+        if key == (DoNotIndex, ):
+            return
+        vindex = bisect_right(self._values, key)
+        self._values.insert(vindex, key)
+        self._rec_by_val.insert(vindex, rec_num)
+        self._records[rec_num] = key
+
+    def __contains__(self, data):
+        if not isinstance(data, (Record, RecordTemplate, tuple, dict)):
+            raise TypeError("%r is not a record, templace, tuple, nor dict" % (data, ))
+        try:
+            value = self.key(data)
+            return value in self._values
+        except Exception:
+            for record in self:
+                if record == data:
+                    return True
+            return False
+
+    def __getitem__(self, key):
+        '''if key is an integer, returns the matching record;
+        if key is a [slice | string | tuple | record] returns a List;
+        raises NotFoundError on failure'''
+        if isinstance(key, baseinteger):
+            count = len(self._values)
+            if not -count <= key < count:
+                raise NotFoundError("Record %d is not in list." % key)
+            rec_num = self._rec_by_val[key]
+            return self._table[rec_num]
+        elif isinstance(key, slice):
+            result = List()
+            start, stop, step = key.start, key.stop, key.step
+            if start is None: start = 0
+            if stop is None: stop = len(self._rec_by_val)
+            if step is None: step = 1
+            if step < 0:
+                start, stop = stop - 1, -(stop - start + 1)
+            for loc in range(start, stop, step):
+                record = self._table[self._rec_by_val[loc]]
+                result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
+            return result
+        elif isinstance (key, (basestring, tuple, Record, RecordTemplate)):
+            if isinstance(key, (Record, RecordTemplate)):
+                key = self.key(key)
+            elif isinstance(key, basestring):
+                key = (key, )
+            lo = self._search(key, where='left')
+            hi = self._search(key, where='right')
+            if lo == hi:
+                raise NotFoundError(key)
+            result = List(desc='match = %r' % (key, ))
+            for loc in range(lo, hi):
+                record = self._table[self._rec_by_val[loc]]
+                result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
+            return result
+        else:
+            raise TypeError('indices must be integers, match objects must by strings or tuples')
+
+    def __enter__(self):
+        self._table.__enter__()
+        return self
+
+    def __exit__(self, *exc_info):
+        self._table.__exit__()
+        return False
+
+    def __iter__(self):
+        return Iter(self)
+
+    def __len__(self):
+        return len(self._records)
+
+    def _clear(self):
+        """
+        removes all entries from index
+        """
+        self._values[:] = []
+        self._rec_by_val[:] = []
+        self._records.clear()
+
+    def _key(self, record):
+        """
+        table_name, record_number
+        """
+        self._still_valid_check()
+        return source_table(record), recno(record)
+
+    def _nav_check(self):
+        """
+        raises error if table is closed
+        """
+        if self._table._meta.status == CLOSED:
+            raise DbfError('indexed table %s is closed' % self.filename)
+
+    def _partial_match(self, target, match):
+        target = target[:len(match)]
+        if isinstance(match[-1], basestring):
+            target = list(target)
+            target[-1] = target[-1][:len(match[-1])]
+            target = tuple(target)
+        return target == match
+
+    def _purge(self, rec_num):
+        value = self._records.get(rec_num)
+        if value is not None:
+            vindex = bisect_left(self._values, value)
+            del self._records[rec_num]
+            self._values.pop(vindex)
+            self._rec_by_val.pop(vindex)
+
+    def _reindex(self):
+        """
+        reindexes all records
+        """
+        for record in self._table:
+            self(record)
+
+    def _search(self, match, lo=0, hi=None, where=None):
+        if hi is None:
+            hi = len(self._values)
+        if where == 'left':
+            return bisect_left(self._values, match, lo, hi)
+        elif where == 'right':
+            return bisect_right(self._values, match, lo, hi)
+
+    def index(self, record, start=None, stop=None):
+        """
+        returns the index of record between start and stop
+        start and stop default to the first and last record
+        """
+        if not isinstance(record, (Record, RecordTemplate, dict, tuple)):
+            raise TypeError("x should be a record, template, dict, or tuple, not %r" % type(record))
+        self._nav_check()
+        if start is None:
+            start = 0
+        if stop is None:
+            stop = len(self)
+        for i in range(start, stop):
+            if record == (self[i]):
+                return i
+        else:
+            raise NotFoundError("dbf.Index.index(x): x not in Index", data=record)
+
+    def index_search(self, match, start=None, stop=None, nearest=False, partial=False):
+        """
+        returns the index of match between start and stop
+        start and stop default to the first and last record.
+        if nearest is true returns the location of where the match should be
+        otherwise raises NotFoundError
+        """
+        self._nav_check()
+        if not isinstance(match, tuple):
+            match = (match, )
+        if start is None:
+            start = 0
+        if stop is None:
+            stop = len(self)
+        loc = self._search(match, start, stop, where='left')
+        if loc == len(self._values):
+            if nearest:
+                return IndexLocation(loc, False)
+            raise NotFoundError("dbf.Index.index_search(x): x not in index", data=match)
+        if self._values[loc] == match \
+        or partial and self._partial_match(self._values[loc], match):
+            return IndexLocation(loc, True)
+        elif nearest:
+            return IndexLocation(loc, False)
+        else:
+            raise NotFoundError("dbf.Index.index_search(x): x not in Index", data=match)
+
+    def key(self, record):
+        result = self._key(record)
+        if not isinstance(result, tuple):
+            result = (result, )
+        return result
+
+    def query(self, criteria):
+        """
+        criteria is a callback that returns a truthy value for matching record
+        """
+        self._nav_check()
+        return pqlc(self, criteria)
+
+    def search(self, match, partial=False):
+        """
+        returns dbf.List of all (partially) matching records
+        """
+        self._nav_check()
+        result = List()
+        if not isinstance(match, tuple):
+            match = (match, )
+        loc = self._search(match, where='left')
+        if loc == len(self._values):
+            return result
+        while loc < len(self._values) and self._values[loc] == match:
+            record = self._table[self._rec_by_val[loc]]
+            result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
+            loc += 1
+        if partial:
+            while loc < len(self._values) and self._partial_match(self._values[loc], match):
+                record = self._table[self._rec_by_val[loc]]
+                result._maybe_add(item=(self._table, self._rec_by_val[loc], result.key(record)))
+                loc += 1
+        return result
+
+
+class Relation(object):
+    """
+    establishes a relation between two dbf tables (not persistent)
+    """
+
+    relations = {}
+
+    def __new__(cls, src, tgt, src_names=None, tgt_names=None):
+        if (len(src) != 2 or  len(tgt) != 2):
+            raise DbfError("Relation should be called with ((src_table, src_field), (tgt_table, tgt_field))")
+        if src_names and len(src_names) !=2 or tgt_names and len(tgt_names) != 2:
+            raise DbfError('src_names and tgt_names, if specified, must be ("table","field")')
+        src_table, src_field = src
+        tgt_table, tgt_field = tgt
+        try:
+            if isinstance(src_field, baseinteger):
+                table, field = src_table, src_field
+                src_field = table.field_names[field]
+            else:
+                src_table.field_names.index(src_field)
+            if isinstance(tgt_field, baseinteger):
+                table, field = tgt_table, tgt_field
+                tgt_field = table.field_names[field]
+            else:
+                tgt_table.field_names.index(tgt_field)
+        except (IndexError, ValueError):
+            raise DbfError('%r not in %r' % (field, table)).from_exc(None)
+        if src_names:
+            src_table_name, src_field_name = src_names
+        else:
+            src_table_name, src_field_name = src_table.filename, src_field
+            if src_table_name[-4:].lower() == '.dbf':
+                src_table_name = src_table_name[:-4]
+        if tgt_names:
+            tgt_table_name, tgt_field_name = tgt_names
+        else:
+            tgt_table_name, tgt_field_name = tgt_table.filename, tgt_field
+            if tgt_table_name[-4:].lower() == '.dbf':
+                tgt_table_name = tgt_table_name[:-4]
+        relation = cls.relations.get(((src_table, src_field), (tgt_table, tgt_field)))
+        if relation is not None:
+            return relation
+        obj = object.__new__(cls)
+        obj._src_table, obj._src_field = src_table, src_field
+        obj._tgt_table, obj._tgt_field = tgt_table, tgt_field
+        obj._src_table_name, obj._src_field_name = src_table_name, src_field_name
+        obj._tgt_table_name, obj._tgt_field_name = tgt_table_name, tgt_field_name
+        obj._tables = dict()
+        cls.relations[((src_table, src_field), (tgt_table, tgt_field))] = obj
+        return obj
+
+    def __eq__(self, other):
+        if (self.src_table == other.src_table
+        and self.src_field == other.src_field
+        and self.tgt_table == other.tgt_table
+        and self.tgt_field == other.tgt_field):
+            return True
+        return False
+
+    def __getitem__(self, record):
+        """
+        record should be from the source table
+        """
+        key = (record[self.src_field], )
+        try:
+            return self.index[key]
+        except NotFoundError:
+            return List(desc='%s not found' % key)
+
+    def __hash__(self):
+        return hash((self.src_table, self.src_field, self.tgt_table, self.tgt_field))
+
+    def __ne__(self, other):
+        if (self.src_table != other.src_table
+        or  self.src_field != other.src_field
+        or  self.tgt_table != other.tgt_table
+        or  self.tgt_field != other.tgt_field):
+            return True
+        return False
+
+    def __repr__(self):
+        return "Relation((%r, %r), (%r, %r))" % (self.src_table_name, self.src_field, self.tgt_table_name, self.tgt_field)
+
+    def __str__(self):
+        return "%s:%s --> %s:%s" % (self.src_table_name, self.src_field_name, self.tgt_table_name, self.tgt_field_name)
+
+    @property
+    def src_table(self):
+        "name of source table"
+        return self._src_table
+
+    @property
+    def src_field(self):
+        "name of source field"
+        return self._src_field
+
+    @property
+    def src_table_name(self):
+        return self._src_table_name
+
+    @property
+    def src_field_name(self):
+        return self._src_field_name
+
+    @property
+    def tgt_table(self):
+        "name of target table"
+        return self._tgt_table
+
+    @property
+    def tgt_field(self):
+        "name of target field"
+        return self._tgt_field
+
+    @property
+    def tgt_table_name(self):
+        return self._tgt_table_name
+
+    @property
+    def tgt_field_name(self):
+        return self._tgt_field_name
+
+    @LazyAttr
+    def index(self):
+        def index(record, field=self._tgt_field):
+            return record[field]
+        index.__doc__ = "%s:%s --> %s:%s" % (self.src_table_name, self.src_field_name, self.tgt_table_name, self.tgt_field_name)
+        self.index = self._tgt_table.create_index(index)
+        source = List(self._src_table, key=lambda rec, field=self._src_field: rec[field])
+        target = List(self._tgt_table, key=lambda rec, field=self._tgt_field: rec[field])
+        if len(source) != len(self._src_table):
+            self._tables[self._src_table] = 'many'
+        else:
+            self._tables[self._src_table] = 'one'
+        if len(target) != len(self._tgt_table):
+            self._tables[self._tgt_table] = 'many'
+        else:
+            self._tables[self._tgt_table] = 'one'
+        return self.index
+
+    def one_or_many(self, table):
+        self.index    # make sure self._tables has been populated
+        try:
+            if isinstance(table, basestring):
+                table = (self._src_table, self._tgt_table)[self._tgt_table_name == table]
+            return self._tables[table]
+        except IndexError:
+            raise NotFoundError("table %s not in relation" % table).from_exc(None)
+
 class IndexLocation(long):
     """
     Represents the index where the match criteria is if True,
@@ -2080,8 +2551,12 @@ class IndexLocation(long):
         result.found = found
         return result
 
-    def __bool__(self):
-        return self.found
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            return self.found
+    else:
+        def __bool__(self):
+            return self.found
 
 
 class FieldInfo(NamedTuple):
@@ -2133,20 +2608,36 @@ class Iter(_Navigation):
     def __iter__(self):
         return self
 
-    def __next__(self):
-        while not self._exhausted:
-            if self._index == len(self._table):
-                break
-            if self._index >= (len(self._table) - 1):
-                self._index = max(self._index, len(self._table))
-                if self._include_vapor:
-                    return RecordVaporWare('eof', self._table)
-                break
-            self._index += 1
-            record = self._table[self._index]
-            return record
-        self._exhausted = True
-        raise StopIteration
+    if py_ver < (3, 0):
+        def next(self):
+            while not self._exhausted:
+                if self._index == len(self._table):
+                    break
+                if self._index >= (len(self._table) - 1):
+                    self._index = max(self._index, len(self._table))
+                    if self._include_vapor:
+                        return RecordVaporWare('eof', self._table)
+                    break
+                self._index += 1
+                record = self._table[self._index]
+                return record
+            self._exhausted = True
+            raise StopIteration
+    else:
+        def __next__(self):
+            while not self._exhausted:
+                if self._index == len(self._table):
+                    break
+                if self._index >= (len(self._table) - 1):
+                    self._index = max(self._index, len(self._table))
+                    if self._include_vapor:
+                        return RecordVaporWare('eof', self._table)
+                    break
+                self._index += 1
+                record = self._table[self._index]
+                return record
+            self._exhausted = True
+            raise StopIteration
 
 
 class Table(_Navigation):
@@ -2241,6 +2732,7 @@ class Table(_Navigation):
         Container class for storing per table metadata
         """
         blankrecord = None
+        codepage = None           # code page being used (can be overridden when table is opened)
         dfd = None                # file handle
         fields = None             # field names
         field_count = 0           # number of fields
@@ -2630,7 +3122,7 @@ class Table(_Navigation):
         specs = [s.strip() for s in specs]
         for i, s in enumerate(specs):
             if isinstance(s, bytes):
-                specs[i] = s.decode(input_decoding)
+                specs[i] = s.decode(dbf.input_decoding)
         return FieldnameList(specs)
 
     def _nav_check(self):
@@ -2772,8 +3264,8 @@ class Table(_Navigation):
         meta.memo_types = self._memo_types
         meta.ignorememos = meta.original_ignorememos = ignore_memos
         meta.memo_size = memo_size
-        meta.input_decoder = codecs.getdecoder(input_decoding)      # from ascii to unicode
-        meta.output_encoder = codecs.getencoder(input_decoding)     # and back to ascii
+        meta.input_decoder = codecs.getdecoder(dbf.input_decoding)      # from ascii to unicode
+        meta.output_encoder = codecs.getencoder(dbf.input_decoding)     # and back to ascii
         meta.unicode_errors = unicode_errors
         meta.header = header = self._TableHeader(self._dbfTableHeader, self._pack_date, self._unpack_date)
         header.extra = self._dbfTableHeaderExtra
@@ -2836,6 +3328,7 @@ class Table(_Navigation):
         if codepage is not None:
             header.codepage(codepage)
             cp, sd, ld = _codepage_lookup(codepage)
+            self._meta.codepage = sd
             self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
         if field_specs:
             meta.status = READ_WRITE
@@ -2845,6 +3338,7 @@ class Table(_Navigation):
             if codepage is None:
                 header.codepage(default_codepage)
                 cp, sd, ld = _codepage_lookup(header.codepage())
+                self._meta.codepage = sd
                 self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
             self.add_fields(field_specs)
         else:
@@ -2852,38 +3346,41 @@ class Table(_Navigation):
             try:
                 dfd = meta.dfd = open(meta.filename, 'rb')
             except IOError:
-                e= sys.exc_info()[1]
+                e = sys.exc_info()[1]
                 raise DbfError(unicode(e)).from_exc(None)
             dfd.seek(0)
-            meta.header = header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
-            if not header.version in self._supported_tables:
+            try:
+                meta.header = header = self._TableHeader(dfd.read(32), self._pack_date, self._unpack_date)
+                if not header.version in self._supported_tables:
+                    dfd.close()
+                    raise DbfError(
+                        "%s does not support %s [%x]" %
+                        (self._version,
+                        version_map.get(header.version, 'Unknown: %s' % header.version),
+                        header.version))
+                if codepage is None:
+                    cp, sd, ld = _codepage_lookup(header.codepage())
+                    self._meta.codepage = sd
+                    self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
+                fieldblock = array('B', dfd.read(header.start - 32))
+                for i in range(len(fieldblock) // 32 + 1):
+                    fieldend = i * 32
+                    if fieldblock[fieldend] == CR:
+                        break
+                else:
+                    raise BadDataError("corrupt field structure in header")
+                if len(fieldblock[:fieldend]) % 32 != 0:
+                    raise BadDataError("corrupt field structure in header")
+                old_length = header.data[10:12]
+                header.fields = fieldblock[:fieldend]
+                header.data = header.data[:10] + old_length + header.data[12:]    # restore original for testing
+                header.extra = fieldblock[fieldend + 1:]  # skip trailing \r
+                self._initialize_fields()
+                self._check_memo_integrity()
+                dfd.seek(0)
+            except DbfError:
                 dfd.close()
-                dfd = None
-                raise DbfError(
-                    "%s does not support %s [%x]" %
-                    (self._version,
-                    version_map.get(header.version, 'Unknown: %s' % header.version),
-                    header.version))
-            if codepage is None:
-                cp, sd, ld = _codepage_lookup(header.codepage())
-                self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
-            fieldblock = array('B', dfd.read(header.start - 32))
-            for i in range(len(fieldblock) // 32 + 1):
-                fieldend = i * 32
-                if fieldblock[fieldend] == CR:
-                    break
-            else:
-                raise BadDataError("corrupt field structure in header")
-            if len(fieldblock[:fieldend]) % 32 != 0:
-                raise BadDataError("corrupt field structure in header")
-            old_length = header.data[10:12]
-            header.fields = fieldblock[:fieldend]
-            header.data = header.data[:10] + old_length + header.data[12:]    # restore original for testing
-            header.extra = fieldblock[fieldend + 1:]  # skip trailing \r
-            self._initialize_fields()
-            self._check_memo_integrity()
-            dfd.seek(0)
-
+                raise
         for field in meta.fields:
             field_type = meta[field][TYPE]
             default_field_type = (
@@ -2921,7 +3418,7 @@ class Table(_Navigation):
         if dbf_type is None and isinstance(filename, Table):
             return filename
         if field_specs and dbf_type is None:
-            dbf_type = default_type
+            dbf_type = dbf.default_type
         if dbf_type is not None:
             dbf_type = dbf_type.lower()
             table = table_types.get(dbf_type)
@@ -2934,18 +3431,25 @@ class Table(_Navigation):
                 return object.__new__(possibles[0][2])
             else:
                 for type, desc, cls in possibles:
-                    if type == default_type:
+                    if type == dbf.default_type:
                         return object.__new__(cls)
                 else:
                     types = ', '.join(["%s" % item[1] for item in possibles])
                     abbrs = '[' + ' | '.join(["%s" % item[0] for item in possibles]) + ']'
                     raise DbfError("Table could be any of %s.  Please specify %s when opening" % (types, abbrs))
 
-    def __bool__(self):
-        """
-        True if table has any records
-        """
-        return self._meta.header.record_count != 0
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            """
+            True if table has any records
+            """
+            return self._meta.header.record_count != 0
+    else:
+        def __bool__(self):
+            """
+            True if table has any records
+            """
+            return self._meta.header.record_count != 0
 
     def __repr__(self):
         return __name__ + ".Table(%r, status=%r)" % (self._meta.filename, self._meta.status)
@@ -2959,19 +3463,20 @@ class Table(_Navigation):
         else:
             version = 'unknown - ' + hex(self._meta.header.version)
         str =  """
-        Table:         %s
-        Type:          %s
-        Codepage:      %s
-        Status:        %s
-        Last updated:  %s
-        Record count:  %d
-        Field count:   %d
-        Record length: %d """ % (self.filename, version
-            , self.codepage, status,
+        Table:           %s
+        Type:            %s
+        Listed Codepage: %s
+        Used Codepage:   %s
+        Status:          %s
+        Last updated:    %s
+        Record count:    %d
+        Field count:     %d
+        Record length:   %d """ % (self.filename, version,
+            code_pages[self._meta.header.codepage()][1], self.codepage, status,
             self.last_update, len(self), self.field_count, self.record_length)
         str += "\n        --Fields--\n"
         for i in range(len(self.field_names)):
-            str += "%11d) %s\n" % (i, (self._field_layout(i).encode(input_decoding, errors='backslashreplace')))
+            str += "%11d) %s\n" % (i, (self._field_layout(i).encode(dbf.input_decoding, errors='backslashreplace')))
         return str
 
     @property
@@ -2979,7 +3484,7 @@ class Table(_Navigation):
         """
         code page used for text translation
         """
-        return CodePage(code_pages[self._meta.header.codepage()][0])
+        return CodePage(self._meta.codepage)
 
     @codepage.setter
     def codepage(self, codepage):
@@ -2990,6 +3495,7 @@ class Table(_Navigation):
             raise DbfError('%s not in read/write mode, unable to change codepage' % meta.filename)
         cp, sd, ld = _codepage_lookup(meta.header.codepage(codepage.code))
         meta.decoder, meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), meta.unicode_errors)
+        meta.codepage = sd
         self._update_disk(headeronly=True)
 
     @property
@@ -3061,10 +3567,27 @@ class Table(_Navigation):
         backup table is created with _backup appended to name
         then zaps table, recreates current structure, and copies records back from the backup
         """
-        if isinstance(field_specs, bytes):
-            raise DbfError('field specifications must be in unicode (or set input_decoding)')
-        if isinstance(field_specs, list) and any(isinstance(t, bytes) for t in field_specs):
-            raise DbfError('field specifications must be in unicode (or set input_decoding)')
+        # for python 2, convert field_specs from bytes to unicode if necessary
+        if py_ver < (3, 0):
+            if isinstance(field_specs, bytes):
+                if dbf.input_decoding is None:
+                    raise DbfError('field specifications must be unicode, not bytes (or set dbf.input_decoding)')
+                field_specs = field_specs.decode(dbf.input_decoding)
+            if isinstance(field_specs, list) and any(isinstance(t, bytes) for t in field_specs):
+                if dbf.input_decoding is None:
+                    raise DbfError('field specifications must be unicode, not bytes (or set dbf.input_decoding)')
+                fs = []
+                for text in field_specs:
+                    if isinstance(text, bytes):
+                        text = text.decode(dbf.input_decoding)
+                    fs.append(text)
+                field_specs = fs
+        else:
+            if (
+                isinstance(field_specs, bytes) or
+                isinstance(field_specs, list) and any(isinstance(t, bytes) for t in field_specs)
+                ):
+                raise DbfError('field specifications must be unicode, not bytes')
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to add fields (%s)' % (meta.filename, meta.status))
@@ -3120,7 +3643,7 @@ class Table(_Navigation):
                         # ignore
                         break
                     elif frame[0] != __file__ or frame[2] not in ('__init__','add_fields'):
-                        warnings.warn('"%s invalid:  field names should start with a letter, and only contain letters, digits, and _' % name, FieldNameWarning, stacklevel=i)
+                        warnings.warn('%r invalid:  field names should start with a letter, and only contain letters, digits, and _' % name, FieldNameWarning, stacklevel=i)
                         break
             if name in meta.fields:
                 raise DbfError("Field '%s' already exists" % name)
@@ -3543,7 +4066,7 @@ class Table(_Navigation):
         meta = self._meta
         if meta.status == CLOSED:
             raise DbfError('%s is closed' % meta.filename)
-        return pql(self, criteria)
+        return pqlc(self, criteria)
 
     def reindex(self):
         """
@@ -3587,7 +4110,11 @@ class Table(_Navigation):
         meta = self._meta
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to change field size' % meta.filename)
-        if not 0 < new_size < 256:
+        if self._versionabbr == 'clp':
+            max_size = 65535
+        else:
+            max_size = 255
+        if not 0 < new_size <= max_size:
             raise DbfError("new_size must be between 1 and 255 (use delete_fields to remove a field)")
         chosen = self._list_fields(chosen)
         for candidate in chosen:
@@ -3686,19 +4213,25 @@ class Db3Table(Table):
             FLOAT: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_numeric,
                     'Class':'default', 'Empty':none, 'flags':tuple(),
-                    } }
+                    },
+            TIMESTAMP: {
+                    'Type':'TimeStamp', 'Retrieve':retrieve_clp_timestamp, 'Update':update_clp_timestamp, 'Blank':lambda x: b'\x00' * 8, 'Init':add_clp_timestamp,
+                    'Class':datetime.datetime, 'Empty':none, 'flags':tuple(),
+                    },
+            }
+
 
     _memoext = '.dbt'
     _memoClass = _Db3Memo
     _yesMemoMask = 0x80
     _noMemoMask = 0x7f
-    _binary_types = ()
+    _binary_types = (TIMESTAMP, )
     _character_types = (CHAR, MEMO)
     _currency_types = tuple()
     _date_types = (DATE, )
-    _datetime_types = tuple()
+    _datetime_types = (TIMESTAMP, )
     _decimal_types = (NUMERIC, FLOAT)
-    _fixed_types = (DATE, LOGICAL, MEMO)
+    _fixed_types = (DATE, LOGICAL, MEMO, TIMESTAMP)
     _logical_types = (LOGICAL, )
     _memo_types = (MEMO, )
     _numeric_types = (NUMERIC, FLOAT)
@@ -3832,8 +4365,12 @@ class ClpTable(Db3Table):
             FLOAT: {
                     'Type':'Numeric', 'Retrieve':retrieve_numeric, 'Update':update_numeric, 'Blank':lambda x: b' ' * x, 'Init':add_numeric,
                     'Class':'default', 'Empty':none, 'flags':tuple(),
-                    } }
-
+                    },
+            TIMESTAMP: {
+                    'Type':'TimeStamp', 'Retrieve':retrieve_clp_timestamp, 'Update':update_clp_timestamp, 'Blank':lambda x: b'\x00' * 8, 'Init':add_clp_timestamp,
+                    'Class':datetime.datetime, 'Empty':none, 'flags':tuple(),
+                    },
+            }
     _memoext = '.dbt'
     _memoClass = _Db3Memo
     _yesMemoMask = 0x80
@@ -3841,10 +4378,10 @@ class ClpTable(Db3Table):
     _binary_types = ()
     _character_types = (CHAR, MEMO)
     _currency_types = tuple()
-    _date_types = (DATE, )
-    _datetime_types = tuple()
+    _date_types = (DATE, TIMESTAMP)
+    _datetime_types = (TIMESTAMP, )
     _decimal_types = (NUMERIC, FLOAT)
-    _fixed_types = (DATE, LOGICAL, MEMO)
+    _fixed_types = (DATE, LOGICAL, MEMO, TIMESTAMP)
     _logical_types = (LOGICAL, )
     _memo_types = (MEMO, )
     _numeric_types = (NUMERIC, FLOAT)
@@ -3986,8 +4523,6 @@ class ClpTable(Db3Table):
             old_fields[name]['type'] = meta[name][TYPE]
             old_fields[name]['empty'] = meta[name][EMPTY]
             old_fields[name]['class'] = meta[name][CLASS]
-        meta.fields[:] = []
-        offset = 1
         fieldsdef = meta.header.fields
         if len(fieldsdef) % 32 != 0:
             raise BadDataError(
@@ -3999,43 +4534,57 @@ class ClpTable(Db3Table):
                         % (meta.header.field_count, len(fieldsdef) // 32))
         total_length = meta.header.record_length
         nulls_found = False
-        for i in range(meta.header.field_count):
-            fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = self._meta.decoder(unpack_str(fieldblock[:11]))[0]
-            type = fieldblock[11]
-            if not type in meta.fieldtypes:
-                raise BadDataError("Unknown field type: %s" % type)
-            start = unpack_long_int(fieldblock[12:16])
-            length = fieldblock[16]
-            decimals = fieldblock[17]
-            if type == CHAR:
-                length += decimals * 256
-            offset += length
-            end = start + length
-            flags = fieldblock[18]
-            null = flags & NULLABLE
-            if null:
-                nulls_found = True
-            if name in meta.fields:
-                raise BadDataError('Duplicate field name found: %s' % name)
-            meta.fields.append(name)
-            if name in old_fields and old_fields[name]['type'] == type:
-                cls = old_fields[name]['class']
-                empty = old_fields[name]['empty']
+        starters = set()  # keep track of starting values in case header is poorly created
+        for starter in ('header', 'offset'):
+            meta.fields[:] = []
+            offset = 1
+            for i in range(meta.header.field_count):
+                fieldblock = fieldsdef[i*32:(i+1)*32]
+                name = self._meta.decoder(unpack_str(fieldblock[:11]))[0]
+                type = fieldblock[11]
+                if not type in meta.fieldtypes:
+                    raise BadDataError("Unknown field type: %s" % type)
+                if starter == 'header':
+                    start = unpack_long_int(fieldblock[12:16])
+                    if start in starters:
+                        # poor header
+                        break
+                    starters.add(start)
+                else:
+                    start = offset
+                length = fieldblock[16]
+                decimals = fieldblock[17]
+                if type == CHAR:
+                    length += decimals * 256
+                end = start + length
+                offset += length
+                flags = fieldblock[18]
+                null = flags & NULLABLE
+                if null:
+                    nulls_found = True
+                if name in meta.fields:
+                    raise BadDataError('Duplicate field name found: %s' % name)
+                meta.fields.append(name)
+                if name in old_fields and old_fields[name]['type'] == type:
+                    cls = old_fields[name]['class']
+                    empty = old_fields[name]['empty']
+                else:
+                    cls = meta.fieldtypes[type]['Class']
+                    empty = meta.fieldtypes[type]['Empty']
+                meta[name] = (
+                        type,
+                        start,
+                        length,
+                        end,
+                        decimals,
+                        flags,
+                        cls,
+                        empty,
+                        null
+                        )
             else:
-                cls = meta.fieldtypes[type]['Class']
-                empty = meta.fieldtypes[type]['Empty']
-            meta[name] = (
-                    type,
-                    start,
-                    length,
-                    end,
-                    decimals,
-                    flags,
-                    cls,
-                    empty,
-                    null
-                    )
+                # made it through all the fields
+                break
         if offset != total_length:
             raise BadDataError(
                     "Header shows record length of %d, but calculated record length is %d"
@@ -4493,9 +5042,14 @@ class List(_Navigation):
         self._still_valid_check()
         return len(self._list)
 
-    def __bool__(self):
-        self._still_valid_check()
-        return len(self) > 0
+    if py_ver < (3, 0):
+        def __nonzero__(self):
+            self._still_valid_check()
+            return len(self) > 0
+    else:
+        def __bool__(self):
+            self._still_valid_check()
+            return len(self) > 0
 
     def __radd__(self, other):
         self._still_valid_check()
@@ -4717,7 +5271,7 @@ class List(_Navigation):
         """
         criteria is a callback that returns a truthy value for matching record
         """
-        return pql(self, criteria)
+        return pqlc(self, criteria)
 
     def remove(self, data):
         self._still_valid_check()
@@ -4838,6 +5392,7 @@ code_pages = {
         0x7c : ('cp874', 'Thai Windows'),
         0x7d : ('cp1255', 'Hebrew Windows'),
         0x7e : ('cp1256', 'Arabic Windows'),
+        0x87 : ('cp852', 'Slovenian OEM'),
         0xc8 : ('cp1250', 'Eastern European Windows'),
         0xc9 : ('cp1251', 'Russian Windows'),
         0xca : ('cp1254', 'Turkish Windows'),
@@ -4849,7 +5404,7 @@ code_pages = {
         }
 
 
-default_codepage = code_pages.get(default_codepage, code_pages.get(0x00))[0]
+dbf.default_codepage = default_codepage =  code_pages.get(0x00)[0]
 
 def _codepage_lookup(cp):
     if cp not in code_pages:
@@ -4936,4 +5491,3 @@ class _Db4Table(Table):
                         self._meta.dfd = None
                         raise BadDataError("Table structure corrupt:  memo fields exist without memo file")
                     break
-

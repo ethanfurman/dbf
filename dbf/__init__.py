@@ -31,7 +31,7 @@ OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-version = 0, 99, 9
+version = 0, 99, 10, 1
 
 # Python 2 code may need to change these
 default_codepage = None     # will be set by tables module (defaults to ascii)

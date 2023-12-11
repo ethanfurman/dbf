@@ -4913,41 +4913,55 @@ class VfpTable(FpTable):
         fieldsdef = meta.header.fields
         nulls_found = False
         total_length = meta.header.record_length
-        for i in range(meta.header.field_count):
-            fieldblock = fieldsdef[i*32:(i+1)*32]
-            name = self._meta.decoder(unpack_str(fieldblock[:11]))[0]
-            type = fieldblock[11]
-            if not type in meta.fieldtypes:
-                raise BadDataError("Unknown field type: %s" % type)
-            start = unpack_long_int(fieldblock[12:16])
-            length = fieldblock[16]
-            offset += length
-            end = start + length
-            decimals = fieldblock[17]
-            flags = fieldblock[18]
-            null = flags & NULLABLE
-            if null:
-                nulls_found = True
-            if name in meta.fields:
-                raise BadDataError('Duplicate field name found: %s' % name)
-            meta.fields.append(name)
-            if name in old_fields and old_fields[name]['type'] == type:
-                cls = old_fields[name]['class']
-                empty = old_fields[name]['empty']
+        starters = set()  # keep track of starting values in case header is poorly created
+        for starter in ('header', 'offset'):
+            meta.fields[:] = []
+            offset = 1
+            for i in range(meta.header.field_count):
+                fieldblock = fieldsdef[i*32:(i+1)*32]
+                name = self._meta.decoder(unpack_str(fieldblock[:11]))[0]
+                type = fieldblock[11]
+                if not type in meta.fieldtypes:
+                    raise BadDataError("Unknown field type: %s" % type)
+                if starter == 'header':
+                    start = unpack_long_int(fieldblock[12:16])
+                    if start in starters:
+                        # poor header
+                        break
+                    starters.add(start)
+                else:
+                    start = offset
+                length = fieldblock[16]
+                decimals = fieldblock[17]
+                end = start + length
+                offset += length
+                flags = fieldblock[18]
+                null = flags & NULLABLE
+                if null:
+                    nulls_found = True
+                if name in meta.fields:
+                    raise BadDataError('Duplicate field name found: %s' % name)
+                meta.fields.append(name)
+                if name in old_fields and old_fields[name]['type'] == type:
+                    cls = old_fields[name]['class']
+                    empty = old_fields[name]['empty']
+                else:
+                    cls = meta.fieldtypes[type]['Class']
+                    empty = meta.fieldtypes[type]['Empty']
+                meta[name] = (
+                        type,
+                        start,
+                        length,
+                        end,
+                        decimals,
+                        flags,
+                        cls,
+                        empty,
+                        null
+                        )
             else:
-                cls = meta.fieldtypes[type]['Class']
-                empty = meta.fieldtypes[type]['Empty']
-            meta[name] = (
-                    type,
-                    start,
-                    length,
-                    end,
-                    decimals,
-                    flags,
-                    cls,
-                    empty,
-                    null
-                    )
+                # made it through all the fields
+                break
         if offset != total_length:
             raise BadDataError("Header shows record length of %d, but calculated record length is %d" % (total_length, offset))
         if nulls_found:

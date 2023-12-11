@@ -4735,10 +4735,14 @@ class TestDbfFunctions(TestCase):
             self.assertEqual(record.name, '!BRAND NEW NAME!         ')
         table.close()
 
-    def test_export(self):
+    def test_export_headers(self):
         for table in self.dbf_table, self.vfp_table:
             table.open(mode=READ_WRITE)
-            dbf.export(table, filename='test_export.csv')
+            dest = os.path.join(tempdir, 'test_export.csv')
+            dbf.export(table, filename=dest)
+            with open(dest) as fh:
+                headers = fh.readline()
+            self.assertEqual(headers.strip(), ','.join(table.field_names))
 
     def test_index_search(self):
         table = Table("unordered", "icao C(20)", default_data_types=dict(C=Char), on_disk=False).open(mode=READ_WRITE)

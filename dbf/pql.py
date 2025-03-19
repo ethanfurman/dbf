@@ -35,7 +35,7 @@ def pql_delete(records, dead_fields, condition, field_names):
 def pql_recall(records, all_fields, condition, field_names):
     if all_fields != '*':
         raise DbfError('SQL RECALL: fields must be * (only able to recover at the record level)')
-    revivified = List()
+    revivified = dbf.List()
     for record in condition(records):
         if is_deleted(record):
             revivified.append(record)
@@ -166,7 +166,7 @@ def pqlc(records, command):
         close_table = True
     try:
         if not records:
-            return List()
+            return dbf.List()
         command = ensure_unicode(command)
         pql_command = command
         uc_command = command.upper()

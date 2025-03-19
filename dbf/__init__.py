@@ -30,7 +30,7 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-version = 0, 99, 10, 1
+version = 0, 99, 10, 2
 # Python 2 code may need to change these
 default_codepage = None     # will be set by tables module (defaults to ascii)
 default_type = 'db3'        # lowest common denominator

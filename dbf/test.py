@@ -1164,8 +1164,8 @@ class TestLogical(TestCase):
         true = Logical(True)
         false = Logical(False)
         none = Logical(None)
-        self.assertEqual(~true, -2)
-        self.assertEqual(~false, -1)
+        self.assertEqual(~true, false)
+        self.assertEqual(~false, true)
         self.assertEqual(~none, none)
 
     def test_complex(self):

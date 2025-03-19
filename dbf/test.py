@@ -12,6 +12,7 @@ from unittest import skipIf, skipUnless, TestCase as unittest_TestCase
 py_ver = sys.version_info[:2]
 module = globals()
 
+from . import dbf
 from . import *
 from .constants import *
 
@@ -32,9 +33,9 @@ else:
 
 try:
     with warnings.catch_warnings():
-        warnings.warn('test if warning is an exception', dbf.DbfWarning, stacklevel=1)
+        warnings.warn('test if warning is an exception', DbfWarning, stacklevel=1)
         warnings_are_exceptions = False
-except dbf.DbfWarning:
+except DbfWarning:
     warnings_are_exceptions = True
 
 

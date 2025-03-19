@@ -18,6 +18,9 @@ NoneType = type(None)
 days_per_month = [31, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
 days_per_leap_month = [31, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31]
 
+def days_in_month(year):
+    return (days_per_month, days_per_leap_month)[is_leapyear(year)]
+
 # gets replaced later by their final values
 Unknown = Other = object()
 
@@ -1415,7 +1418,7 @@ class Logical(object):
 
     def __invert__(x):
         if x in (Truth, Falsth):
-            return ~x.value
+            return (Truth, Falsth)[x.value]
         return Unknown
 
     def __complex__(x):

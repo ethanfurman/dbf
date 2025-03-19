@@ -30,9 +30,7 @@ WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
 ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-
 version = 0, 99, 10, 1
-
 # Python 2 code may need to change these
 default_codepage = None     # will be set by tables module (defaults to ascii)
 default_type = 'db3'        # lowest common denominator
@@ -43,7 +41,7 @@ import sys as _sys
 dbf = _sys.modules[__package__]
 
 ## user-defined pql functions  (pql == primitive query language)
-## it is not real sql and won't be for a long time (if ever)
+# it is not real sql and won't be for a long time (if ever)
 pql_user_functions = dict()
 
 ## signature:_meta of template records
@@ -97,3 +95,24 @@ api = fake_module('api',
     )
 
 api.register()
+
+
+__all__ = (
+        'Decimal', 'DbfError', 'DataOverflowError', 'BadDataError', 
+        'FieldMissingError', 'FieldSpecError', 'NonUnicodeError', 
+        'NotFoundError', 'DbfWarning', 'Eof', 'Bof', 'DoNotIndex', 
+        'FieldNameWarning', 
+        'CLOSED', 'READ_ONLY', 'READ_WRITE', 'IN_MEMORY', 'ON_DISK', 
+        'create_template', 'delete', 'field_names', 'is_deleted', 'recno', 
+        'reset', 'source_table', 'undelete', 'write', 'Process', 'Templates', 
+        'gather', 'scatter', 'scan', 'ensure_unicode', 'table_type', 
+        'add_fields', 'delete_fields', 'export', 'from_csv', 
+        'Char', 'Date', 'DateTime', 'Time', 'Logical', 'Quantum', 'Null', 
+        'NullDate', 'NullDateTime', 'NullTime', 'NullType', 'NoneType', 
+        'Vapor', 'Period', 'On', 'Off', 'Other', 'Truth', 'Falsth', 'Unknown', 
+        'pqlc', 
+        'Table', 'Record', 'List', 'Index', 'Relation', 'Iter', 'IndexLocation', 
+        'CodePage', 'FieldnameList', 'RecordTemplate', 
+        'Db3Table', 'ClpTable', 'FpTable', 'VfpTable', 
+        'RecordVaporWare', 
+        )

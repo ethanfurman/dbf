@@ -1,11 +1,15 @@
+*.bak
 *.pyc
+*.pyo
 *.xml
 *.sw?
 ~*
+.~*
 FoxPro.zip
 cc/
 clicketyclick/
 dbf/docs/
+dbf/__pycache__/
 dist/
 emptytemptable
 emptytemptable.dbt
@@ -22,4 +26,3 @@ test.fpt
 test_backup.dbf
 test_backup.fpt
 test_export.csv
-

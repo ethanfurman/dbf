@@ -5,7 +5,7 @@ from decimal import Decimal
 import sys
 
 __all__ = [
-        'bytes', 'str', 'basestring',
+        'bytes', 'str', 'unicode', 'basestring',
         'int', 'long', 'baseinteger', 'Decimal',
         'builtins', 'execute', 'ord', 'to_bytes',
         'py_ver',
@@ -16,6 +16,7 @@ py_ver = sys.version_info[:2]
 if py_ver < (3, 0):
     bytes = str
     str = unicode
+    unicode = unicode
     basestring = bytes, unicode
     int = int
     long = long
@@ -23,6 +24,7 @@ if py_ver < (3, 0):
     import __builtin__ as builtins
 else:
     bytes = bytes
+    str = str
     unicode = str
     basestring = unicode,
     int = int

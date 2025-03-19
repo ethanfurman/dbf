@@ -6,7 +6,7 @@ import sys
 
 __all__ = [
         'bytes', 'str', 'basestring',
-        'int', 'long', 'baseinteger',
+        'int', 'long', 'baseinteger', 'Decimal',
         'builtins', 'execute', 'ord', 'to_bytes',
         'py_ver',
         ]
@@ -17,6 +17,7 @@ if py_ver < (3, 0):
     bytes = str
     str = unicode
     basestring = bytes, unicode
+    int = int
     long = long
     baseinteger = int, long
     import __builtin__ as builtins
@@ -24,6 +25,7 @@ else:
     bytes = bytes
     unicode = str
     basestring = unicode,
+    int = int
     long = int
     baseinteger = int,
     xrange = range

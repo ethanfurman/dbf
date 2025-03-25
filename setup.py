@@ -21,7 +21,7 @@ make = []
 
 data = dict(
         name='dbf',
-        version='0.99.10a2',
+        version='0.99.10',
         license='BSD License',
         description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
         long_description=long_desc,

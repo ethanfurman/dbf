@@ -60,9 +60,4 @@ data = dict(
         )
 
 if __name__ == '__main__':
-    try:
-        setup(**data)
-    except UserWarning:
-        from setuptools import setup
-        setup(**data)
-
+    setup(**data)

@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dbf"
+version = "0.99.11a1"
+
+[metadata]
+description = "Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)"
+long_description = """
+Currently supports dBase III, Clipper, FoxPro, and Visual FoxPro tables. Text is returned as unicode, and codepage settings in tables are honored. Memos and Null fields are supported.  Documentation needs work, but author is very responsive to e-mails.
+
+Not supported: index files (but can create tempory non-file indexes), auto-incrementing fields, and Varchar fields.
+
+Installation:  `pip install dbf`
+"""
+readme = "README.md"
+authors = [
+    { name="Ethan Furman", email="ethan@stoneleaf.us" },
+]
+license = [ 'LICENSE', 'WHATSNEW' ]
+requires-python = ">=3.8"
+dependencies = [
+    "aenum",
+]
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: BSD License',
+    'Programming Language :: Python',
+    'Topic :: Database',
+    'Programming Language :: Python :: 2.7',
+    'Programming Language :: Python :: 3.3',
+    'Programming Language :: Python :: 3.4',
+    'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13'
+]
+
+[project.urls]
+Homepage = "https://github.com/ethanfurman/dbf"

@@ -46,3 +46,6 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/ethanfurman/dbf"
+
+[tools.setuptools]
+packages = ["dbf"]

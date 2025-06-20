@@ -5,8 +5,6 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dbf"
 version = "0.99.11a1"
-
-[metadata]
 description = "Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)"
 long_description = """
 Currently supports dBase III, Clipper, FoxPro, and Visual FoxPro tables. Text is returned as unicode, and codepage settings in tables are honored. Memos and Null fields are supported.  Documentation needs work, but author is very responsive to e-mails.

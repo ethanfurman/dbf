@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dbf"
+version = "0.99.11a1"
+description = "Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)"
+readme = "README.md"
+authors = [
+    { name="Ethan Furman", email="ethan@stoneleaf.us" },
+]
+license = 'BSD-3-Clause'
+license-files = [ 'LICENSE' ]
+requires-python = ">=2.7, >=3.5"
+dependencies = [
+    "aenum",
+]
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Developers',
+    'Programming Language :: Python',
+    'Topic :: Database',
+    'Programming Language :: Python :: 2.7',
+    'Programming Language :: Python :: 3.3',
+    'Programming Language :: Python :: 3.4',
+    'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
+    'Programming Language :: Python :: 3.7',
+    'Programming Language :: Python :: 3.8',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13'
+]
+
+[project.urls]
+Homepage = "https://github.com/ethanfurman/dbf"
+
+[tool.setuptools]
+packages = ["dbf"]

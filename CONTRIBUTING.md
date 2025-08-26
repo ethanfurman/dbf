@@ -3,7 +3,7 @@
 ## Backwards compatibility
 
 As of August 2025, `dbf` is still officially compatible with Python 2.7  
-(EOL: 2020) and Python 3.6+ (EOL: 2021).
+(EOL 2020) and Python 3.6+ (3.6 EOL 2021, 3.7 EOL 2023, 3.8 EOL 2024).
 
 The tooling used for building/packaging requires Python >= 3.7.
 

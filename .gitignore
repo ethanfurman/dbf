@@ -26,3 +26,5 @@ test.fpt
 test_backup.dbf
 test_backup.fpt
 test_export.csv
+toxrunner
+build

@@ -22,7 +22,7 @@ make = []
 data = dict(
         name='dbf',
         version='0.99.12a1',
-        license='BSD License',
+        license='BSD-3-Clause',
         description='Pure python package for reading/writing dBase, FoxPro, and Visual FoxPro .dbf files (including memos)',
         long_description=long_desc,
         url='https://github.com/ethanfurman/dbf',
@@ -34,7 +34,7 @@ data = dict(
         classifiers=[
             'Development Status :: 4 - Beta',
             'Intended Audience :: Developers',
-            'License :: OSI Approved :: BSD License',
+            'SPDX-License-Identifier :: BSD-3-Clause',
             'Programming Language :: Python',
             'Topic :: Database',
             'Programming Language :: Python :: 2.7',

@@ -61,6 +61,12 @@ class IsoDay(_IntEnum):
 
 @_export(_module)
 class RelativeDay(_Enum):
+    _order_ = (
+            'LAST_SUNDAY LAST_SATURDAY LAST_FRIDAY LAST_THURSDAY '
+            'LAST_WEDNESDAY LAST_TUESDAY LAST_MONDAY '
+            'NEXT_MONDAY NEXT_TUESDAY NEXT_WEDNESDAY NEXT_THURSDAY '
+            'NEXT_FRIDAY NEXT_SATURDAY NEXT_SUNDAY'
+            )
     LAST_SUNDAY = ()
     LAST_SATURDAY = ()
     LAST_FRIDAY = ()
@@ -162,6 +168,11 @@ class RelativeMonth(_Enum):
 
 @_export(_module)
 class LatinByte(_HexEnum):
+    _order_ = (
+            'NULL SOH STX ETX EOT ENQ ACK BEL BS TAB LF VT FF CR '
+            'SO SI DLE DC1 DC2 DC3 DC4 NAK SYN ETB CAN EM EOF SUB '
+            'ESC FS GS RS US SPACE ASTERISK'
+            )
     NULL = 0x00
     SOH = 0x01
     STX = 0x02
@@ -267,6 +278,7 @@ class FieldType(_IntEnum):
 
 @_export(_module)
 class FieldFlag(_IntFlag):
+    _order_ = 'SYSTEM NULLABLE BINARY NOCPTRANS'
     @classmethod
     def lookup(cls, alias):
         alias = alias.lower()

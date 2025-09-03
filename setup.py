@@ -34,7 +34,6 @@ data = dict(
         classifiers=[
             'Development Status :: 4 - Beta',
             'Intended Audience :: Developers',
-            'SPDX-License-Identifier :: BSD-3-Clause',
             'Programming Language :: Python',
             'Topic :: Database',
             'Programming Language :: Python :: 2.7',

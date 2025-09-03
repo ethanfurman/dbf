@@ -210,7 +210,7 @@ def first_record(table_name):
 
 def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fields=None,
         dbf_type='db3', memo_size=64, min_field_size=1,
-        encoding=None, errors=None):
+        encoding=None, errors=None, overwrite=False):
     """
     creates a Character table from a csv file
     to_disk will create a table with the same name
@@ -232,7 +232,7 @@ def from_csv(csvfile, to_disk=False, filename=None, field_names=None, extra_fiel
         else:
             filename = os.path.splitext(csvfile)[0]
         if to_disk:
-            csv_table = dbf.Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding)
+            csv_table = dbf.Table(filename, [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, overwrite=overwrite)
         else:
             csv_table = dbf.Table(':memory:', [field_names[0]], dbf_type=dbf_type, memo_size=memo_size, codepage=encoding, on_disk=False)
         csv_table.open(dbf.READ_WRITE)

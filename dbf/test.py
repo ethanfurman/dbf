@@ -2716,11 +2716,11 @@ class TestExceptions(TestCase):
         self.assertRaises(DbfError, table.append, dict(name='uh uh!'))
 
     def test_clipper(self):
-        Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp')
+        Table(os.path.join(tempdir, 'temptable'), 'name C(377); thesis C(20179)', dbf_type='clp', overwrite=True)
         self.assertRaises(BadDataError, Table, os.path.join(tempdir, 'temptable'))
 
     def test_data_overflow(self):
-        table = Table(os.path.join(tempdir, 'temptable'), 'mine C(2); yours C(15)')
+        table = Table(os.path.join(tempdir, 'temptable'), 'mine C(2); yours C(15)', overwrite=True)
         table.open(mode=READ_WRITE)
         table.append(('me',))
         try:
@@ -2739,6 +2739,7 @@ class TestExceptions(TestCase):
                 ' dist B',
                 dbf_type='vfp',
                 default_data_types='enhanced',
+                overwrite=True,
                 )
         table.open(mode=READ_WRITE)
         namelist = []
@@ -2816,7 +2817,7 @@ class TestDbfCreation(TestCase):
         fields = unicodify(['name C(25)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)'])
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3')
+                table = Table(os.path.join(tempdir, 'temptable'), ';'.join(fieldlist), dbf_type='db3', overwrite=True)
                 table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
@@ -2839,12 +2840,12 @@ class TestDbfCreation(TestCase):
 
     def test_clp_disk_tables(self):
         "clp table on disk"
-        table = Table(os.path.join(tempdir, 'temptable'), u'name C(377); thesis C(20179)', dbf_type='clp')
+        table = Table(os.path.join(tempdir, 'temptable'), u'name C(377); thesis C(20179)', dbf_type='clp', overwrite=True)
         self.assertEqual(table.record_length, 20557)
         fields = unicodify(['name C(10977)', 'hiredate D', 'male L', 'wisdom M', 'qty N(3,0)', 'weight F(7,3)'])
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(os.path.join(tempdir, 'temptable'), u';'.join(fieldlist), dbf_type='clp')
+                table = Table(os.path.join(tempdir, 'temptable'), u';'.join(fieldlist), dbf_type='clp', overwrite=True)
                 table = Table(os.path.join(tempdir, 'temptable'), dbf_type='clp')
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
@@ -2871,7 +2872,7 @@ class TestDbfCreation(TestCase):
                   'litres F(11,5)', 'blob G', 'graphic P', 'weight F(7,3)'])
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(os.path.join(tempdir, 'tempfp'), u';'.join(fieldlist), dbf_type='fp')
+                table = Table(os.path.join(tempdir, 'tempfp'), u';'.join(fieldlist), dbf_type='fp', overwrite=True)
                 table = Table(os.path.join(tempdir, 'tempfp'), dbf_type='fp')
                 actualFields = table.structure()
                 self.assertEqual(fieldlist, actualFields)
@@ -2898,34 +2899,34 @@ class TestDbfCreation(TestCase):
                   'weight F(7,3)'])
         for i in range(1, len(fields)+1):
             for fieldlist in combinate(fields, i):
-                table = Table(os.path.join(tempdir, 'tempvfp'), u';'.join(fieldlist), dbf_type='vfp')
+                table = Table(os.path.join(tempdir, 'tempvfp'), u';'.join(fieldlist), dbf_type='vfp', overwrite=True)
                 table = Table(os.path.join(tempdir, 'tempvfp'), dbf_type='vfp')
                 actualFields = table.structure()
                 fieldlist = [f.replace('nocptrans','BINARY') for f in fieldlist]
                 self.assertEqual(fieldlist, actualFields)
 
     def test_codepage(self):
-        table = Table(os.path.join(tempdir, 'tempvfp'), u'name C(25); male L; fired D NULL', dbf_type='vfp')
+        table = Table(os.path.join(tempdir, 'tempvfp'), u'name C(25); male L; fired D NULL', dbf_type='vfp', overwrite=True)
         table.close()
-        self.assertEqual(dbf.default_codepage, 'ascii')
-        self.assertEqual(table.codepage, dbf.CodePage('ascii'))
+        self.assertEqual(dbf.default_codepage, 'utf8')
+        self.assertEqual(table.codepage, dbf.CodePage('utf8'))
         table.close()
         table.open(mode=READ_WRITE)
         table.close()
-        table = Table(os.path.join(tempdir, 'tempvfp'), u'name C(25); male L; fired D NULL', dbf_type='vfp', codepage='cp850')
+        table = Table(os.path.join(tempdir, 'tempvfp'), u'name C(25); male L; fired D NULL', dbf_type='vfp', codepage='cp850', overwrite=True)
         table.close()
         self.assertEqual(table.codepage, dbf.CodePage('cp850'))
 
-        newtable = table.new('tempvfp2', codepage='cp437')
+        newtable = table.new('tempvfp2', codepage='cp437', overwrite=True)
         self.assertEqual(newtable.codepage, dbf.CodePage('cp437'))
         newtable.open(mode=READ_WRITE)
-        newtable.create_backup()
+        newtable.create_backup(overwrite=True)
         newtable.close()
         bckup = Table(os.path.join(tempdir, newtable.backup))
         self.assertEqual(bckup.codepage, newtable.codepage)
 
     def test_db3_ignore_memos(self):
-        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='db3').open(mode=READ_WRITE)
+        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='db3', overwrite=True).open(mode=READ_WRITE)
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='db3', ignore_memos=True)
@@ -2936,7 +2937,7 @@ class TestDbfCreation(TestCase):
             table.close()
 
     def test_fp_ignore_memos(self):
-        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='fp').open(mode=READ_WRITE)
+        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='fp', overwrite=True).open(mode=READ_WRITE)
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='fp', ignore_memos=True)
@@ -2947,7 +2948,7 @@ class TestDbfCreation(TestCase):
             table.close()
 
     def test_vfp_ignore_memos(self):
-        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='vfp').open(mode=READ_WRITE)
+        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='vfp', overwrite=True).open(mode=READ_WRITE)
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='vfp', ignore_memos=True)
@@ -2958,7 +2959,7 @@ class TestDbfCreation(TestCase):
             table.close()
 
     def test_clp_ignore_memos(self):
-        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='clp').open(mode=READ_WRITE)
+        table = Table(os.path.join(tempdir, 'tempdb3'), u'name C(25); wisdom M', dbf_type='clp', overwrite=True).open(mode=READ_WRITE)
         table.append(('QC Tester', 'check it twice!  check it thrice!  check it . . . uh . . . again!'))
         table.close()
         table = Table(os.path.join(tempdir, 'tempdb3'), dbf_type='clp', ignore_memos=True)
@@ -2977,6 +2978,7 @@ class TestDbfRecords(TestCase):
                 os.path.join(tempdir, 'dbf_table'),
                 u'name C(25); paid L; qty N(11,5); orderdate D; desc M',
                 dbf_type='db3',
+                overwrite=True,
                 )
         self.vfp_table = Table(
                 os.path.join(tempdir, 'vfp_table'),
@@ -2985,11 +2987,13 @@ class TestDbfRecords(TestCase):
                 u' dist B',
                 dbf_type='vfp',
                 default_data_types='enhanced',
+                overwrite=True,
                 )
         self.null_vfp_table = null_table = Table(
                 os.path.join(tempdir, 'null_vfp_table'),
                 'first C(25) null; last C(25); height N(3,1) null; age N(3,0); life_story M null; plans M',
                 dbf_type='vfp',
+                overwrite=True,
                 )
         null_table.open(dbf.READ_WRITE)
         null_table.append()
@@ -3525,6 +3529,7 @@ class TestDbfRecords(TestCase):
             self.vfp_table.filename,
             'name C(50); age N(3,0)',
             dbf_type='vfp',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         def _50(text):
@@ -3556,6 +3561,7 @@ class TestDbfRecords(TestCase):
             self.vfp_table.filename,
             'name C(50); age N(3,0); fired D NULL',
             dbf_type='vfp',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         def _50(text):
@@ -3586,6 +3592,7 @@ class TestDbfRecords(TestCase):
             self.vfp_table.filename,
             'name C(50); age N(3,0); fired D NULL',
             dbf_type='vfp',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         def _50(text):
@@ -3621,6 +3628,7 @@ class TestDbfRecords(TestCase):
             self.vfp_table.filename,
             'name C(50); age N(3,0); fired D NULL',
             dbf_type='vfp',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         def _50(text):
@@ -3781,12 +3789,14 @@ class TestDbfRecordTemplates(TestCase):
                 os.path.join(tempdir, 'dbf_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M',
                 dbf_type='db3',
+                overwrite=True,
                 )
         self.vfp_table = Table(
                 os.path.join(tempdir, 'vfp_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;' +
                 ' weight F(18,3); age I; meeting T; misc G; photo P; price Y',
                 dbf_type='vfp',
+                overwrite=True,
                 )
 
     def tearDown(self):
@@ -3829,11 +3839,13 @@ class TestDbfFunctions(TestCase):
         "create a dbf and vfp table"
         self.empty_dbf_table = Table(
             os.path.join(tempdir, 'emptytemptable'),
-            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3',
+            overwrite=True,
             )
         self.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
-            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         namelist = self.dbf_namelist = []
@@ -3862,6 +3874,7 @@ class TestDbfFunctions(TestCase):
                 ' dist B BINARY; atom I BINARY; wealth Y BINARY;'
                 ,
                 dbf_type='vfp',
+                overwrite=True,
                 )
         self.odd_memo_vfp_table = Table(
                 os.path.join(tempdir, 'emptytempvfp'),
@@ -3871,6 +3884,7 @@ class TestDbfFunctions(TestCase):
                 ,
                 dbf_type='vfp',
                 memo_size=48,
+                overwrite=True,
                 )
         self.vfp_table = table = Table(
                 os.path.join(tempdir, 'tempvfp'),
@@ -3879,6 +3893,7 @@ class TestDbfFunctions(TestCase):
                 ' dist B BINARY; atom I BINARY; wealth Y BINARY;'
                 ,
                 dbf_type='vfp',
+                overwrite=True,
                 )
         table.open(mode=READ_WRITE)
         namelist = self.vfp_namelist = []
@@ -4249,7 +4264,7 @@ class TestDbfFunctions(TestCase):
 
         # check that deletes were saved to disk..
         table.close()
-        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3')
+        table = Table(os.path.join(tempdir, 'temptable'), dbf_type='db3', overwrite=True)
         table.open(mode=READ_WRITE)
         active_records = table.create_index(active)
         i = 0
@@ -4390,7 +4405,7 @@ class TestDbfFunctions(TestCase):
         "scattering and gathering fields, and new()"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        table2 = table.new(os.path.join(tempdir, 'temptable2'))
+        table2 = table.new(os.path.join(tempdir, 'temptable2'), overwrite=True)
         table2.open(mode=READ_WRITE)
         for record in table:
             table2.append()
@@ -4451,7 +4466,7 @@ class TestDbfFunctions(TestCase):
         "kamikaze"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        table2 = table.new(os.path.join(tempdir, 'temptable2'))
+        table2 = table.new(os.path.join(tempdir, 'temptable2'), overwrite=True)
         table2.open(mode=READ_WRITE)
         for record in table:
             table2.append(record)
@@ -4490,7 +4505,7 @@ class TestDbfFunctions(TestCase):
         "multiple append"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        table2 = table.new(os.path.join(tempdir, 'temptable2'))
+        table2 = table.new(os.path.join(tempdir, 'temptable2'), overwrite=True)
         table2.open(mode=READ_WRITE)
         record = table.next_record
         table2.append(dbf.scatter(record), multiple=100)
@@ -4504,7 +4519,7 @@ class TestDbfFunctions(TestCase):
             for field in dbf.field_names(record):
                 self.assertEqual(record[field], samerecord[field])
         table2.close()
-        table3 = table.new(os.path.join(tempdir, 'temptable3'))
+        table3 = table.new(os.path.join(tempdir, 'temptable3'), overwrite=True)
         table3.open(mode=READ_WRITE)
         record = table.next_record
         table3.append(record, multiple=100)
@@ -4566,7 +4581,7 @@ class TestDbfFunctions(TestCase):
         dbf.write(table[0], motto='Are we there yet??')
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
-        table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='db3')
+        table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='db3', overwrite=True)
         table.open(mode=READ_WRITE)
         table.append(('user', 0))
         table.close()
@@ -4582,7 +4597,7 @@ class TestDbfFunctions(TestCase):
         table.open(mode=READ_WRITE)
         self.assertEqual(table[0].motto, 'Are we there yet??')
         table.close()
-        table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='vfp')
+        table = Table(os.path.join(tempdir, 'temptable4'), 'name C(50); age N(3,0)', dbf_type='vfp', overwrite=True)
         table.open(mode=READ_WRITE)
         table.append(('user', 0))
         table.close()
@@ -4622,7 +4637,7 @@ class TestDbfFunctions(TestCase):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]), csvtable[i][j])
         csvtable.close()
-        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['field1','field2'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'), overwrite=True)
         csvtable.open(mode=READ_WRITE)
         for i in index(table):
             for j in index(table.field_names):
@@ -4634,7 +4649,7 @@ class TestDbfFunctions(TestCase):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]), csvtable[i][j])
         csvtable.close()
-        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), extra_fields=['count N(5,0)','id C(10)'], to_disk=True, filename=os.path.join(tempdir, 'temptable5'), overwrite=True)
         csvtable.open(mode=READ_WRITE)
         for i in index(table):
             for j in index(table.field_names):
@@ -4646,7 +4661,7 @@ class TestDbfFunctions(TestCase):
             for j in index(table.field_names):
                 self.assertEqual(str(table[i][j]), csvtable[i][j])
         csvtable.close()
-        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'))
+        csvtable = dbf.from_csv(os.path.join(tempdir, 'temptable.csv'), field_names=['name','qty','paid','desc'], extra_fields='test1 C(15);test2 L'.split(';'), to_disk=True, filename=os.path.join(tempdir, 'temptable5'), overwrite=True)
         csvtable.open(mode=READ_WRITE)
         for i in index(table):
             for j in index(table.field_names):
@@ -4673,14 +4688,14 @@ class TestDbfFunctions(TestCase):
 
     def test_memos_after_close(self):
         "memos available after close/open"
-        table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
+        table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char), overwrite=True)
         table.open(mode=READ_WRITE)
         table.append(('Author','dashing, debonair, delightful'))
         table.close()
         table.open(mode=READ_WRITE)
         self.assertEqual(tuple(table[0]), ('Author','dashing, debonair, delightful'))
         table.close()
-        table2 = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3')
+        table2 = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', overwrite=True)
         table2.open(mode=READ_WRITE)
         table2.append(('Benedict', 'brilliant, bombastic, bothered'))
         table2.close()
@@ -4691,7 +4706,7 @@ class TestDbfFunctions(TestCase):
 
     def test_field_type(self):
         "table.type(field) == ('C', Char)"
-        table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char))
+        table = dbf.Table('tempy', 'name C(20); desc M', dbf_type='db3', default_data_types=dict(C=Char), overwrite=True)
         table.open(mode=READ_WRITE)
         field_info = table.field_info('name')
         self.assertEqual(field_info, (FieldType.CHAR, 20, 0, Char))
@@ -4705,7 +4720,7 @@ class TestDbfFunctions(TestCase):
         "memo fields accessible after .backup()"
         table = self.dbf_table
         table.open(mode=READ_WRITE)
-        table.create_backup()
+        table.create_backup(overwrite=True)
         backup = dbf.Table(table.backup)
         backup.open(mode=READ_WRITE)
         desclist = self.dbf_desclist
@@ -4721,7 +4736,7 @@ class TestDbfFunctions(TestCase):
     def test_memo_file_size_after_backup(self):
         table = self.odd_memo_vfp_table
         table.open(mode=READ_ONLY)
-        table.create_backup()
+        table.create_backup(overwrite=True)
         table.close()
         backup = dbf.Table(table.backup)
         self.assertEqual(backup._meta.memo_size, table._meta.memo_size)
@@ -4841,7 +4856,8 @@ class TestDbfNavigation(TestCase):
         "create a dbf and vfp table"
         self.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
-            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         namelist = self.dbf_namelist = []
@@ -4868,6 +4884,7 @@ class TestDbfNavigation(TestCase):
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
                 ' weight F(18,3); age I; meeting T; misc G; photo P',
                 dbf_type='vfp',
+                overwrite=True,
                 )
         table.open(mode=READ_WRITE)
         namelist = self.vfp_namelist = []
@@ -5140,7 +5157,8 @@ class TestDbfLists(TestCase):
         "create a dbf table"
         self.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
-            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         records = []
@@ -5436,7 +5454,8 @@ class TestReadWriteDefaultOpen(TestCase):
         "create a dbf table"
         self.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
-            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3',
+            overwrite=True,
             )
         table.open(READ_WRITE)
         table.append(('Rose Petals', True, 115, Date(2018, 2, 14), 'lightly scented, pink & red'))
@@ -5489,21 +5508,25 @@ class TestMisc(TestCase):
                 os.path.join(tempdir, 'dbf_table.'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M',
                 dbf_type='db3',
+                overwrite=True,
                 )
         self.table_dbf = Table(
                 os.path.join(tempdir, 'dbf_table.dbf'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M',
                 dbf_type='db3',
+                overwrite=True,
                 )
         self.table_implicit = Table(
                 os.path.join(tempdir, 'dbf_table'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M',
                 dbf_type='db3',
+                overwrite=True,
                 )
         self.table_wierd = Table(
                 os.path.join(tempdir, 'dbf_table.blah'),
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M',
                 dbf_type='db3',
+                overwrite=True,
                 )
         self.table.close()
         self.table_dbf.close()
@@ -5528,7 +5551,8 @@ class TestWhatever(TestCase):
         "create a dbf and vfp table"
         self.dbf_table = table = Table(
             os.path.join(tempdir, 'temptable'),
-            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3'
+            'name C(25); paid L; qty N(11,5); orderdate D; desc M', dbf_type='db3',
+            overwrite=True,
             )
         table.open(mode=READ_WRITE)
         namelist = self.dbf_namelist = []
@@ -5555,6 +5579,7 @@ class TestWhatever(TestCase):
                 'name C(25); paid L; qty N(11,5); orderdate D; desc M; mass B;'
                 ' weight F(18,3); age I; meeting T; misc G; photo P',
                 dbf_type='vfp',
+                overwrite=True,
                 )
         table.open(mode=READ_WRITE)
         namelist = self.vfp_namelist = []

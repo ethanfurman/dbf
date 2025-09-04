@@ -3257,7 +3257,7 @@ class Table(_Navigation):
 
     def __init__(self, filename, field_specs=None, memo_size=128, ignore_memos=False,
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
-                 dbf_type=None, on_disk=True, unicode_errors='strict'
+                 dbf_type=None, on_disk=True, unicode_errors='strict', overwrite=False,
                  ):
         """
         open/create dbf file
@@ -3364,6 +3364,8 @@ class Table(_Navigation):
             self._meta.codepage = sd
             self._meta.decoder, self._meta.encoder = unicode_error_handler(codecs.getdecoder(sd), codecs.getencoder(sd), unicode_errors)
         if field_specs:
+            if on_disk and os.path.exists(meta.filename) and not overwrite:
+                raise DbfError("file %r already exists; use overwrite=True to replace it" % meta.filename)
             meta.status = READ_WRITE
             if meta.location == ON_DISK:
                 meta.dfd = open(meta.filename, 'w+b')
@@ -3446,7 +3448,7 @@ class Table(_Navigation):
 
     def __new__(cls, filename, field_specs=None, memo_size=128, ignore_memos=False,
                  codepage=None, default_data_types=None, field_data_types=None,    # e.g. 'name':str, 'age':float
-                 dbf_type=None, on_disk=True, unicode_errors='strict',
+                 dbf_type=None, on_disk=True, unicode_errors='strict', overwrite=False,
                  ):
         if dbf_type is None and isinstance(filename, Table):
             return filename
@@ -3635,7 +3637,7 @@ class Table(_Navigation):
                     )
         old_table = None
         if self:
-            old_table = self.create_backup()
+            old_table = self.create_backup(overwrite=True)
             self.zap()
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
@@ -3823,7 +3825,7 @@ class Table(_Navigation):
                 self._meta.dfd = None
         self._meta.status = CLOSED
 
-    def create_backup(self, new_name=None, on_disk=None):
+    def create_backup(self, new_name=None, on_disk=None, overwrite=False):
         """
         creates a backup table
         """
@@ -3847,6 +3849,7 @@ class Table(_Navigation):
                 codepage=self.codepage.name,
                 dbf_type=self._versionabbr,
                 on_disk=on_disk,
+                overwrite=overwrite,
                 )
         # use same encoder/decoder as current table, which may have been overridden
         bkup._meta.encoder = self._meta.encoder
@@ -3890,7 +3893,7 @@ class Table(_Navigation):
                 raise DbfError("field %s not in table -- delete aborted" % victim)
         old_table = None
         if self:
-            old_table = self.create_backup()
+            old_table = self.create_backup(overwrite=True)
             self.zap()
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
@@ -3937,7 +3940,7 @@ class Table(_Navigation):
             raise FieldMissingError(', '.join(missing))
         old_table = None
         if self:
-            old_table = self.create_backup()
+            old_table = self.create_backup(overwrite=True)
             self.zap()
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
@@ -3988,7 +3991,7 @@ class Table(_Navigation):
         else:
             raise NotFoundError("dbf.Table.index(x): x not in table", data=record)
 
-    def new(self, filename, field_specs=None, memo_size=None, ignore_memos=None, codepage=None, default_data_types=None, field_data_types=None, on_disk=True):
+    def new(self, filename, field_specs=None, memo_size=None, ignore_memos=None, codepage=None, default_data_types=None, field_data_types=None, on_disk=True, overwrite=False):
         """
         returns a new table of the same type
         """
@@ -4010,7 +4013,7 @@ class Table(_Navigation):
             default_data_types = self._meta._default_data_types
         if field_data_types is None:
             field_data_types = self._meta._field_data_types
-        return Table(filename, field_specs, memo_size, ignore_memos, codepage, default_data_types, field_data_types, dbf_type=self._versionabbr, on_disk=on_disk)
+        return Table(filename, field_specs, memo_size, ignore_memos, codepage, default_data_types, field_data_types, dbf_type=self._versionabbr, on_disk=on_disk, overwrite=overwrite)
 
     def nullable_field(self, field):
         """
@@ -4121,7 +4124,7 @@ class Table(_Navigation):
         if meta.status != READ_WRITE:
             raise DbfError('%s not in read/write mode, unable to change field names' % meta.filename)
         if self:
-            self.create_backup()
+            self.create_backup(overwrite=True)
         if not oldname in self._meta.user_fields:
             raise FieldMissingError("field --%s-- does not exist -- cannot rename it." % oldname)
         if newname[0] == '_' or newname[0].isdigit() or not newname.replace('_', '').isalnum():
@@ -4157,7 +4160,7 @@ class Table(_Navigation):
                 raise DbfError("field %s is not Character -- resize aborted" % candidate)
         old_table = None
         if self:
-            old_table = self.create_backup()
+            old_table = self.create_backup(overwrite=True)
             self.zap()
         if meta.mfd is not None and not meta.ignorememos:
             meta.mfd.close()
@@ -5383,7 +5386,7 @@ version_map = {
         0xf5 : 'FoxPro w/memos'}
 
 code_pages = {
-        0x00 : ('ascii', "plain ol' ascii"),
+        0x00 : ('utf8', "ascii interpreted as utf8"),
         0x01 : ('cp437', 'U.S. MS-DOS'),
         0x02 : ('cp850', 'International MS-DOS'),
         0x03 : ('cp1252', 'Windows ANSI'),

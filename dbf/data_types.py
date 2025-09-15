@@ -1849,4 +1849,3 @@ Marshaller.dispatch[DateTime] = lambda s, dt, w: w(
         '</dateTime.iso8601></value>\n'
             % dt.utctimetuple()[:6])
 del Marshaller
-

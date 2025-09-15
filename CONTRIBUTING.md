@@ -2,7 +2,7 @@
 
 ## Backwards compatibility
 
-As of August 2025, `dbf` is still officially compatible with Python 2.7  
+As of August 2025, `dbf` is still officially compatible with Python 2.7
 (EOL 2020) and Python 3.6+ (3.6 EOL 2021, 3.7 EOL 2023, 3.8 EOL 2024).
 
 The tooling used for building/packaging requires Python >= 3.7.
@@ -85,4 +85,27 @@ To run all environments/targets:
 
 ```bash
 tox
+```
+
+## pre-commit
+
+The repo contains a file `.pre-commit-config.yaml`, which defines
+a number of code quality and code style checks.
+
+To install pre-commit:
+
+```bash
+pip install pre-commit
+```
+
+To run manually:
+
+```bash
+pre-commit run --all-files
+```
+
+Its possible to set up git to run pre-commit before any commit, by using:
+
+```bash
+pre-commit install
 ```

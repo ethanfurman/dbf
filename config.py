@@ -14,5 +14,3 @@ default_codepage = 'ascii'
 default_type = 'db3'
 
 temp_dir = os.environ.get("DBF_TEMP") or os.environ.get("TMP") or os.environ.get("TEMP") or ""
-
-

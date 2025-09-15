@@ -327,5 +327,3 @@ class DbfStatus(_ZeroEnum):
     CLOSED = 'closed (only meta information available)'
     READ_ONLY = 'read-only'
     READ_WRITE = 'read-write'
-
-

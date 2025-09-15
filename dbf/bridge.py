@@ -80,4 +80,3 @@ else:
             return data.tobytes()
         else:
             return bytes(data)
-

@@ -558,4 +558,3 @@ def scatter(record, as_type=create_template, _mappings=getattr(collections, 'Map
         return as_type(zip(field_names(record), record))
     else:
         return as_type(record)
-

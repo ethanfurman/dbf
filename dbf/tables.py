@@ -513,7 +513,7 @@ class Record(object):
             if kamikaze:
                 record._data = array('B', kamikaze)
         else:
-            raise BadDataError("%r recieved for record data" % kamikaze)
+            raise BadDataError("%r received for record data" % kamikaze)
         if record._data[0] == NULL:
             record._data[0] = SPACE
         if record._data[0] not in (SPACE, ASTERISK):
@@ -607,7 +607,7 @@ class Record(object):
                 if start not in names or stop not in names:
                     raise FieldMissingError("Either %r or %r (or both) are not valid field names" % (start, stop))
                 if step is not None and not isinstance(step, baseinteger):
-                    raise DbfError("step value must be an intger, not %r" % type(step))
+                    raise DbfError("step value must be an integer, not %r" % type(step))
                 start = names.index(start)
                 stop = names.index(stop) + 1
                 item = slice(start, stop, step)
@@ -692,7 +692,7 @@ class Record(object):
 
     def _commit_flux(self):
         """
-        stores field updates to disk; if any errors restores previous contents and propogates exception
+        stores field updates to disk; if any errors restores previous contents and propagates exception
         """
         if self._write_to_disk:
             raise DbfError("record not in flux")
@@ -1837,7 +1837,7 @@ def retrieve_clp_timestamp(bytes, fielddef, *ignore):
     """
     returns the timestamp stored in bytes
     """
-    # First long repesents date and second long time.
+    # First long represents date and second long time.
     # Date is the number of days since January 1st, 4713 BC.
     # Time is hours * 3600000L + minutes * 60000L + seconds * 1000L
     # http://www.manmrk.net/tutorials/database/xbase/data_types.html
@@ -2737,7 +2737,7 @@ class Table(_Navigation):
 
     class _Indexen(object):
         """
-        implements the weakref structure for seperate indexes
+        implements the weakref structure for separate indexes
         """
 
         def __init__(self):

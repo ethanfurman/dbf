@@ -125,5 +125,3 @@ class DoNotIndex(DbfWarning):
 
 class FieldNameWarning(UserWarning):
     message = 'non-standard characters in field name'
-
-

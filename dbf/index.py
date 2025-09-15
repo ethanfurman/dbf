@@ -355,6 +355,3 @@ class Idx(object):
             if prev_node is None:
                 return
             node = self.read_node(prev_node)
-
-
-

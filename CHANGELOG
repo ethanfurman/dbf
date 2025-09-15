@@ -216,7 +216,7 @@ Add .fromfloat() to Time
 
 Add .tofloat() to Time
 
-Add Period for matching various time periods 
+Add Period for matching various time periods
 
 
 0.95.006
@@ -443,7 +443,7 @@ can be used to get dicts (or tuples, lists, whatever)
 
 0.92.002
 --------
-    added more support for the Null type in the other custome data types
+    added more support for the Null type in the other custom data types
 
 
 0.91.001
